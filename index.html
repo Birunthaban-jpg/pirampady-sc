@@ -1,0 +1,1439 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Pirampady SC Subscriptions</title>
+<meta name="description" content="Monthly subscription register for Pirampady Sports Club. Works offline and saves on this device.">
+<meta name="theme-color" content="#6B3A00">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Pirampady SC">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" sizes="32x32" href="icons/favicon-32.png">
+<link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
+<style>
+@font-face { font-family: "Barlow"; font-weight: 400; font-style: normal; font-display: swap; src: url("fonts/barlow-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 500; font-style: normal; font-display: swap; src: url("fonts/barlow-latin-500-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 600; font-style: normal; font-display: swap; src: url("fonts/barlow-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow"; font-weight: 700; font-style: normal; font-display: swap; src: url("fonts/barlow-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Condensed"; font-weight: 600; font-style: normal; font-display: swap; src: url("fonts/barlow-condensed-latin-600-normal.woff2") format("woff2"); }
+@font-face { font-family: "Barlow Condensed"; font-weight: 700; font-style: normal; font-display: swap; src: url("fonts/barlow-condensed-latin-700-normal.woff2") format("woff2"); }
+/* Layout: club header → year totals → Month (collect) / Whole year (sheet) views; dialogs become bottom sheets on phones. */
+:root {
+  --bg: #F6F3EF; --surface: #FFFFFF; --surface-2: #FBF8F4; --ink: #1F1A15; --muted: #6C6359;
+  --line: #E6DED4; --line-strong: #CFC1B0;
+  --brand: #6B3A00; --brand-ink: #FFFFFF; --brand-soft: #F4E9DB; --gold: #E9A800;
+  --ok: #1D7A3D; --ok-bg: #E2F2E6; --warn: #985600; --warn-bg: #FCEED4;
+  --adv: #1D5DA6; --adv-bg: #E2ECF8; --due: #B0281F; --due-bg: #FBEAE7;
+  --scrim: rgba(28, 16, 4, .45);
+  --shadow: 0 1px 2px rgba(70, 40, 10, .06), 0 6px 20px rgba(70, 40, 10, .06);
+  --f-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
+  --f-body: "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+@media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) {
+  --bg: #14100C; --surface: #1E1813; --surface-2: #241D17; --ink: #F1EAE2; --muted: #A99E92;
+  --line: #352B22; --line-strong: #4C3F33;
+  --brand: #D9964A; --brand-ink: #1A1108; --brand-soft: #33251A; --gold: #F2C230;
+  --ok: #63C485; --ok-bg: #16301F; --warn: #F0B04A; --warn-bg: #3A2A10;
+  --adv: #82B4F0; --adv-bg: #152842; --due: #F28B82; --due-bg: #3D1B18;
+  --scrim: rgba(0, 0, 0, .6);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 20px rgba(0, 0, 0, .25);
+  color-scheme: dark;
+} }
+@media (prefers-color-scheme: dark) { html { color-scheme: dark; } }
+:root[data-theme="dark"] {
+  --bg: #14100C; --surface: #1E1813; --surface-2: #241D17; --ink: #F1EAE2; --muted: #A99E92;
+  --line: #352B22; --line-strong: #4C3F33;
+  --brand: #D9964A; --brand-ink: #1A1108; --brand-soft: #33251A; --gold: #F2C230;
+  --ok: #63C485; --ok-bg: #16301F; --warn: #F0B04A; --warn-bg: #3A2A10;
+  --adv: #82B4F0; --adv-bg: #152842; --due: #F28B82; --due-bg: #3D1B18;
+  --scrim: rgba(0, 0, 0, .6);
+  --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 20px rgba(0, 0, 0, .25);
+  color-scheme: dark;
+}
+
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; color-scheme: light; }
+body { margin: 0; min-height: 100vh; }
+img { max-width: 100%; }
+.vh { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+.nag { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 12px 10px 14px; border-radius: 12px; background: var(--warn-bg); color: var(--warn); font-weight: 600; font-size: 14px; }
+.nag .btn { height: 36px; }
+.bakbox { display: grid; gap: 10px; padding: 12px; border-radius: 12px; background: var(--brand-soft); font-size: 14px; }
+.bakbox p { margin: 0; }
+.bakbox .inrow .btn { flex: 1; }
+label.btn { cursor: pointer; }
+[hidden] { display: none !important; }
+body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.4; }
+button, input, select { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: default; }
+:focus-visible { outline: 2px solid var(--gold); outline-offset: 2px; }
+.num { font-variant-numeric: tabular-nums; }
+
+.app {
+  max-width: 1240px; margin: 0 auto; display: grid; gap: 16px;
+  padding-top: calc(14px + env(safe-area-inset-top, 0px));
+  padding-bottom: calc(56px + env(safe-area-inset-bottom, 0px));
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+}
+.app > *, main > * { min-width: 0; }
+.app { overflow-x: clip; }
+
+/* Header */
+.top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px 20px; }
+.brand { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.brand img { width: 58px; height: auto; border-radius: 8px; background: #fff; flex: none; }
+.brand h1 { margin: 0; font-family: var(--f-display); font-weight: 700; font-size: 26px; line-height: 1.05; letter-spacing: .02em; text-transform: uppercase; color: var(--brand); text-wrap: balance; }
+.brand p { margin: 2px 0 0; color: var(--muted); font-size: 14px; }
+.top-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.yearstep { display: inline-flex; align-items: center; border: 1px solid var(--line-strong); border-radius: 12px; background: var(--surface); overflow: hidden; }
+.yearstep button { width: 40px; height: 42px; border: 0; background: none; font-size: 20px; color: var(--muted); }
+.yearstep button:hover { background: var(--surface-2); color: var(--ink); }
+.yearstep span { min-width: 64px; text-align: center; font-family: var(--f-display); font-weight: 700; font-size: 22px; color: var(--brand); }
+
+.btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; height: 42px; padding: 0 16px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--surface); font-weight: 600; font-size: 15px; white-space: nowrap; }
+.btn:hover { background: var(--surface-2); }
+.btn.primary { background: var(--brand); color: var(--brand-ink); border-color: transparent; }
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.ghost { background: transparent; }
+.btn.big { height: 52px; font-size: 17px; width: 100%; }
+.btn.danger { color: var(--due); border-color: transparent; background: transparent; padding: 0 4px; }
+.btn[aria-busy="true"] { opacity: .7; }
+.btn svg { width: 18px; height: 18px; flex: none; }
+
+/* Totals */
+.stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; }
+.stat { background: var(--surface); border: 1px solid var(--line); border-radius: 14px; padding: 14px 16px; display: grid; gap: 2px; min-width: 0; }
+.stat .lbl { font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--muted); }
+.stat strong { font-family: var(--f-display); font-weight: 700; font-size: 30px; line-height: 1.1; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.stat .sub { font-size: 13px; color: var(--muted); }
+.stat.is-due strong { color: var(--due); }
+.stat.is-bal strong { color: var(--brand); }
+
+/* Toolbar */
+.toolbar { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 10px; }
+.seg { display: inline-flex; padding: 3px; gap: 3px; background: var(--brand-soft); border-radius: 12px; }
+.seg button { border: 0; background: transparent; height: 38px; padding: 0 16px; border-radius: 9px; font-weight: 600; color: var(--muted); }
+.seg button[aria-selected="true"] { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+.tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.chip-ro { font-size: 13px; font-weight: 600; color: var(--muted); border: 1px dashed var(--line-strong); border-radius: 999px; padding: 4px 10px; }
+
+.card { background: var(--surface); border: 1px solid var(--line); border-radius: 16px; }
+.notice { padding: 28px 20px; text-align: center; color: var(--muted); }
+.notice h2 { margin: 0 0 6px; color: var(--ink); font-size: 18px; }
+
+/* Month view */
+.months { position: relative; display: flex; gap: 6px; overflow-x: auto; padding: 2px 2px 6px; scroll-snap-type: x proximity; scrollbar-width: thin; }
+.mchip { flex: none; scroll-snap-align: start; min-width: 62px; padding: 7px 10px 6px; border-radius: 12px; border: 1px solid var(--line); background: var(--surface); display: grid; justify-items: center; gap: 1px; }
+.mchip b { font-weight: 700; font-size: 15px; }
+.mchip small { font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.mchip.is-now { border-color: var(--gold); }
+.mchip[aria-pressed="true"] { background: var(--brand); border-color: var(--brand); color: var(--brand-ink); }
+.mchip[aria-pressed="true"] small { color: inherit; opacity: .85; }
+.mchip .bar { width: 100%; height: 3px; border-radius: 3px; background: var(--line); overflow: hidden; margin-top: 3px; }
+.mchip .bar i { display: block; height: 100%; background: var(--ok); }
+.mchip[aria-pressed="true"] .bar { background: rgba(255,255,255,.3); }
+.mchip[aria-pressed="true"] .bar i { background: var(--brand-ink); }
+
+.msum { padding: 16px; display: grid; gap: 14px; }
+.msum-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+.msum-head h2 { margin: 0; font-family: var(--f-display); font-size: 26px; font-weight: 700; }
+.msum-head span { color: var(--muted); font-weight: 600; }
+.figs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.fig { background: var(--surface-2); border-radius: 12px; padding: 10px 12px; min-width: 0; }
+.fig span { display: block; font-size: 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .05em; }
+.fig b { display: block; font-family: var(--f-display); font-size: 22px; font-variant-numeric: tabular-nums; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.elec-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 12px; }
+.elec-row p { margin: 0; font-size: 14px; }
+.elec-row p b { font-variant-numeric: tabular-nums; }
+
+.filter { display: flex; gap: 6px; flex-wrap: wrap; }
+.filter button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; height: 34px; padding: 0 14px; font-weight: 600; font-size: 14px; color: var(--muted); }
+.filter button[aria-pressed="true"] { border-color: var(--ink); color: var(--ink); }
+
+.mlist { list-style: none; margin: 0; padding: 0; }
+.mlist li { display: flex; align-items: center; gap: 8px; border-top: 1px solid var(--line); padding: 4px 10px 4px 4px; }
+.mlist li:first-child { border-top: 0; }
+.mrow { flex: 1; min-width: 0; display: grid; grid-template-columns: 32px minmax(0, 1fr) auto; align-items: center; gap: 8px; min-height: 52px; border: 0; background: none; text-align: left; padding: 4px 6px; border-radius: 10px; }
+.mrow:hover:not(:disabled) { background: var(--surface-2); }
+.mrow .no { color: var(--muted); font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
+.mrow .nm { font-weight: 600; font-size: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mrow .nm small { font-weight: 500; color: var(--muted); font-size: 12px; margin-left: 4px; }
+.pill { font-size: 13px; font-weight: 600; padding: 4px 10px; border-radius: 999px; white-space: nowrap; font-variant-numeric: tabular-nums; }
+.pill.ok { background: var(--ok-bg); color: var(--ok); }
+.pill.warn { background: var(--warn-bg); color: var(--warn); }
+.pill.adv { background: var(--adv-bg); color: var(--adv); }
+.pill.due { background: var(--due-bg); color: var(--due); }
+.pill.off { color: var(--muted); }
+.quick { flex: none; height: 40px; padding: 0 12px; border-radius: 10px; border: 1.5px solid var(--ok); color: var(--ok); background: transparent; font-weight: 700; font-size: 14px; white-space: nowrap; }
+.quick:hover { background: var(--ok-bg); }
+.quick.rest { border-color: var(--warn); color: var(--warn); }
+.quick.rest:hover { background: var(--warn-bg); }
+.empty-filter { padding: 20px; text-align: center; color: var(--muted); }
+
+/* Whole-year sheet */
+.sheet-wrap { position: relative; overflow-x: auto; border-radius: 16px; }
+.sheet { border-collapse: separate; border-spacing: 0; width: 100%; font-size: 14px; font-variant-numeric: tabular-nums; }
+.sheet th, .sheet td { border-bottom: 1px solid var(--line); padding: 0; text-align: center; }
+.sheet thead th { background: var(--brand); color: var(--brand-ink); font-weight: 600; font-size: 13px; height: 40px; padding: 0 4px; position: relative; }
+.sheet thead th:first-child { border-top-left-radius: 15px; }
+.sheet thead th:last-child { border-top-right-radius: 15px; }
+.sheet thead th.is-now::after { content: ""; position: absolute; left: 6px; right: 6px; bottom: 4px; height: 3px; border-radius: 3px; background: var(--gold); }
+.sheet .c-no { width: 36px; color: var(--muted); font-size: 12px; }
+.sheet thead .c-no { color: inherit; }
+.sheet .c-name { text-align: left; padding: 0 10px; min-width: 150px; font-weight: 600; white-space: nowrap; position: sticky; left: 0; z-index: 1; background: var(--surface); border-right: 1px solid var(--line); }
+.sheet thead .c-name { background: var(--brand); z-index: 2; }
+.sheet .c-name small { color: var(--muted); font-weight: 500; margin-left: 4px; }
+.sheet td.mc { min-width: 50px; padding: 3px; }
+.cellbtn { width: 100%; height: 34px; border: 0; border-radius: 8px; background: transparent; font-weight: 600; font-size: 13px; }
+.cellbtn:hover:not(:disabled) { outline: 1.5px solid var(--line-strong); }
+.cellbtn.ok { color: var(--ok); background: var(--ok-bg); font-size: 16px; }
+.cellbtn.warn { color: var(--warn); background: var(--warn-bg); }
+.cellbtn.adv { color: var(--adv); background: var(--adv-bg); }
+.cellbtn.due { background: var(--due-bg); }
+.cellbtn.off { color: var(--muted); }
+.sheet td.tot { min-width: 78px; padding: 0 8px; font-weight: 700; }
+.sheet td.dcol { min-width: 82px; padding: 0 8px; font-weight: 700; }
+.dcol.due { color: var(--due); }
+.dcol.adv { color: var(--adv); }
+.dcol.ok { color: var(--ok); }
+.dcol.off { color: var(--muted); font-weight: 500; }
+.sheet tfoot td, .sheet tfoot th { background: var(--surface-2); height: 40px; font-weight: 700; }
+.sheet tfoot tr:first-child > * { border-top: 2px solid var(--brand); }
+.sheet tfoot .c-name { background: var(--surface-2); color: var(--brand); font-size: 13px; }
+.sheet tfoot td.mc { font-size: 13px; }
+.sheet tfoot .neg { color: var(--due); }
+.sheet tbody tr:last-child > * { border-bottom: 0; }
+.legend { display: flex; flex-wrap: wrap; gap: 8px 16px; padding: 12px 16px; border-top: 1px solid var(--line); font-size: 13px; color: var(--muted); }
+.legend span { display: inline-flex; align-items: center; gap: 6px; }
+.legend i { font-style: normal; display: inline-grid; place-items: center; min-width: 30px; height: 22px; padding: 0 6px; border-radius: 6px; font-weight: 700; font-size: 12px; }
+
+/* Dialogs */
+dialog.dlg { border: 0; padding: 0; border-radius: 18px; width: min(480px, calc(100vw - 32px)); max-height: min(88vh, 760px); background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+dialog.dlg::backdrop { background: var(--scrim); }
+.dlg form, .dlg .inner { padding: 20px; display: grid; gap: 14px; }
+.dlg-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.dlg-head h3 { margin: 0; font-family: var(--f-display); font-size: 26px; font-weight: 700; line-height: 1.1; }
+.eyebrow { margin: 0 0 2px; font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--brand); }
+.close { border: 0; background: var(--surface-2); width: 36px; height: 36px; border-radius: 10px; font-size: 20px; line-height: 1; color: var(--muted); flex: none; }
+.state { margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); font-size: 14px; }
+.state p { margin: 0; font-weight: 600; }
+.prog { height: 6px; border-radius: 6px; background: var(--line); overflow: hidden; margin-bottom: 8px; }
+.prog i { display: block; height: 100%; width: 0; background: var(--ok); border-radius: 6px; }
+.prog i.part { background: var(--gold); }
+.parts { list-style: none; margin: -4px 0 0; padding: 0; display: grid; gap: 4px; }
+.parts li { display: grid; grid-template-columns: minmax(0, 1fr) auto 36px; align-items: center; gap: 10px; padding: 6px 4px 6px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; }
+.parts li span { color: var(--muted); }
+.parts li b { font-variant-numeric: tabular-nums; }
+.parts li button { width: 32px; height: 32px; border-radius: 8px; border: 0; background: var(--due-bg); color: var(--due); font-size: 18px; line-height: 1; }
+.field { display: grid; gap: 6px; }
+.field label, .lbl2 { font-size: 13px; font-weight: 600; color: var(--muted); }
+.inrow { display: flex; gap: 8px; }
+.inrow > input, .inrow > select { flex: 1; min-width: 0; }
+input[type="text"], input:not([type]), select { height: 46px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface); font-size: 16px; }
+input:focus, select:focus { border-color: var(--brand); outline: none; box-shadow: 0 0 0 3px var(--brand-soft); }
+.check { display: flex; align-items: center; gap: 10px; font-weight: 600; min-height: 44px; }
+.check input { width: 22px; height: 22px; accent-color: var(--brand); }
+.hint { margin: 0; font-size: 13px; color: var(--muted); }
+.err { margin: 0; font-size: 14px; color: var(--due); font-weight: 600; }
+.foot-row { display: flex; gap: 8px; justify-content: space-between; align-items: center; flex-wrap: wrap; }
+
+.memlist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.memlist li { display: grid; grid-template-columns: 26px minmax(0, 1fr) auto; gap: 8px; align-items: center; }
+.memlist .no { color: var(--muted); font-size: 13px; text-align: right; font-variant-numeric: tabular-nums; }
+.memlist .opts { display: flex; gap: 4px; align-items: center; }
+.memlist .opts button { width: 34px; height: 34px; border-radius: 8px; border: 1px solid var(--line); background: var(--surface); color: var(--muted); }
+.memlist .opts button.rm { color: var(--due); }
+.memlist .sub { grid-column: 2 / -1; display: flex; gap: 8px; align-items: center; font-size: 13px; color: var(--muted); }
+.memlist .sub select { height: 34px; font-size: 14px; padding: 0 8px; }
+.memlist .confirm { grid-column: 2 / -1; display: flex; gap: 8px; align-items: center; flex-wrap: wrap; background: var(--due-bg); color: var(--due); padding: 8px 10px; border-radius: 10px; font-weight: 600; font-size: 14px; }
+.memlist .confirm button { height: 34px; padding: 0 12px; border-radius: 8px; border: 0; font-weight: 700; }
+.memlist .confirm .yes { background: var(--due); color: var(--surface); }
+.memlist .confirm .no2 { background: var(--surface); color: var(--ink); }
+.memdivider { height: 1px; background: var(--line); margin: 4px 0; }
+details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
+.removed { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.removed li { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 50; display: flex; align-items: center; gap: 14px; background: var(--ink); color: var(--bg); padding: 10px 12px 10px 16px; border-radius: 12px; box-shadow: var(--shadow); max-width: calc(100vw - 32px); font-size: 14px; font-weight: 500; }
+.toast button { border: 0; background: transparent; color: var(--gold); font-weight: 700; padding: 6px 8px; }
+
+@media (max-width: 760px) {
+  .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+  .stat { padding: 12px 14px; }
+  .stat strong { font-size: 23px; }
+  .stat .sub { font-size: 12px; }
+  .brand h1 { font-size: 22px; }
+  .brand img { width: 50px; }
+  .top-actions { width: 100%; }
+  .top-actions .btn.primary { flex: 1; }
+  .figs { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 6px; }
+  .fig { padding: 8px; }
+  .fig b { font-size: 16px; }
+  .fig span { font-size: 11px; letter-spacing: .03em; }
+  .sheet .c-name { min-width: 120px; }
+}
+@media (max-width: 600px) {
+  .mrow { grid-template-columns: 28px minmax(0, 1fr); row-gap: 3px; padding-block: 8px; }
+  .mrow .no { grid-row: 1 / span 2; align-self: start; padding-top: 2px; }
+  .mrow .pill { grid-column: 2; justify-self: start; font-size: 12px; padding: 2px 8px; }
+  dialog.dlg { width: 100%; max-width: 100%; margin: auto 0 0; border-radius: 20px 20px 0 0; max-height: 92vh; }
+  .dlg form, .dlg .inner { padding: 20px max(18px, env(safe-area-inset-left, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(18px, env(safe-area-inset-right, 0px)); }
+  .toolbar { gap: 8px; }
+  .seg { width: 100%; }
+  .seg button { flex: 1; }
+  .tools { width: 100%; }
+  .tools .btn { flex: 1; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .mchip, .seg button, .cellbtn, .quick { transition: background-color .15s, color .15s, box-shadow .15s; }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand">
+      <img id="logo" src="icons/logo.jpg" alt="Pirampady Sports Club logo">
+      <div>
+        <h1>Pirampady Sports Club</h1>
+        <p id="feeLine">Monthly subscriptions</p>
+      </div>
+    </div>
+    <div class="top-actions">
+      <div class="yearstep" aria-label="Year">
+        <button type="button" data-act="yprev" aria-label="Previous year">‹</button>
+        <span id="yearLbl" class="num">2026</span>
+        <button type="button" data-act="ynext" aria-label="Next year">›</button>
+      </div>
+      <button type="button" class="btn primary" id="pdfBtn" data-act="pdf">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+        Download PDF
+      </button>
+    </div>
+  </header>
+
+  <section class="stats" id="stats" aria-label="Year totals"></section>
+
+  <div class="toolbar">
+    <div class="seg" role="tablist" aria-label="View">
+      <button type="button" role="tab" id="tabMonth" data-act="view" data-v="month" aria-selected="true">Month</button>
+      <button type="button" role="tab" id="tabYear" data-act="view" data-v="year" aria-selected="false">Whole year</button>
+    </div>
+    <div class="tools">
+      <span class="chip-ro" id="roChip" hidden>View only</span>
+      <button type="button" class="btn ghost" data-act="members">Members</button>
+      <button type="button" class="btn ghost" data-act="settings">Settings</button>
+      <button type="button" class="btn ghost" data-act="backup">Backup</button>
+    </div>
+  </div>
+
+  <div class="nag" id="bakNag" hidden>
+    <span id="bakNagTxt">Your register is only on this device. Save a backup file.</span>
+    <button type="button" class="btn" data-act="backup">Back up now</button>
+  </div>
+
+  <main id="main">
+    <div class="card notice"><h2>Loading the register…</h2><p>Members and payments will appear here in a moment.</p></div>
+  </main>
+</div>
+
+<dialog class="dlg" id="payDlg" aria-labelledby="payName">
+  <form id="payForm" novalidate>
+    <div class="dlg-head">
+      <div><p class="eyebrow" id="payWhen">October 2026</p><h3 id="payName">Member</h3></div>
+      <button type="button" class="close" data-close aria-label="Close">×</button>
+    </div>
+    <div class="state" id="payState">
+      <div class="prog"><i id="payBar"></i></div>
+      <p id="payStateTxt">Not paid yet</p>
+    </div>
+    <ul class="parts" id="payParts" hidden></ul>
+    <button type="button" class="btn primary big" id="payMain">Paid in full · Rs. 650</button>
+    <div class="field">
+      <label for="payAmt" id="payAmtLbl">Paid only part? Enter the amount (Rs.)</label>
+      <div class="inrow">
+        <input id="payAmt" inputmode="numeric" autocomplete="off" placeholder="e.g. 325">
+        <button type="submit" class="btn">Add</button>
+      </div>
+      <p class="err" id="payErr" hidden></p>
+      <p class="hint" id="payHint">When they pay the rest later, open this again and tap “Paid the rest”.</p>
+    </div>
+    <div class="foot-row">
+      <button type="button" class="btn danger" id="payClear">Remove all payments for this month</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="dlg" id="elecDlg" aria-labelledby="elecTitle">
+  <form id="elecForm" novalidate>
+    <div class="dlg-head">
+      <div><p class="eyebrow" id="elecWhen">October 2026</p><h3 id="elecTitle">Electricity bill</h3></div>
+      <button type="button" class="close" data-close aria-label="Close">×</button>
+    </div>
+    <p class="state" id="elecState"></p>
+    <div class="field">
+      <label for="elecAmt">Amount paid to the electricity provider (Rs.)</label>
+      <input id="elecAmt" inputmode="numeric" autocomplete="off" placeholder="e.g. 3000">
+      <p class="err" id="elecErr" hidden></p>
+    </div>
+    <label class="check" for="elecSigned"><input type="checkbox" id="elecSigned"> Selvarajah signed for this payment</label>
+    <div class="foot-row">
+      <button type="button" class="btn danger" id="elecClear">Clear this month</button>
+      <button type="submit" class="btn primary">Save</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="dlg" id="memDlg" aria-labelledby="memTitle">
+  <div class="inner">
+    <div class="dlg-head">
+      <div><p class="eyebrow">Register</p><h3 id="memTitle">Members</h3></div>
+      <button type="button" class="close" data-close aria-label="Close">×</button>
+    </div>
+    <form id="addForm" class="inrow" novalidate>
+      <input id="newName" autocomplete="off" placeholder="New member's name" aria-label="New member's name">
+      <button type="submit" class="btn primary">Add</button>
+    </form>
+    <p class="hint">Change a name and tap outside the box to save it. “Pays from” is the first month a member owes, so dues are not counted before they joined.</p>
+    <ol class="memlist" id="memList"></ol>
+    <details id="remBox" hidden><summary id="remSum">Removed members</summary><ul class="removed" id="remList"></ul></details>
+  </div>
+</dialog>
+
+<dialog class="dlg" id="setDlg" aria-labelledby="setTitle">
+  <form id="setForm" novalidate>
+    <div class="dlg-head">
+      <div><p class="eyebrow">Register</p><h3 id="setTitle">Settings</h3></div>
+      <button type="button" class="close" data-close aria-label="Close">×</button>
+    </div>
+    <div class="field">
+      <label for="feeIn" id="feeLbl">Monthly fee for 2026 (Rs.)</label>
+      <input id="feeIn" inputmode="numeric" autocomplete="off">
+    </div>
+    <div class="field">
+      <span class="lbl2">Collection started from</span>
+      <div class="inrow">
+        <select id="startM" aria-label="Start month"></select>
+        <select id="startY" aria-label="Start year"></select>
+      </div>
+      <p class="hint">Dues are counted from this month up to the current month. A member's own “pays from” month in Members overrides it.</p>
+    </div>
+    <p class="err" id="setErr" hidden></p>
+    <div class="foot-row"><span></span><button type="submit" class="btn primary">Save</button></div>
+  </form>
+</dialog>
+
+<dialog class="dlg" id="bakDlg" aria-labelledby="bakTitle">
+  <div class="inner">
+    <div class="dlg-head">
+      <div><p class="eyebrow">This device</p><h3 id="bakTitle">Backup</h3></div>
+      <button type="button" class="close" data-close aria-label="Close">×</button>
+    </div>
+    <p class="state" id="bakState">The register is saved on this device only.</p>
+    <button type="button" class="btn primary big" id="bakSave">Save backup file</button>
+    <p class="hint">Keep the file somewhere safe, for example in Files, iCloud Drive or a WhatsApp chat with yourself. Open it on your other device with “Restore” to copy the register there.</p>
+    <div class="memdivider"></div>
+    <label class="btn" for="bakFile">Restore from a backup file</label>
+    <input type="file" id="bakFile" class="vh" accept=".json,application/json">
+    <div class="bakbox" id="bakConfirm" hidden>
+      <p id="bakConfirmTxt"></p>
+      <div class="inrow">
+        <button type="button" class="btn primary" id="bakReplace">Replace</button>
+        <button type="button" class="btn" id="bakCancel">Cancel</button>
+      </div>
+    </div>
+    <p class="err" id="bakErr" hidden></p>
+    <div class="memdivider"></div>
+    <button type="button" class="btn" id="csvSave">Export for Excel (.csv)</button>
+    <p class="hint" id="appVer"></p>
+  </div>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite" hidden><span id="toastMsg"></span><button type="button" id="toastBtn" hidden>Undo</button></div>
+
+<script src="vendor/jspdf.umd.min.js"></script>
+<script src="vendor/jspdf.plugin.autotable.min.js"></script>
+<script>
+(() => {
+  "use strict";
+  const MONTHS = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  const MONTHS_FULL = ["January","February","March","April","May","June","July","August","September","October","November","December"];
+  const DEFAULT_FEE = 650;
+  const NOW = new Date();
+  const CY = NOW.getFullYear(), CM = NOW.getMonth();
+
+  const $ = (id) => document.getElementById(id);
+  const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+  const fmt = (n) => Math.round(n).toLocaleString("en-US");
+  const rs = (n) => "Rs. " + fmt(n);
+  const parseAmt = (v) => { const d = String(v ?? "").replace(/[^0-9]/g, ""); return d ? parseInt(d, 10) : NaN; };
+
+  let savedView = null;
+  try { savedView = localStorage.getItem("psc-view"); } catch (e) {}
+
+  const S = {
+    db: null, dbState: "loading", canWrite: true,
+    membersServer: [], membersLoaded: false,
+    settingsServer: null,
+    year: CY, month: CM,
+    payServer: {}, payLoaded: false, elecServer: {},
+    view: savedView || (window.matchMedia("(min-width: 900px)").matches ? "year" : "month"),
+    filter: "all",
+  };
+
+  /* ---------- writes: one in flight per document, latest value wins ---------- */
+  const overlay = new Map(), inflight = new Set(), dirty = new Set();
+  function writeDoc(path, body) {
+    if (!S.db) { toast("Saving isn't available in this view."); return; }
+    if (!S.canWrite) { toast("You can view this register, but you can't change it."); return; }
+    overlay.set(path, body);
+    if (inflight.has(path)) { dirty.add(path); return; }
+    flush(path);
+  }
+  async function flush(path, retried) {
+    inflight.add(path);
+    const body = overlay.get(path);
+    let failed = false;
+    try {
+      const ref = S.db.doc(path);
+      if (body === null) await ref.delete(); else await ref.set(body);
+    } catch (e) {
+      const code = e && e.code;
+      if (code === "unavailable" && !retried) {
+        await new Promise((r) => setTimeout(r, 400 + Math.random() * 700));
+        inflight.delete(path);
+        return flush(path, true);
+      }
+      failed = true;
+      if (code === "invalid_argument") { S.canWrite = false; toast("You can view this register, but you can't change it."); }
+      else if (code === "quota_exceeded") toast("This device's storage is full, so that change wasn't saved.");
+      else if (code === "revoked" || code === "not_granted") { S.canWrite = false; toast("Saving was switched off for this page."); }
+      else toast("That change wasn't saved. Check your connection and try again.");
+    }
+    inflight.delete(path);
+    if (!failed && dirty.has(path)) { dirty.delete(path); flush(path); return; }
+    dirty.delete(path);
+    overlay.delete(path);
+    render();
+  }
+
+  /* ---------- reads ---------- */
+  function settings() {
+    const o = overlay.get("settings/club");
+    const s = o || S.settingsServer || {};
+    return { fees: s.fees || {}, start: s.start && Number.isInteger(s.start.y) ? s.start : { y: CY, m: 0 } };
+  }
+  function feeFor(y) {
+    const fees = settings().fees;
+    const ys = Object.keys(fees).map(Number).filter((k) => fees[k] > 0).sort((a, b) => a - b);
+    if (!ys.length) return DEFAULT_FEE;
+    let pick = ys[0];
+    for (const k of ys) if (k <= y) pick = k;
+    return fees[pick];
+  }
+  function allMembers() {
+    const map = new Map(S.membersServer.map((m) => [m.id, m]));
+    for (const [p, b] of overlay) if (p.startsWith("members/")) { const id = p.slice(8); if (b) map.set(id, { ...b, id }); else map.delete(id); }
+    return [...map.values()].sort((a, b) => (a.order ?? 1e9) - (b.order ?? 1e9) || String(a.name).localeCompare(String(b.name)));
+  }
+  const payPath = (y, mid) => `payments/${y}-${mid}`;
+  // A member's payments for the viewed year: m = month total, h = the separate payments that make it up.
+  function payDoc(mid) {
+    const p = payPath(S.year, mid);
+    if (overlay.has(p)) { const b = overlay.get(p); return b ? { m: b.m || {}, h: b.h || {} } : { m: {}, h: {} }; }
+    return S.payServer[mid] || { m: {}, h: {} };
+  }
+  const payMap = (mid) => payDoc(mid).m;
+  function partsOf(mid, i) {
+    const d = payDoc(mid), h = d.h[i], tot = d.m[i] > 0 ? d.m[i] : 0;
+    if (Array.isArray(h) && h.length) return h.filter((x) => x && x.a > 0).map((x) => ({ a: x.a, t: x.t || null }));
+    return tot ? [{ a: tot, t: null }] : [];
+  }
+  function todayStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
+  function dayLabel(t) { if (!t) return "Earlier"; const [y, mo, d] = t.split("-").map(Number); return `${d} ${MONTHS[mo - 1]}${y !== CY ? " " + y : ""}`; }
+  const amt = (mid, i) => { const v = payMap(mid)[i]; return typeof v === "number" && v > 0 ? v : 0; };
+  function elecMap() {
+    const p = "electricity/" + S.year;
+    if (overlay.has(p)) { const b = overlay.get(p); return b ? b.m || {} : {}; }
+    return S.elecServer || {};
+  }
+  const elec = (i) => { const e = elecMap()[i]; return { amount: e && e.amount > 0 ? e.amount : 0, signed: !!(e && e.signed) }; };
+
+  function startOf(m) { return m.start && Number.isInteger(m.start.y) ? m.start : settings().start; }
+  // months [first..last] of the viewed year that a member owes (last = current month for this year)
+  function owedRange(m, y) {
+    if (m.removed) return null;
+    const st = startOf(m);
+    if (y > CY || st.y > y) return null;
+    const first = st.y < y ? 0 : st.m;
+    const last = y < CY ? 11 : CM;
+    return last >= first ? [first, last] : null;
+  }
+  const isOwed = (m, y, i) => { const r = owedRange(m, y); return !!r && i >= r[0] && i <= r[1]; };
+  function paidTotal(mid) { const mp = payMap(mid); let t = 0; for (const k in mp) if (mp[k] > 0) t += mp[k]; return t; }
+  // Due = fee × months owed so far this year − everything paid this year.
+  // Owed months run from the member's start (or January) to the current month (December for past years).
+  // Removed members owe nothing further and are never shown as paid ahead.
+  function dueOf(m, y) {
+    const paid = paidTotal(m.id);
+    if (m.removed) return { owed: 0, paid, due: 0, months: 0 };
+    const r = owedRange(m, y);
+    const months = r ? r[1] - r[0] + 1 : 0;
+    const owed = months * feeFor(y);
+    return { owed, paid, due: owed - paid, months };
+  }
+  // The months the "Still due" figure counts for the viewed year, e.g. "Jan–Oct".
+  function countedLabel(y) {
+    if (y > CY) return "";
+    const st = settings().start;
+    if (st.y > y) return "";
+    const first = st.y < y ? 0 : st.m, last = y < CY ? 11 : CM;
+    if (last < first) return "";
+    return first === last ? MONTHS[first] : `${MONTHS[first]}–${MONTHS[last]}`;
+  }
+  function yearMembers() {
+    const y = S.year;
+    return allMembers().filter((m) => {
+      const hasPay = paidTotal(m.id) > 0;
+      if (m.removed) return hasPay;
+      return startOf(m).y <= y || hasPay;
+    });
+  }
+  function monthTotal(i) { let t = 0; for (const m of yearMembers()) t += amt(m.id, i); return t; }
+
+  /* ---------- rendering ---------- */
+  function render() {
+    $("yearLbl").textContent = S.year;
+    const fee = feeFor(S.year);
+    $("feeLine").textContent = `Monthly subscription · Rs. ${fmt(fee)} per member`;
+    $("roChip").hidden = S.canWrite || !S.db;
+    $("tabMonth").setAttribute("aria-selected", String(S.view === "month"));
+    $("tabYear").setAttribute("aria-selected", String(S.view === "year"));
+    renderStats();
+    const main = $("main");
+    if (S.dbState === "none") {
+      main.innerHTML = `<div class="card notice"><h2>The register can't load here</h2><p>This browser is blocking storage. Turn off private browsing and open the app again.</p></div>`;
+      return;
+    }
+    if (!S.membersLoaded || !S.payLoaded) {
+      main.innerHTML = `<div class="card notice"><h2>Loading the register…</h2><p>Members and payments will appear here in a moment.</p></div>`;
+      return;
+    }
+    const ms = yearMembers();
+    if (!ms.length) {
+      main.innerHTML = `<div class="card notice"><h2>No members yet</h2><p>Open <b>Members</b> and add the first name to start recording payments.</p></div>`;
+      return;
+    }
+    // keep the user's own sideways scroll across live updates; only re-centre when the month, year or view changes
+    const prevBar = main.querySelector(".months, .sheet-wrap");
+    const keepLeft = prevBar ? prevBar.scrollLeft : 0;
+    main.innerHTML = S.view === "month" ? monthHTML(ms) : yearHTML(ms);
+    const key = `${S.view}-${S.year}-${S.month}`;
+    const bar = main.querySelector(S.view === "month" ? ".months" : ".sheet-wrap");
+    if (!bar) return;
+    if (key === lastCentered) { bar.scrollLeft = keepLeft; return; }
+    lastCentered = key;
+    const target = main.querySelector(S.view === "month" ? '.mchip[aria-pressed="true"]' : "thead th.is-now");
+    if (target && bar.scrollWidth > bar.clientWidth) bar.scrollLeft = Math.max(0, target.offsetLeft - (bar.clientWidth - target.offsetWidth) / 2);
+  }
+  let lastCentered = "";
+
+  function renderStats() {
+    const el = $("stats");
+    if (!S.membersLoaded || !S.payLoaded) {
+      el.innerHTML = ["Collected", "Electricity paid", "Balance in hand", "Still due"].map((l) => `<div class="stat"><span class="lbl">${l}</span><strong>–</strong><span class="sub">&nbsp;</span></div>`).join("");
+      return;
+    }
+    const ms = yearMembers();
+    let collected = 0, dueSum = 0, behind = 0, elecSum = 0, signed = 0, elecMonths = 0;
+    for (const m of ms) { const d = dueOf(m, S.year); collected += d.paid; if (d.due > 0) { dueSum += d.due; behind++; } }
+    for (let i = 0; i < 12; i++) { const e = elec(i); elecSum += e.amount; if (e.amount > 0) elecMonths++; if (e.signed) signed++; }
+    const bal = collected - elecSum;
+    const thisMonth = S.year === CY ? `Rs. ${fmt(monthTotal(CM))} in ${MONTHS_FULL[CM]}` : `in ${S.year}`;
+    const span = countedLabel(S.year);
+    const dueSub = S.year > CY || !span ? "Nothing due yet" : behind ? `${behind} member${behind > 1 ? "s" : ""} behind · ${span} counted` : `Everyone is paid up · ${span}`;
+    el.innerHTML = `
+      <div class="stat"><span class="lbl">Collected · ${S.year}</span><strong>${rs(collected)}</strong><span class="sub">${thisMonth}</span></div>
+      <div class="stat"><span class="lbl">Electricity paid</span><strong>${rs(elecSum)}</strong><span class="sub">${elecMonths} month${elecMonths === 1 ? "" : "s"} · ${signed} signed</span></div>
+      <div class="stat is-bal"><span class="lbl">Balance in hand</span><strong${bal < 0 ? ' style="color:var(--due)"' : ""}>${bal < 0 ? "−" : ""}${rs(Math.abs(bal))}</strong><span class="sub">Collected minus electricity</span></div>
+      <div class="stat is-due"><span class="lbl">Still due</span><strong>${rs(dueSum)}</strong><span class="sub">${dueSub}</span></div>`;
+  }
+
+  function statusFor(m, i) {
+    const fee = feeFor(S.year), a = amt(m.id, i);
+    if (a === fee) return { cls: "ok", pill: "✓ Paid", cell: "✓" };
+    if (a > fee) return { cls: "adv", pill: `${rs(a)} · +${fmt(a - fee)}`, cell: fmt(a) };
+    if (a > 0) return { cls: "warn", pill: `${rs(a)} paid · ${fmt(fee - a)} left`, cell: fmt(a) };
+    if (isOwed(m, S.year, i)) return { cls: "due", pill: "Not paid", cell: "" };
+    return { cls: "off", pill: "Not due", cell: "" };
+  }
+
+  function monthHTML(ms) {
+    const fee = feeFor(S.year), i = S.month;
+    const chips = MONTHS.map((mn, k) => {
+      let paid = 0, owed = 0;
+      for (const m of ms) { const a = amt(m.id, k); if (a >= fee) paid++; if (isOwed(m, S.year, k) || a > 0) owed++; }
+      const denom = Math.max(owed, paid);
+      const pct = denom ? Math.round((paid / denom) * 100) : 0;
+      return `<button type="button" class="mchip${S.year === CY && k === CM ? " is-now" : ""}" data-act="month" data-m="${k}" aria-pressed="${k === i}" aria-label="${MONTHS_FULL[k]}: ${paid} of ${denom} paid in full"><b>${mn}</b><small>${denom ? `${paid}/${denom}` : "–"}</small><span class="bar"><i style="width:${pct}%"></i></span></button>`;
+    }).join("");
+
+    let paidFull = 0, collected = 0, expected = 0, toPay = 0;
+    const rows = [];
+    for (const [idx, m] of ms.entries()) {
+      const a = amt(m.id, i), owed = isOwed(m, S.year, i);
+      collected += a;
+      if (owed) expected += fee;
+      if (a >= fee) paidFull++;
+      const pending = a < fee && (owed || a > 0);
+      if (pending) toPay++;
+      if (S.filter === "todo" && !pending) continue;
+      if (S.filter === "paid" && a === 0) continue;
+      const st = statusFor(m, i);
+      let quick = "";
+      if (S.canWrite && !m.removed && a === 0)
+        quick = `<button type="button" class="quick" data-act="quick" data-id="${esc(m.id)}" aria-label="Mark ${esc(m.name)} paid Rs. ${fmt(fee)} for ${MONTHS_FULL[i]}">✓ ${fmt(fee)}</button>`;
+      else if (S.canWrite && a > 0 && a < fee)
+        quick = `<button type="button" class="quick rest" data-act="rest" data-id="${esc(m.id)}" aria-label="${esc(m.name)} paid the remaining Rs. ${fmt(fee - a)} for ${MONTHS_FULL[i]}">+ ${fmt(fee - a)}</button>`;
+      rows.push(`<li><button type="button" class="mrow" data-act="pay" data-id="${esc(m.id)}" data-m="${i}"${S.canWrite ? "" : " disabled"}><span class="no">${idx + 1}</span><span class="nm">${esc(m.name)}${m.removed ? "<small>left</small>" : ""}</span><span class="pill ${st.cls}">${st.pill}</span></button>${quick}</li>`);
+    }
+    const owedCount = ms.filter((m) => isOwed(m, S.year, i) || amt(m.id, i) > 0).length;
+    const e = elec(i);
+    const label = { all: `All ${ms.length}`, todo: `Still to pay ${toPay}`, paid: `Paid ${ms.filter((m) => amt(m.id, i) > 0).length}` };
+    const list = rows.length ? `<ul class="mlist">${rows.join("")}</ul>` : `<p class="empty-filter">${S.filter === "todo" ? "Everyone has paid for this month." : "No payments recorded for this month yet."}</p>`;
+    return `
+      <div style="display:grid;gap:12px">
+        <div class="months" role="group" aria-label="Month">${chips}</div>
+        <section class="card msum">
+          <div class="msum-head"><h2>${MONTHS_FULL[i]} ${S.year}</h2><span>${paidFull} of ${owedCount} paid in full</span></div>
+          <div class="figs">
+            <div class="fig"><span>Collected</span><b>${rs(collected)}</b></div>
+            <div class="fig"><span>Expected</span><b>${rs(expected)}</b></div>
+            <div class="fig"><span>Electricity</span><b>${rs(e.amount)}</b></div>
+          </div>
+          <div class="elec-row">
+            <p>Electricity bill: <b>${e.amount ? rs(e.amount) : "not paid yet"}</b> · ${e.signed ? '<span style="color:var(--ok);font-weight:700">✓ Signed by Selvarajah</span>' : "Selvarajah has not signed"}</p>
+            <button type="button" class="btn" data-act="elec" data-m="${i}"${S.canWrite ? "" : " disabled"}>${e.amount || e.signed ? "Edit" : "Record bill"}</button>
+          </div>
+        </section>
+        <div class="filter" role="group" aria-label="Show">
+          ${["all", "todo", "paid"].map((f) => `<button type="button" data-act="filter" data-f="${f}" aria-pressed="${S.filter === f}">${label[f]}</button>`).join("")}
+        </div>
+        <section class="card">${list}</section>
+      </div>`;
+  }
+
+  function yearHTML(ms) {
+    const fee = feeFor(S.year), y = S.year;
+    const head = `<tr><th class="c-no">#</th><th class="c-name">Member</th>${MONTHS.map((mn, k) => `<th class="${y === CY && k === CM ? "is-now" : ""}">${mn}</th>`).join("")}<th>Paid</th><th>${y === CY ? `Due to ${MONTHS[CM]}` : "Due"}</th></tr>`;
+    let dueTotal = 0;
+    const body = ms.map((m, idx) => {
+      const cells = MONTHS.map((_, k) => {
+        const st = statusFor(m, k);
+        return `<td class="mc"><button type="button" class="cellbtn ${st.cls}" data-act="pay" data-id="${esc(m.id)}" data-m="${k}" aria-label="${esc(m.name)}, ${MONTHS_FULL[k]}: ${st.pill}"${S.canWrite ? "" : " disabled"}>${st.cell}</button></td>`;
+      }).join("");
+      const d = dueOf(m, y);
+      if (d.due > 0) dueTotal += d.due;
+      let dc = `<td class="dcol off">–</td>`;
+      if (d.due > 0) dc = `<td class="dcol due">${fmt(d.due)}</td>`;
+      else if (d.due < 0) dc = `<td class="dcol adv" title="Paid ahead">+${fmt(-d.due)}</td>`;
+      else if (d.months > 0) dc = `<td class="dcol ok" aria-label="Paid up">✓</td>`;
+      return `<tr><td class="c-no">${idx + 1}</td><th class="c-name" scope="row">${esc(m.name)}${m.removed ? "<small>left</small>" : ""}</th>${cells}<td class="tot">${d.paid ? fmt(d.paid) : "–"}</td>${dc}</tr>`;
+    }).join("");
+    let yc = 0, ye = 0;
+    const colRow = MONTHS.map((_, k) => { const t = monthTotal(k); yc += t; return `<td class="mc">${t ? fmt(t) : "–"}</td>`; }).join("");
+    const elRow = MONTHS.map((_, k) => { const e = elec(k); ye += e.amount; return `<td class="mc"><button type="button" class="cellbtn${e.amount ? "" : " off"}" data-act="elec" data-m="${k}" aria-label="Electricity ${MONTHS_FULL[k]}"${S.canWrite ? "" : " disabled"}>${e.amount ? fmt(e.amount) : S.canWrite ? "+" : "–"}</button></td>`; }).join("");
+    const sgRow = MONTHS.map((_, k) => { const e = elec(k); return `<td class="mc"><button type="button" class="cellbtn${e.signed ? " ok" : " off"}" data-act="elec" data-m="${k}" aria-label="Selvarajah signature ${MONTHS_FULL[k]}: ${e.signed ? "signed" : "not signed"}"${S.canWrite ? "" : " disabled"}>${e.signed ? "✓" : "–"}</button></td>`; }).join("");
+    const blRow = MONTHS.map((_, k) => { const b = monthTotal(k) - elec(k).amount; return `<td class="mc${b < 0 ? " neg" : ""}">${b ? (b < 0 ? "−" : "") + fmt(Math.abs(b)) : "–"}</td>`; }).join("");
+    const yb = yc - ye;
+    const foot = `
+      <tr><th class="c-name" colspan="2" scope="row">Total collected</th>${colRow}<td class="tot">${fmt(yc)}</td><td class="dcol due">${dueTotal ? fmt(dueTotal) : "–"}</td></tr>
+      <tr><th class="c-name" colspan="2" scope="row">Paid for electricity</th>${elRow}<td class="tot">${fmt(ye)}</td><td></td></tr>
+      <tr><th class="c-name" colspan="2" scope="row">Selvarajah signed</th>${sgRow}<td></td><td></td></tr>
+      <tr><th class="c-name" colspan="2" scope="row">Balance</th>${blRow}<td class="tot${yb < 0 ? " neg" : ""}">${yb < 0 ? "−" : ""}${fmt(Math.abs(yb))}</td><td></td></tr>`;
+    return `
+      <section class="card">
+        <div class="sheet-wrap"><table class="sheet"><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table></div>
+        <div class="legend">
+          <span><i style="background:var(--ok-bg);color:var(--ok)">✓</i> Paid Rs. ${fmt(fee)}</span>
+          <span><i style="background:var(--warn-bg);color:var(--warn)">325</i> Part paid (rest still due)</span>
+          <span><i style="background:var(--adv-bg);color:var(--adv)">1,300</i> Paid more (advance)</span>
+          <span><i style="background:var(--due-bg)">&nbsp;</i> Not paid yet</span>
+          <span>Tap any box to change it</span>
+        </div>
+      </section>`;
+  }
+
+  /* ---------- toast ---------- */
+  let toastTimer = null, toastUndo = null;
+  function toast(msg, undo, label) {
+    $("toastMsg").textContent = msg;
+    toastUndo = undo || null;
+    $("toastBtn").textContent = label || "Undo";
+    $("toastBtn").hidden = !undo;
+    $("toast").hidden = false;
+    clearTimeout(toastTimer);
+    toastTimer = setTimeout(() => { $("toast").hidden = true; toastUndo = null; }, undo ? 6000 : 3500);
+  }
+  $("toastBtn").addEventListener("click", () => { const u = toastUndo; $("toast").hidden = true; toastUndo = null; if (u) u(); });
+
+  /* ---------- payment editing ---------- */
+  // Replace the list of payments for one member and month; the month total is their sum.
+  function setParts(mid, i, list) {
+    const d = payDoc(mid), m = { ...d.m }, h = { ...d.h };
+    const clean = list.filter((x) => x && x.a > 0).map((x) => ({ a: x.a, t: x.t || null }));
+    const tot = clean.reduce((s, x) => s + x.a, 0);
+    if (tot > 0) { m[i] = tot; h[i] = clean; } else { delete m[i]; delete h[i]; }
+    writeDoc(payPath(S.year, mid), Object.keys(m).length ? { year: S.year, member: mid, m, h } : null);
+    render();
+  }
+  const nameOf = (mid) => { const m = allMembers().find((x) => x.id === mid); return m ? m.name : "Member"; };
+  function addPart(mid, i, a) {
+    const before = partsOf(mid, i);
+    setParts(mid, i, [...before, { a, t: todayStr() }]);
+    return () => setParts(mid, i, before);
+  }
+  function afterAddMsg(mid, i) {
+    const fee = feeFor(S.year), now = amt(mid, i);
+    if (now === fee) return `${nameOf(mid)} has paid in full for ${MONTHS[i]}.`;
+    if (now < fee) return `${nameOf(mid)} paid Rs. ${fmt(now)} for ${MONTHS[i]}. Rs. ${fmt(fee - now)} left.`;
+    return `${nameOf(mid)} paid Rs. ${fmt(now)} for ${MONTHS[i]} (Rs. ${fmt(now - fee)} extra).`;
+  }
+
+  let payCtx = null;
+  function fillPay() {
+    const { mid, i } = payCtx;
+    const m = allMembers().find((x) => x.id === mid);
+    if (!m) { $("payDlg").close(); return; }
+    const fee = feeFor(S.year), a = amt(mid, i), parts = partsOf(mid, i);
+    $("payWhen").textContent = `${MONTHS_FULL[i]} ${S.year}`;
+    $("payName").textContent = m.name;
+    const bar = $("payBar");
+    bar.style.width = `${Math.min(100, Math.round((a / fee) * 100))}%`;
+    bar.className = a > 0 && a < fee ? "part" : "";
+    $("payStateTxt").textContent = a === 0 ? (isOwed(m, S.year, i) ? `Not paid yet · Rs. ${fmt(fee)} to pay` : "Not due this month (you can still record an advance)")
+      : a === fee ? `Paid in full · Rs. ${fmt(a)}`
+      : a < fee ? `Paid Rs. ${fmt(a)} of Rs. ${fmt(fee)} · Rs. ${fmt(fee - a)} left`
+      : `Paid Rs. ${fmt(a)} · Rs. ${fmt(a - fee)} more than the fee`;
+    const list = $("payParts");
+    list.hidden = !parts.length;
+    list.innerHTML = parts.map((p, k) => `<li><span>${parts.length > 1 ? `Payment ${k + 1} · ` : ""}${dayLabel(p.t)}</span><b>${rs(p.a)}</b><button type="button" data-k="${k}" aria-label="Delete this Rs. ${fmt(p.a)} payment">×</button></li>`).join("");
+    const main = $("payMain");
+    main.hidden = a >= fee;
+    main.textContent = a === 0 ? `Paid in full · Rs. ${fmt(fee)}` : `Paid the rest · Rs. ${fmt(fee - a)}`;
+    $("payAmtLbl").textContent = a === 0 ? "Paid only part? Enter the amount (Rs.)" : "Add another payment (Rs.)";
+    $("payAmt").placeholder = a === 0 ? `e.g. ${fmt(Math.round(fee / 2))}` : a < fee ? `e.g. ${fmt(fee - a)}` : "e.g. 650";
+    $("payHint").hidden = a >= fee;
+    $("payHint").textContent = a === 0 ? "If they pay the rest later, open this again and tap “Paid the rest”." : "Each payment is kept separately with its date.";
+    $("payErr").hidden = true;
+    $("payClear").hidden = parts.length < 2;
+  }
+  function openPay(mid, i) {
+    if (!S.canWrite) return;
+    payCtx = { mid, i, year: S.year };
+    $("payAmt").value = "";
+    fillPay();
+    $("payDlg").showModal();
+  }
+  const payOk = () => payCtx && payCtx.year === S.year;
+  $("payMain").addEventListener("click", () => {
+    if (!payOk()) return;
+    const { mid, i } = payCtx, rest = feeFor(S.year) - amt(mid, i);
+    if (rest <= 0) return;
+    const undo = addPart(mid, i, rest);
+    $("payDlg").close();
+    toast(afterAddMsg(mid, i), undo);
+  });
+  $("payForm").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    if (!payOk()) return;
+    const v = parseAmt($("payAmt").value);
+    if (!(v > 0)) { $("payErr").textContent = "Enter the amount in rupees, for example 325."; $("payErr").hidden = false; $("payAmt").focus(); return; }
+    if (v > 100000) { $("payErr").textContent = "That amount looks too large. Check the number and try again."; $("payErr").hidden = false; return; }
+    const { mid, i } = payCtx;
+    const undo = addPart(mid, i, v);
+    $("payDlg").close();
+    toast(afterAddMsg(mid, i), undo);
+  });
+  $("payParts").addEventListener("click", (ev) => {
+    const b = ev.target.closest("button[data-k]");
+    if (!b || !payOk()) return;
+    const { mid, i } = payCtx, before = partsOf(mid, i), k = +b.dataset.k;
+    const gone = before[k];
+    setParts(mid, i, before.filter((_, j) => j !== k));
+    fillPay();
+    toast(`Deleted the Rs. ${fmt(gone ? gone.a : 0)} payment.`, () => { setParts(mid, i, before); if ($("payDlg").open && payOk()) fillPay(); });
+  });
+  $("payClear").addEventListener("click", () => {
+    if (!payOk()) return;
+    const { mid, i } = payCtx, before = partsOf(mid, i);
+    setParts(mid, i, []);
+    $("payDlg").close();
+    toast(`Removed all of ${nameOf(mid)}'s payments for ${MONTHS[i]}.`, () => setParts(mid, i, before));
+  });
+  function quickPay(mid) {
+    const i = S.month;
+    if (amt(mid, i) > 0) return;
+    const undo = addPart(mid, i, feeFor(S.year));
+    toast(afterAddMsg(mid, i), undo);
+  }
+  function quickRest(mid) {
+    const i = S.month, rest = feeFor(S.year) - amt(mid, i);
+    if (rest <= 0) return;
+    const undo = addPart(mid, i, rest);
+    toast(afterAddMsg(mid, i), undo);
+  }
+
+  /* ---------- electricity ---------- */
+  let elecCtx = null;
+  function openElec(i) {
+    if (!S.canWrite) return;
+    elecCtx = { i, year: S.year };
+    const e = elec(i);
+    $("elecWhen").textContent = `${MONTHS_FULL[i]} ${S.year}`;
+    $("elecState").textContent = `Collected from members this month: Rs. ${fmt(monthTotal(i))}`;
+    $("elecAmt").value = e.amount ? String(e.amount) : "";
+    $("elecSigned").checked = e.signed;
+    $("elecErr").hidden = true;
+    $("elecClear").hidden = !(e.amount || e.signed);
+    $("elecDlg").showModal();
+  }
+  function setElec(i, amount, signed) {
+    const mp = { ...elecMap() };
+    if (amount > 0 || signed) mp[i] = { amount: amount > 0 ? amount : 0, signed: !!signed }; else delete mp[i];
+    writeDoc("electricity/" + S.year, { year: S.year, m: mp });
+    render();
+  }
+  $("elecForm").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    if (!elecCtx || elecCtx.year !== S.year) return;
+    const raw = $("elecAmt").value.trim();
+    const v = raw ? parseAmt(raw) : 0;
+    if (raw && !(v >= 0)) { $("elecErr").textContent = "Enter the bill amount in rupees, for example 3000."; $("elecErr").hidden = false; return; }
+    setElec(elecCtx.i, v || 0, $("elecSigned").checked);
+    $("elecDlg").close();
+  });
+  $("elecClear").addEventListener("click", () => {
+    if (!elecCtx || elecCtx.year !== S.year) return;
+    const prev = elec(elecCtx.i), i = elecCtx.i;
+    setElec(i, 0, false);
+    $("elecDlg").close();
+    toast(`Cleared the electricity record for ${MONTHS[i]}.`, () => setElec(i, prev.amount, prev.signed));
+  });
+
+  /* ---------- members ---------- */
+  let confirmId = null;
+  function startOptions(sel) {
+    const st = settings().start, opts = [`<option value="">Club start (${MONTHS[st.m]} ${st.y})</option>`];
+    for (let y = Math.min(st.y, CY - 1); y <= CY + 1; y++) for (let k = 0; k < 12; k++) {
+      const v = `${y}-${k}`;
+      opts.push(`<option value="${v}"${sel === v ? " selected" : ""}>${MONTHS[k]} ${y}</option>`);
+    }
+    return opts.join("");
+  }
+  function renderMembers() {
+    const all = allMembers(), act = all.filter((m) => !m.removed), rem = all.filter((m) => m.removed);
+    $("memTitle").textContent = `Members (${act.length})`;
+    $("memList").innerHTML = act.map((m, idx) => {
+      const sel = m.start && Number.isInteger(m.start.y) ? `${m.start.y}-${m.start.m}` : "";
+      const confirm = confirmId === m.id
+        ? `<div class="confirm">Remove ${esc(m.name)}? Their past payments stay in the register. <button type="button" class="yes" data-mact="rm-yes" data-id="${esc(m.id)}">Remove</button><button type="button" class="no2" data-mact="rm-no">Keep</button></div>` : "";
+      return `<li>
+        <span class="no">${idx + 1}</span>
+        <input id="mn-${esc(m.id)}" data-id="${esc(m.id)}" class="nm-in" value="${esc(m.name)}" aria-label="Name of member ${idx + 1}" autocomplete="off">
+        <span class="opts">
+          <button type="button" data-mact="up" data-id="${esc(m.id)}" aria-label="Move ${esc(m.name)} up"${idx === 0 ? " disabled" : ""}>↑</button>
+          <button type="button" data-mact="down" data-id="${esc(m.id)}" aria-label="Move ${esc(m.name)} down"${idx === act.length - 1 ? " disabled" : ""}>↓</button>
+          <button type="button" class="rm" data-mact="rm" data-id="${esc(m.id)}" aria-label="Remove ${esc(m.name)}">×</button>
+        </span>
+        <span class="sub"><label for="ms-${esc(m.id)}">Pays from</label><select id="ms-${esc(m.id)}" data-id="${esc(m.id)}" class="st-in">${startOptions(sel)}</select></span>
+        ${confirm}
+      </li>`;
+    }).join("") || `<li><span></span><span class="hint">No members yet. Add the first name above.</span></li>`;
+    $("remBox").hidden = !rem.length;
+    $("remSum").textContent = `Removed members (${rem.length})`;
+    $("remList").innerHTML = rem.map((m) => `<li><span>${esc(m.name)}</span><button type="button" class="btn" data-mact="restore" data-id="${esc(m.id)}">Restore</button></li>`).join("");
+  }
+  function memberBody(m) { const { id, ...rest } = m; return rest; }
+  function openMembers() { confirmId = null; renderMembers(); $("memDlg").showModal(); }
+  $("addForm").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const name = $("newName").value.trim().replace(/\s+/g, " ");
+    if (!name) { $("newName").focus(); return; }
+    const all = allMembers();
+    if (all.some((m) => !m.removed && m.name.toLowerCase() === name.toLowerCase())) { toast(`${name} is already in the list.`); return; }
+    const order = all.reduce((mx, m) => Math.max(mx, m.order || 0), 0) + 1;
+    const id = "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    const start = S.year === CY ? { y: CY, m: CM } : { y: S.year, m: 0 };
+    writeDoc("members/" + id, { name, order, start, removed: false });
+    $("newName").value = "";
+    renderMembers(); render();
+    toast(`Added ${name}. They pay from ${MONTHS[start.m]} ${start.y}.`);
+  });
+  $("memList").addEventListener("change", (ev) => {
+    const t = ev.target, id = t.dataset.id;
+    const m = allMembers().find((x) => x.id === id);
+    if (!m) return;
+    if (t.classList.contains("nm-in")) {
+      const name = t.value.trim().replace(/\s+/g, " ");
+      if (!name) { t.value = m.name; return; }
+      if (name !== m.name) { writeDoc("members/" + id, { ...memberBody(m), name }); render(); toast("Name saved."); }
+    } else if (t.classList.contains("st-in")) {
+      let start = null;
+      if (t.value) { const [y, k] = t.value.split("-").map(Number); start = { y, m: k }; }
+      writeDoc("members/" + id, { ...memberBody(m), start }); render();
+    }
+  });
+  $("memList").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && ev.target.classList.contains("nm-in")) { ev.preventDefault(); ev.target.blur(); } });
+  $("memDlg").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-mact]");
+    if (!b) return;
+    const act = b.dataset.mact, id = b.dataset.id;
+    const all = allMembers(), list = all.filter((m) => !m.removed);
+    const m = all.find((x) => x.id === id);
+    if (act === "rm") { confirmId = id; renderMembers(); return; }
+    if (act === "rm-no") { confirmId = null; renderMembers(); return; }
+    if (!S.canWrite) { toast("You can view this register, but you can't change it."); return; }
+    if (act === "rm-yes" && m) { confirmId = null; writeDoc("members/" + id, { ...memberBody(m), removed: true }); toast(`Removed ${m.name}.`); }
+    if (act === "restore" && m) { const order = all.reduce((mx, x) => Math.max(mx, x.order || 0), 0) + 1; writeDoc("members/" + id, { ...memberBody(m), removed: false, order }); toast(`Restored ${m.name}.`); }
+    if ((act === "up" || act === "down") && m) {
+      const idx = list.findIndex((x) => x.id === id), j = act === "up" ? idx - 1 : idx + 1;
+      if (j < 0 || j >= list.length) return;
+      // renumber the whole active list so orders stay clean
+      const next = list.slice(); [next[idx], next[j]] = [next[j], next[idx]];
+      next.forEach((x, k) => { if (x.order !== k + 1) writeDoc("members/" + x.id, { ...memberBody(x), order: k + 1 }); });
+    }
+    renderMembers(); render();
+  });
+
+  /* ---------- settings ---------- */
+  function openSettings() {
+    const st = settings();
+    $("feeLbl").textContent = `Monthly fee for ${S.year} onwards (Rs.)`;
+    $("feeIn").value = String(feeFor(S.year));
+    $("startM").innerHTML = MONTHS_FULL.map((n, k) => `<option value="${k}"${k === st.start.m ? " selected" : ""}>${n}</option>`).join("");
+    let ys = "";
+    for (let y = CY - 3; y <= CY + 1; y++) ys += `<option value="${y}"${y === st.start.y ? " selected" : ""}>${y}</option>`;
+    $("startY").innerHTML = ys;
+    $("setErr").hidden = true;
+    $("setDlg").showModal();
+  }
+  $("setForm").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const fee = parseAmt($("feeIn").value);
+    if (!(fee > 0)) { $("setErr").textContent = "Enter the monthly fee in rupees, for example 650."; $("setErr").hidden = false; return; }
+    const st = settings();
+    const fees = { ...st.fees, [String(S.year)]: fee };
+    writeDoc("settings/club", { fees, start: { y: +$("startY").value, m: +$("startM").value } });
+    $("setDlg").close();
+    render();
+    toast("Settings saved.");
+  });
+
+  /* ---------- PDF ---------- */
+  // The logo is loaded once as a data URL so PDFs can be made offline.
+  let LOGO_DATA = null;
+  fetch("icons/logo.jpg").then((r) => r.blob()).then((b) => new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(b); })).then((d) => { LOGO_DATA = d; }).catch(() => {});
+
+  // Phones get the share sheet (WhatsApp, Save to Files); computers get a normal download.
+  async function deliverFile(blob, filename, type) {
+    const file = new File([blob], filename, { type });
+    const touch = window.matchMedia("(pointer: coarse)").matches;
+    if (touch && navigator.canShare && navigator.canShare({ files: [file] })) {
+      try { await navigator.share({ files: [file], title: filename }); return "shared"; }
+      catch (e) { if (e && e.name === "AbortError") return "cancelled"; }
+    }
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = filename; a.rel = "noopener";
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    return "downloaded";
+  }
+  function drawTick(doc, cx, cy, s, rgb) {
+    doc.setDrawColor(rgb[0], rgb[1], rgb[2]);
+    doc.setLineWidth(s * 0.2);
+    doc.setLineCap("round"); doc.setLineJoin("round");
+    doc.lines([[s * 0.32, s * 0.32], [s * 0.62, -0.68 * s]], cx - s * 0.47, cy + s * 0.02, [1, 1], "S", false);
+  }
+  function buildPdf() {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
+    const W = 297, H = 210;
+    const BROWN = [107, 58, 0], CREAM = [255, 247, 218], GREEN = [29, 122, 61], AMBER = [152, 86, 0], BLUE = [29, 93, 166], RED = [176, 40, 31], GREY = [110, 103, 95];
+    const LOGO = LOGO_DATA;
+    const y = S.year, fee = feeFor(y), ms = yearMembers();
+
+    // header
+    if (LOGO) doc.addImage(LOGO, "JPEG", 10, 6, 28, 24.8);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(21); doc.setTextColor(...BROWN);
+    doc.text("PIRAMPADY SPORTS CLUB", W / 2, 15, { align: "center" });
+    doc.setFontSize(11.5); doc.setTextColor(40, 34, 28);
+    doc.text(`Monthly Subscription Register  ·  Rs. ${fmt(fee)} per member`, W / 2, 22, { align: "center" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...GREY);
+    const upd = NOW.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    const span = countedLabel(y).replace("–", " to ");
+    doc.text(`Updated ${upd}${span ? `  ·  Dues counted for ${span} ${y}` : ""}`, W / 2, 27.5, { align: "center" });
+    doc.setFillColor(...BROWN); doc.rect(W - 44, 7, 34, 7, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(255, 255, 255);
+    doc.text("YEAR", W - 27, 11.8, { align: "center", charSpace: 0.8 });
+    doc.setFillColor(...CREAM); doc.setDrawColor(...BROWN); doc.setLineWidth(0.6); doc.rect(W - 44, 14, 34, 13, "FD");
+    doc.setFontSize(20); doc.setTextColor(...BROWN); doc.text(String(y), W - 27, 23.2, { align: "center" });
+    doc.setDrawColor(...BROWN); doc.setLineWidth(0.9); doc.line(10, 33, W - 10, 33);
+    doc.setLineWidth(0.25); doc.line(10, 34.3, W - 10, 34.3);
+
+    // rows
+    const nm = ms.length;
+    const avail = H - 37 - 13;
+    const rowH = Math.max(4.6, Math.min(7.5, avail / (nm + 4 + 1.6)));
+    const body = [];
+    let dueTotal = 0;
+    ms.forEach((m, idx) => {
+      const row = [String(idx + 1), m.name + (m.removed ? " (left)" : "")];
+      for (let k = 0; k < 12; k++) {
+        const a = amt(m.id, k);
+        if (a === fee) row.push({ content: "", tick: GREEN });
+        else if (a > fee) row.push({ content: fmt(a), styles: { textColor: BLUE, fontStyle: "bold" } });
+        else if (a > 0) row.push({ content: fmt(a), styles: { textColor: AMBER, fontStyle: "bold" } });
+        else row.push("");
+      }
+      const d = dueOf(m, y);
+      row.push({ content: d.paid ? fmt(d.paid) : "-", styles: { fontStyle: "bold" } });
+      if (d.due > 0) { dueTotal += d.due; row.push({ content: fmt(d.due), styles: { textColor: RED, fontStyle: "bold" } }); }
+      else if (d.due < 0) row.push({ content: "Adv " + fmt(-d.due), styles: { textColor: BLUE, fontStyle: "bold" } });
+      else if (d.months > 0) row.push({ content: "", tick: GREEN });
+      else row.push({ content: "-", styles: { textColor: GREY } });
+      body.push(row);
+    });
+    const sumStyle = { fillColor: CREAM, fontStyle: "bold" };
+    const label = (t) => ({ content: t, colSpan: 2, styles: { ...sumStyle, halign: "left", textColor: BROWN } });
+    let yc = 0, ye = 0;
+    const r1 = [label("Total collected (Rs.)")], r2 = [label("Paid for electricity (Rs.)")], r3 = [label("Selvarajah's signature")], r4 = [label("Balance (Rs.)")];
+    for (let k = 0; k < 12; k++) {
+      const t = monthTotal(k), e = elec(k);
+      yc += t; ye += e.amount;
+      r1.push({ content: t ? fmt(t) : "-", styles: sumStyle });
+      r2.push({ content: e.amount ? fmt(e.amount) : "-", styles: sumStyle });
+      r3.push(e.signed ? { content: "", tick: GREEN, styles: sumStyle } : { content: "", styles: sumStyle });
+      const b = t - e.amount;
+      r4.push({ content: b ? (b < 0 ? "-" : "") + fmt(Math.abs(b)) : "-", styles: b < 0 ? { ...sumStyle, textColor: RED } : sumStyle });
+    }
+    r1.push({ content: fmt(yc), styles: sumStyle }, { content: dueTotal ? fmt(dueTotal) : "-", styles: { ...sumStyle, textColor: RED } });
+    r2.push({ content: fmt(ye), styles: sumStyle }, { content: "", styles: sumStyle });
+    r3.push({ content: "", styles: sumStyle }, { content: "", styles: sumStyle });
+    const yb = yc - ye;
+    r4.push({ content: (yb < 0 ? "-" : "") + fmt(Math.abs(yb)), styles: yb < 0 ? { ...sumStyle, textColor: RED } : sumStyle }, { content: "", styles: sumStyle });
+    body.push(r1, r2, r3, r4);
+
+    const colStyles = { 0: { cellWidth: 9, textColor: GREY, fontSize: 7.5 }, 1: { cellWidth: 44, halign: "left", fontStyle: "bold" }, 14: { cellWidth: 25 }, 15: { cellWidth: 25 } };
+    for (let k = 2; k < 14; k++) colStyles[k] = { cellWidth: 14.5 };
+    const logoW = 120, logoH = logoW * 372 / 420;
+    doc.autoTable({
+      startY: 37,
+      margin: { left: 10, right: 10, bottom: 12 },
+      theme: "grid",
+      head: [["No.", "Member Name", ...MONTHS, "Total Paid", y === CY ? `Due to ${MONTHS[CM]}` : "Due"]],
+      body,
+      styles: { font: "helvetica", fontSize: 8.5, textColor: [30, 26, 22], lineColor: [160, 132, 100], lineWidth: 0.15, halign: "center", valign: "middle", cellPadding: { top: 0.6, bottom: 0.6, left: 1.5, right: 1.5 }, minCellHeight: rowH, fillColor: false },
+      headStyles: { fillColor: BROWN, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8.5, minCellHeight: 8, halign: "center" },
+      columnStyles: colStyles,
+      willDrawPage: () => {
+        if (!LOGO) return;
+        doc.saveGraphicsState();
+        doc.setGState(new doc.GState({ opacity: 0.09 }));
+        doc.addImage(LOGO, "JPEG", (W - logoW) / 2 + 14, 58, logoW, logoH);
+        doc.restoreGraphicsState();
+      },
+      didParseCell: (data) => { if (data.section === "head" && data.column.index === 1) data.cell.styles.halign = "left"; },
+      didDrawCell: (data) => {
+        if (data.section !== "body") return;
+        const c = data.cell;
+        if (c.raw && c.raw.tick) drawTick(doc, c.x + c.width / 2, c.y + c.height / 2, Math.min(3.4, c.height * 0.62), c.raw.tick);
+        if (data.row.index === nm && data.column.index === 0) {
+          doc.setDrawColor(...BROWN); doc.setLineWidth(0.7);
+          doc.line(10, c.y, W - 10, c.y);
+        }
+      },
+    });
+
+    // legend
+    let ly = doc.lastAutoTable.finalY + 5.5;
+    if (ly > H - 5) { doc.addPage(); ly = 14; }
+    doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(...GREY);
+    let lx = 10;
+    drawTick(doc, lx + 1.6, ly - 1.1, 3, GREEN); lx += 4.5;
+    const seg = (txt, color, bold) => { doc.setTextColor(...color); doc.setFont("helvetica", bold ? "bold" : "normal"); doc.text(txt, lx, ly); lx += doc.getTextWidth(txt); };
+    seg(`= paid Rs. ${fmt(fee)}`, GREY); lx += 7;
+    seg(fmt(Math.round(fee / 2)), AMBER, true); seg(" = part paid", GREY); lx += 7;
+    seg(fmt(fee * 2), BLUE, true); seg(" = paid more (advance)", GREY); lx += 7;
+    seg("Due", RED, true); seg(y === CY ? ` = still to pay up to ${MONTHS_FULL[CM]} ${y}` : " = still to pay for the year", GREY);
+    doc.setFont("helvetica", "normal"); doc.setTextColor(...GREY);
+    doc.text("Pirampady Sports Club", W - 10, ly, { align: "right" });
+    return doc.output("blob");
+  }
+  async function downloadPdf() {
+    if (!S.membersLoaded || !S.payLoaded) { toast("Wait for the register to finish loading."); return; }
+    if (!window.jspdf || !window.jspdf.jsPDF || !window.jspdf.jsPDF.API.autoTable) { toast("The PDF maker didn't load. Check your connection and reload the page."); return; }
+    const btn = $("pdfBtn");
+    btn.setAttribute("aria-busy", "true");
+    try {
+      const blob = buildPdf();
+      const day = `${NOW.getDate()}${MONTHS[NOW.getMonth()]}`;
+      const how = await deliverFile(blob, `Pirampady_SC_Subscriptions_${S.year}_${day}.pdf`, "application/pdf");
+      if (how === "downloaded") toast("PDF saved to your Downloads. You can now send it to the members.");
+    } catch (e) {
+      toast("The PDF couldn't be made. Try again.");
+    } finally { btn.removeAttribute("aria-busy"); }
+  }
+  window.__psc = { buildPdf, S };
+
+  /* ---------- events ---------- */
+  document.addEventListener("click", (ev) => {
+    const closeBtn = ev.target.closest("[data-close]");
+    if (closeBtn) { closeBtn.closest("dialog").close(); return; }
+    const b = ev.target.closest("[data-act]");
+    if (!b || b.disabled) return;
+    const act = b.dataset.act;
+    if (act === "yprev" || act === "ynext") { S.year += act === "yprev" ? -1 : 1; S.month = S.year === CY ? CM : 0; subYear(); render(); }
+    else if (act === "view") { S.view = b.dataset.v; try { localStorage.setItem("psc-view", S.view); } catch (e) {} render(); }
+    else if (act === "month") { S.month = +b.dataset.m; render(); }
+    else if (act === "filter") { S.filter = b.dataset.f; render(); }
+    else if (act === "pay") openPay(b.dataset.id, +b.dataset.m);
+    else if (act === "quick") quickPay(b.dataset.id);
+    else if (act === "rest") quickRest(b.dataset.id);
+    else if (act === "elec") openElec(+b.dataset.m);
+    else if (act === "members") { if (!S.db) { toast("Members can't load in this view."); return; } openMembers(); }
+    else if (act === "settings") { if (!S.canWrite || !S.db) { toast("You can view this register, but you can't change its settings."); return; } openSettings(); }
+    else if (act === "pdf") downloadPdf();
+    else if (act === "backup") openBackup();
+  });
+  for (const d of document.querySelectorAll("dialog.dlg")) {
+    d.addEventListener("click", (ev) => { if (ev.target === d) d.close(); });
+  }
+  $("memDlg").addEventListener("close", () => { confirmId = null; });
+
+  /* ---------- data ---------- */
+  let unsubPay = null, unsubElec = null;
+  function onSubErr(e) {
+    if (e && (e.code === "revoked" || e.code === "not_granted")) { S.canWrite = false; render(); return; }
+    if (e && e.code === "unavailable") setTimeout(() => { if (S.db) { startMembers(); subYear(); } }, 3000);
+  }
+  function subYear() {
+    if (!S.db) return;
+    if (unsubPay) unsubPay();
+    if (unsubElec) unsubElec();
+    S.payServer = {}; S.elecServer = {}; S.payLoaded = false;
+    const y = S.year;
+    unsubPay = S.db.collection("payments").where("year", "==", y).onSnapshot((snap) => {
+      if (y !== S.year) return;
+      const o = {};
+      for (const d of snap.docs) { const x = d.data(); if (x && x.member) o[x.member] = { m: x.m || {}, h: x.h || {} }; }
+      S.payServer = o; S.payLoaded = true; render();
+    }, onSubErr);
+    unsubElec = S.db.doc("electricity/" + y).onSnapshot((d) => {
+      if (y !== S.year) return;
+      S.elecServer = d.exists ? (d.data().m || {}) : {}; render();
+    }, onSubErr);
+  }
+  let unsubMem = null, unsubSet = null;
+  function startMembers() {
+    if (unsubMem) unsubMem();
+    if (unsubSet) unsubSet();
+    unsubMem = S.db.collection("members").onSnapshot((snap) => {
+      S.membersServer = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((m) => typeof m.name === "string");
+      S.membersLoaded = true; render();
+    }, onSubErr);
+    unsubSet = S.db.doc("settings/club").onSnapshot((d) => { S.settingsServer = d.exists ? d.data() : null; render(); }, onSubErr);
+  }
+
+  /* ---------- on-device store (same shape as the online version, kept in this browser) ---------- */
+  const APP_VERSION = "1.0.0";
+  const STORE_KEY = "psc.store.v1", PREV_KEY = "psc.store.prev", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
+  const SEED = {"members/m01":{"name":"Kaja","order":1,"removed":false,"start":null},"members/m02":{"name":"Thivakaran","order":2,"removed":false,"start":null},"members/m03":{"name":"Birunthaban","order":3,"removed":false,"start":null},"members/m04":{"name":"Keerthan","order":4,"removed":false,"start":null},"members/m05":{"name":"Chan Shankee","order":5,"removed":false,"start":null},"members/m06":{"name":"Dilojan","order":6,"removed":false,"start":null},"members/m07":{"name":"Sivaluxan","order":7,"removed":false,"start":null},"members/m08":{"name":"Siva Siburu","order":8,"removed":false,"start":null},"members/m09":{"name":"Shankar","order":9,"removed":false,"start":null},"members/m10":{"name":"Kugankukathas","order":10,"removed":false,"start":null},"members/m11":{"name":"Mathu","order":11,"removed":false,"start":null},"members/m12":{"name":"Nanthan","order":12,"removed":false,"start":null},"members/m13":{"name":"Naren","order":13,"removed":false,"start":null},"members/m14":{"name":"Luxshan","order":14,"removed":false,"start":null},"members/m15":{"name":"Kutty Pirathees","order":15,"removed":false,"start":null},"members/m16":{"name":"Saravana (Sana)","order":16,"removed":false,"start":null},"members/m17":{"name":"Thuva","order":17,"removed":false,"start":null},"members/m18":{"name":"Aathy","order":18,"removed":false,"start":null},"members/m19":{"name":"Thuvarakethan","order":19,"removed":false,"start":null},"members/m20":{"name":"Vinoban","order":20,"removed":false,"start":null},"members/m21":{"name":"Amalaraj","order":21,"removed":false,"start":null},"members/m22":{"name":"Vinshan","order":22,"removed":false,"start":null},"members/m23":{"name":"Nadesh (Doctor)","order":23,"removed":false,"start":null},"members/m24":{"name":"Patrick","order":24,"removed":false,"start":null},"members/m25":{"name":"Senthu","order":25,"removed":false,"start":null},"payments/2026-m01":{"m":{"9":650},"member":"m01","year":2026},"payments/2026-m04":{"m":{"9":500},"member":"m04","year":2026},"payments/2026-m05":{"m":{"9":650},"member":"m05","year":2026},"payments/2026-m07":{"m":{"9":500},"member":"m07","year":2026},"payments/2026-m10":{"h":{"9":[{"a":250,"t":"2026-10-27"}]},"m":{"9":250},"member":"m10","year":2026},"payments/2026-m15":{"h":{"9":[{"a":650,"t":"2026-10-27"}]},"m":{"9":650},"member":"m15","year":2026},"payments/2026-m20":{"h":{"9":[{"a":700,"t":"2026-10-27"}]},"m":{"9":700},"member":"m20","year":2026},"payments/2026-m21":{"h":{"9":[{"a":650,"t":"2026-10-27"}]},"m":{"9":650},"member":"m21","year":2026},"payments/2026-m23":{"h":{"9":[{"a":500,"t":"2026-10-27"}]},"m":{"9":500},"member":"m23","year":2026},"settings/club":{"fees":{"2026":650},"start":{"m":9,"y":2026}}};
+  const LocalDB = (() => {
+    let ok = true, store = null;
+    try { store = JSON.parse(localStorage.getItem(STORE_KEY) || "null"); } catch (e) { ok = false; }
+    if (!store || typeof store !== "object") {
+      store = JSON.parse(JSON.stringify(SEED));
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) { ok = false; }
+    }
+    const subs = new Set();
+    const clone = (o) => JSON.parse(JSON.stringify(o));
+    const meta = { fromCache: false, hasPendingWrites: false };
+    const snapDoc = (p) => ({ id: p.split("/").pop(), exists: Object.prototype.hasOwnProperty.call(store, p), data: () => store[p], metadata: meta });
+    const notify = () => { for (const s of [...subs]) s(); };
+    function persist(p, prev) {
+      try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); localStorage.setItem(CHG_KEY, new Date().toISOString()); return; }
+      catch (e) {
+        if (prev === undefined) delete store[p]; else store[p] = prev;
+        throw { code: "quota_exceeded", message: "storage full" };
+      }
+    }
+    function query(col, filters) {
+      const depth = col.split("/").length + 1;
+      const run = () => {
+        const docs = Object.keys(store).filter((k) => k.startsWith(col + "/") && k.split("/").length === depth)
+          .filter((k) => filters.every(([f, , v]) => store[k] && store[k][f] === v)).sort().map(snapDoc);
+        return { docs, size: docs.length, empty: !docs.length, docChanges: () => [], metadata: meta };
+      };
+      return {
+        where: (f, op, v) => query(col, [...filters, [f, op, v]]),
+        get: async () => run(),
+        onSnapshot: (next) => { const s = () => next(run()); subs.add(s); setTimeout(s, 0); return () => subs.delete(s); },
+        doc: (id) => docRef(col + "/" + id),
+      };
+    }
+    function docRef(p) {
+      return {
+        id: p.split("/").pop(), path: p,
+        get: async () => snapDoc(p),
+        set: async (d) => { const prev = store[p]; store[p] = clone(d); persist(p, prev); notify(); },
+        delete: async () => { const prev = store[p]; delete store[p]; persist(p, prev); notify(); },
+        onSnapshot: (next) => { const s = () => next(snapDoc(p)); subs.add(s); setTimeout(s, 0); return () => subs.delete(s); },
+      };
+    }
+    // another tab or window of the app changed the data
+    window.addEventListener("storage", (ev) => {
+      if (ev.key !== STORE_KEY || !ev.newValue) return;
+      try { store = JSON.parse(ev.newValue); notify(); } catch (e) {}
+    });
+    return {
+      ok: () => ok,
+      doc: docRef,
+      collection: (c) => query(c, []),
+      all: () => clone(store),
+      replaceAll: (obj) => {
+        const prev = JSON.stringify(store);
+        localStorage.setItem(STORE_KEY, JSON.stringify(obj));
+        try { localStorage.setItem(PREV_KEY, prev); } catch (e) {}
+        store = clone(obj); notify();
+      },
+    };
+  })();
+
+  /* ---------- backup and restore ---------- */
+  const readLS = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const writeLS = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+  function fmtWhen(iso) {
+    if (!iso) return "never";
+    const d = new Date(iso);
+    if (isNaN(d)) return "never";
+    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) + ", " + d.toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit" });
+  }
+  function countRecords(store) {
+    let members = 0, pays = 0;
+    for (const k in store) {
+      if (k.startsWith("members/") && !store[k].removed) members++;
+      if (k.startsWith("payments/")) for (const i in (store[k].m || {})) if (store[k].m[i] > 0) pays++;
+    }
+    return { members, pays };
+  }
+  function renderNag() {
+    const last = readLS(BAK_KEY), changed = readLS(CHG_KEY);
+    const days = last ? (Date.now() - new Date(last).getTime()) / 864e5 : Infinity;
+    const needs = changed && (!last || new Date(changed) > new Date(last)) && days > 7;
+    $("bakNag").hidden = !needs;
+    if (needs) $("bakNagTxt").textContent = last ? `Last backup was ${Math.floor(days)} days ago. The register is only on this device.` : "You haven't saved a backup yet. The register is only on this device.";
+  }
+  function openBackup() {
+    const c = countRecords(LocalDB.all());
+    $("bakState").textContent = `Saved on this device only: ${c.members} members, ${c.pays} monthly payments. Last backup: ${fmtWhen(readLS(BAK_KEY))}.`;
+    $("bakConfirm").hidden = true; $("bakErr").hidden = true; $("bakFile").value = "";
+    $("appVer").textContent = `App version ${APP_VERSION} · works offline`;
+    $("bakDlg").showModal();
+  }
+  $("bakSave").addEventListener("click", async () => {
+    const now = new Date();
+    const body = JSON.stringify({ app: "pirampady-sc", format: 1, savedAt: now.toISOString(), store: LocalDB.all() }, null, 1);
+    const name = `Pirampady_SC_backup_${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}.json`;
+    const how = await deliverFile(new Blob([body], { type: "application/json" }), name, "application/json");
+    if (how === "cancelled") return;
+    writeLS(BAK_KEY, now.toISOString());
+    renderNag();
+    $("bakDlg").close();
+    toast(how === "downloaded" ? "Backup saved to your Downloads." : "Backup file ready. Keep it somewhere safe.");
+  });
+  let pendingRestore = null;
+  $("bakFile").addEventListener("change", () => {
+    const f = $("bakFile").files && $("bakFile").files[0];
+    $("bakErr").hidden = true; $("bakConfirm").hidden = true; pendingRestore = null;
+    if (!f) return;
+    const fr = new FileReader();
+    fr.onload = () => {
+      let data = null;
+      try { data = JSON.parse(fr.result); } catch (e) {}
+      const st = data && data.app === "pirampady-sc" && data.store && typeof data.store === "object" ? data.store : null;
+      const valid = st && Object.keys(st).every((k) => /^(members|payments|electricity|settings)\/[A-Za-z0-9_.:@+~-]+$/.test(k) && st[k] && typeof st[k] === "object");
+      if (!valid) { $("bakErr").textContent = "That file isn't a Pirampady SC backup. Choose the .json file saved with “Save backup file”."; $("bakErr").hidden = false; return; }
+      const c = countRecords(st);
+      pendingRestore = st;
+      $("bakConfirmTxt").textContent = `Replace everything on this device with the backup from ${fmtWhen(data.savedAt)}? It has ${c.members} members and ${c.pays} monthly payments.`;
+      $("bakConfirm").hidden = false;
+    };
+    fr.onerror = () => { $("bakErr").textContent = "That file couldn't be read. Try choosing it again."; $("bakErr").hidden = false; };
+    fr.readAsText(f);
+  });
+  $("bakCancel").addEventListener("click", () => { pendingRestore = null; $("bakConfirm").hidden = true; $("bakFile").value = ""; });
+  $("bakReplace").addEventListener("click", () => {
+    if (!pendingRestore) return;
+    const before = LocalDB.all();
+    try { LocalDB.replaceAll(pendingRestore); }
+    catch (e) { $("bakErr").textContent = "This device's storage is full, so the backup couldn't be restored."; $("bakErr").hidden = false; return; }
+    pendingRestore = null;
+    $("bakDlg").close();
+    writeLS(BAK_KEY, new Date().toISOString());
+    renderNag();
+    toast("Backup restored on this device.", () => { LocalDB.replaceAll(before); toast("Went back to the register you had before."); });
+  });
+  $("csvSave").addEventListener("click", async () => {
+    const st = LocalDB.all();
+    const names = {};
+    for (const k in st) if (k.startsWith("members/")) names[k.slice(8)] = st[k].name;
+    const q = (v) => { const t = String(v ?? ""); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+    const rows = [["Type", "Year", "Month", "Member", "Amount (Rs.)", "Paid on", "Note"]];
+    const pays = Object.keys(st).filter((k) => k.startsWith("payments/")).map((k) => st[k]).sort((a, b) => a.year - b.year || String(names[a.member]).localeCompare(String(names[b.member])));
+    for (const p of pays) for (let i = 0; i < 12; i++) {
+      const tot = p.m && p.m[i];
+      if (!(tot > 0)) continue;
+      const parts = p.h && Array.isArray(p.h[i]) && p.h[i].length ? p.h[i] : [{ a: tot, t: "" }];
+      for (const part of parts) rows.push(["Subscription", p.year, MONTHS_FULL[i], names[p.member] || p.member, part.a, part.t || "", parts.length > 1 ? `Part payment (month total ${tot})` : ""]);
+    }
+    for (const k of Object.keys(st).filter((k) => k.startsWith("electricity/")).sort()) {
+      const e = st[k];
+      for (let i = 0; i < 12; i++) { const x = e.m && e.m[i]; if (x && (x.amount > 0 || x.signed)) rows.push(["Electricity", e.year, MONTHS_FULL[i], "", x.amount || 0, "", x.signed ? "Signed by Selvarajah" : "Not signed"]); }
+    }
+    const csv = "\ufeff" + rows.map((r) => r.map(q).join(",")).join("\r\n");
+    const d = new Date();
+    await deliverFile(new Blob([csv], { type: "text/csv" }), `Pirampady_SC_payments_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}.csv`, "text/csv");
+  });
+
+  /* ---------- start ---------- */
+  S.db = LocalDB; S.dbState = LocalDB.ok() ? "ready" : "none";
+  render();
+  if (S.dbState === "ready") { startMembers(); subYear(); }
+  renderNag();
+  try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+
+  /* ---------- offline support and updates ---------- */
+  if ("serviceWorker" in navigator && location.protocol !== "file:") {
+    navigator.serviceWorker.register("sw.js").then((reg) => {
+      const offer = (w) => toast("A new version of the app is ready.", () => w.postMessage("skipWaiting"), "Update");
+      if (reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
+      reg.addEventListener("updatefound", () => {
+        const w = reg.installing;
+        if (!w) return;
+        w.addEventListener("statechange", () => { if (w.state === "installed" && navigator.serviceWorker.controller) offer(w); });
+      });
+    }).catch(() => {});
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (reloaded) return; reloaded = true; location.reload(); });
+  }
+})();
+</script>
+</body>
+</html>
