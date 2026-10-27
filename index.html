@@ -65,6 +65,25 @@ img { max-width: 100%; }
 .bakbox p { margin: 0; }
 .bakbox .inrow .btn { flex: 1; }
 label.btn { cursor: pointer; }
+.syncchip { display: inline-flex; align-items: center; gap: 6px; margin-top: 4px; padding: 3px 10px 3px 8px; border: 1px solid var(--line); border-radius: 999px; background: var(--surface); color: var(--muted); font-size: 12.5px; font-weight: 600; max-width: 100%; }
+.syncchip i { width: 8px; height: 8px; border-radius: 50%; background: var(--line-strong); flex: none; }
+.syncchip span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.syncchip[data-s="ok"] i { background: var(--ok); }
+.syncchip[data-s="busy"] i { background: var(--gold); }
+.syncchip[data-s="err"] { color: var(--due); border-color: var(--due); }
+.syncchip[data-s="err"] i { background: var(--due); }
+@media (prefers-reduced-motion: no-preference) { .syncchip[data-s="busy"] i { animation: pulse 1s ease-in-out infinite alternate; } }
+@keyframes pulse { from { opacity: 1; } to { opacity: .3; } }
+.grp { display: grid; gap: 12px; }
+.vers { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 6px; }
+.vers li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 8px 8px 8px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.vers li.hint, .vers li.err { display: block; border: 0; padding: 4px 0; }
+.vmeta { display: grid; min-width: 0; }
+.vmeta b { font-size: 14px; }
+.vmeta span { font-size: 13px; color: var(--muted); }
+.vers .btn { height: 36px; }
+.vconfirm { grid-column: 1 / -1; }
+details > summary { padding: 4px 0; }
 [hidden] { display: none !important; }
 body { background: var(--bg); color: var(--ink); font-family: var(--f-body); font-size: 15px; line-height: 1.4; }
 button, input, select { font: inherit; color: inherit; }
@@ -302,6 +321,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       <div>
         <h1>Pirampady Sports Club</h1>
         <p id="feeLine">Monthly subscriptions</p>
+        <button type="button" class="syncchip" id="syncChip" data-act="sync" data-s="off"><i aria-hidden="true"></i><span id="syncTxt">Only on this device</span></button>
       </div>
     </div>
     <div class="top-actions">
@@ -328,13 +348,13 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       <span class="chip-ro" id="roChip" hidden>View only</span>
       <button type="button" class="btn ghost" data-act="members">Members</button>
       <button type="button" class="btn ghost" data-act="settings">Settings</button>
-      <button type="button" class="btn ghost" data-act="backup">Backup</button>
+      <button type="button" class="btn ghost" data-act="sync">Sync</button>
     </div>
   </div>
 
   <div class="nag" id="bakNag" hidden>
-    <span id="bakNagTxt">Your register is only on this device. Save a backup file.</span>
-    <button type="button" class="btn" data-act="backup">Back up now</button>
+    <span id="bakNagTxt">This register is only on this device.</span>
+    <button type="button" class="btn" data-act="sync">Set up sync</button>
   </div>
 
   <main id="main">
@@ -428,17 +448,85 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
   </form>
 </dialog>
 
-<dialog class="dlg" id="bakDlg" aria-labelledby="bakTitle">
+<dialog class="dlg" id="syncDlg" aria-labelledby="syncTitle">
   <div class="inner">
     <div class="dlg-head">
-      <div><p class="eyebrow">This device</p><h3 id="bakTitle">Backup</h3></div>
+      <div><p class="eyebrow">Phone and Mac</p><h3 id="syncTitle">Sync &amp; backup</h3></div>
       <button type="button" class="close" data-close aria-label="Close">×</button>
     </div>
-    <p class="state" id="bakState">The register is saved on this device only.</p>
-    <button type="button" class="btn primary big" id="bakSave">Save backup file</button>
-    <p class="hint">Keep the file somewhere safe, for example in Files, iCloud Drive or a WhatsApp chat with yourself. Open it on your other device with “Restore” to copy the register there.</p>
+    <p class="state" id="syncState">This register is only on this device.</p>
+
+    <section class="grp" id="syncSetup">
+      <p class="hint">Connect this device to your private GitHub repository. Do it once on your phone and once on your Mac, and both will share the same register.</p>
+      <div class="field">
+        <label for="sOwner">GitHub username</label>
+        <input id="sOwner" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="sRepo">Private data repository</label>
+        <input id="sRepo" autocomplete="off" autocapitalize="off" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="sToken">Access token</label>
+        <input id="sToken" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="github_pat_…">
+      </div>
+      <button type="button" class="btn primary big" id="sConnect">Connect and sync</button>
+      <details>
+        <summary>Connected on your other device already? Use a setup code</summary>
+        <div class="field" style="margin-top:10px">
+          <label for="sCode">Setup code</label>
+          <div class="inrow">
+            <input id="sCode" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="PSC1.…">
+            <button type="button" class="btn primary" id="sUseCode">Connect</button>
+          </div>
+        </div>
+      </details>
+      <p class="err" id="sErr" hidden></p>
+    </section>
+
+    <section class="grp" id="syncOn" hidden>
+      <div class="inrow">
+        <button type="button" class="btn primary" id="sNow">Sync now</button>
+        <button type="button" class="btn" id="sCopy">Copy setup code</button>
+      </div>
+      <p class="hint">To connect your other device without typing the token, tap “Copy setup code” here and paste it there. Keep the code private, because it works like a password.</p>
+      <input id="sCodeOut" class="vh" readonly aria-label="Setup code">
+      <details id="verBox">
+        <summary>Earlier versions</summary>
+        <p class="hint" style="margin-top:8px">Each sync is saved on GitHub. If something goes wrong, restore the register as it was at that time. Restoring updates every device.</p>
+        <ul class="vers" id="verList"></ul>
+        <button type="button" class="btn" id="verMore" hidden>Show older versions</button>
+      </details>
+      <details id="tokBox">
+        <summary>Replace the access token</summary>
+        <div class="field" style="margin-top:10px">
+          <label for="sNewTok">New access token</label>
+          <div class="inrow">
+            <input id="sNewTok" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="github_pat_…">
+            <button type="button" class="btn primary" id="sSaveTok">Save</button>
+          </div>
+          <p class="hint">Needed when the old token expires. Your register stays as it is.</p>
+        </div>
+      </details>
+      <p class="err" id="sErr2" hidden></p>
+      <div class="foot-row">
+        <button type="button" class="btn danger" id="sOff">Disconnect this device</button>
+      </div>
+      <div class="bakbox" id="sOffConfirm" hidden>
+        <p>Stop syncing on this device? The register stays here and online. You can connect again later.</p>
+        <div class="inrow">
+          <button type="button" class="btn primary" id="sOffYes">Disconnect</button>
+          <button type="button" class="btn" id="sOffNo">Cancel</button>
+        </div>
+      </div>
+    </section>
+
     <div class="memdivider"></div>
-    <label class="btn" for="bakFile">Restore from a backup file</label>
+    <span class="lbl2">Backup file</span>
+    <div class="inrow">
+      <button type="button" class="btn" id="bakSave">Save backup file</button>
+      <label class="btn" for="bakFile">Restore a file</label>
+    </div>
     <input type="file" id="bakFile" class="vh" accept=".json,application/json">
     <div class="bakbox" id="bakConfirm" hidden>
       <p id="bakConfirmTxt"></p>
@@ -448,7 +536,6 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       </div>
     </div>
     <p class="err" id="bakErr" hidden></p>
-    <div class="memdivider"></div>
     <button type="button" class="btn" id="csvSave">Export for Excel (.csv)</button>
     <p class="hint" id="appVer"></p>
   </div>
@@ -1210,7 +1297,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     else if (act === "members") { if (!S.db) { toast("Members can't load in this view."); return; } openMembers(); }
     else if (act === "settings") { if (!S.canWrite || !S.db) { toast("You can view this register, but you can't change its settings."); return; } openSettings(); }
     else if (act === "pdf") downloadPdf();
-    else if (act === "backup") openBackup();
+    else if (act === "sync") openSync();
   });
   for (const d of document.querySelectorAll("dialog.dlg")) {
     d.addEventListener("click", (ev) => { if (ev.target === d) d.close(); });
@@ -1251,34 +1338,50 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     unsubSet = S.db.doc("settings/club").onSnapshot((d) => { S.settingsServer = d.exists ? d.data() : null; render(); }, onSubErr);
   }
 
-  /* ---------- on-device store (same shape as the online version, kept in this browser) ---------- */
-  const APP_VERSION = "1.0.0";
-  const STORE_KEY = "psc.store.v1", PREV_KEY = "psc.store.prev", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
+  /* ======================================================================
+     On-device store. Same shape as the online version: path -> record.
+     Every record carries _u (last change, ms). Deleted records become
+     {_deleted: true, _u} so a deletion can travel to the other device.
+     ====================================================================== */
+  const APP_VERSION = "1.1.0";
+  const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
+  const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty";
   const SEED = {"members/m01":{"name":"Kaja","order":1,"removed":false,"start":null},"members/m02":{"name":"Thivakaran","order":2,"removed":false,"start":null},"members/m03":{"name":"Birunthaban","order":3,"removed":false,"start":null},"members/m04":{"name":"Keerthan","order":4,"removed":false,"start":null},"members/m05":{"name":"Chan Shankee","order":5,"removed":false,"start":null},"members/m06":{"name":"Dilojan","order":6,"removed":false,"start":null},"members/m07":{"name":"Sivaluxan","order":7,"removed":false,"start":null},"members/m08":{"name":"Siva Siburu","order":8,"removed":false,"start":null},"members/m09":{"name":"Shankar","order":9,"removed":false,"start":null},"members/m10":{"name":"Kugankukathas","order":10,"removed":false,"start":null},"members/m11":{"name":"Mathu","order":11,"removed":false,"start":null},"members/m12":{"name":"Nanthan","order":12,"removed":false,"start":null},"members/m13":{"name":"Naren","order":13,"removed":false,"start":null},"members/m14":{"name":"Luxshan","order":14,"removed":false,"start":null},"members/m15":{"name":"Kutty Pirathees","order":15,"removed":false,"start":null},"members/m16":{"name":"Saravana (Sana)","order":16,"removed":false,"start":null},"members/m17":{"name":"Thuva","order":17,"removed":false,"start":null},"members/m18":{"name":"Aathy","order":18,"removed":false,"start":null},"members/m19":{"name":"Thuvarakethan","order":19,"removed":false,"start":null},"members/m20":{"name":"Vinoban","order":20,"removed":false,"start":null},"members/m21":{"name":"Amalaraj","order":21,"removed":false,"start":null},"members/m22":{"name":"Vinshan","order":22,"removed":false,"start":null},"members/m23":{"name":"Nadesh (Doctor)","order":23,"removed":false,"start":null},"members/m24":{"name":"Patrick","order":24,"removed":false,"start":null},"members/m25":{"name":"Senthu","order":25,"removed":false,"start":null},"payments/2026-m01":{"m":{"9":650},"member":"m01","year":2026},"payments/2026-m04":{"m":{"9":500},"member":"m04","year":2026},"payments/2026-m05":{"m":{"9":650},"member":"m05","year":2026},"payments/2026-m07":{"m":{"9":500},"member":"m07","year":2026},"payments/2026-m10":{"h":{"9":[{"a":250,"t":"2026-10-27"}]},"m":{"9":250},"member":"m10","year":2026},"payments/2026-m15":{"h":{"9":[{"a":650,"t":"2026-10-27"}]},"m":{"9":650},"member":"m15","year":2026},"payments/2026-m20":{"h":{"9":[{"a":700,"t":"2026-10-27"}]},"m":{"9":700},"member":"m20","year":2026},"payments/2026-m21":{"h":{"9":[{"a":650,"t":"2026-10-27"}]},"m":{"9":650},"member":"m21","year":2026},"payments/2026-m23":{"h":{"9":[{"a":500,"t":"2026-10-27"}]},"m":{"9":500},"member":"m23","year":2026},"settings/club":{"fees":{"2026":650},"start":{"m":9,"y":2026}}};
+  const readLS = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
+  const writeLS = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+  const delLS = (k) => { try { localStorage.removeItem(k); } catch (e) {} };
+  const clone = (o) => JSON.parse(JSON.stringify(o));
+  const live = (d) => !!d && typeof d === "object" && !d._deleted;
+
   const LocalDB = (() => {
     let ok = true, store = null;
     try { store = JSON.parse(localStorage.getItem(STORE_KEY) || "null"); } catch (e) { ok = false; }
     if (!store || typeof store !== "object") {
-      store = JSON.parse(JSON.stringify(SEED));
+      store = clone(SEED);
       try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) { ok = false; }
     }
     const subs = new Set();
-    const clone = (o) => JSON.parse(JSON.stringify(o));
+    let changeHook = null;
     const meta = { fromCache: false, hasPendingWrites: false };
-    const snapDoc = (p) => ({ id: p.split("/").pop(), exists: Object.prototype.hasOwnProperty.call(store, p), data: () => store[p], metadata: meta });
+    const snapDoc = (p) => ({ id: p.split("/").pop(), exists: live(store[p]), data: () => (live(store[p]) ? store[p] : undefined), metadata: meta });
     const notify = () => { for (const s of [...subs]) s(); };
-    function persist(p, prev) {
-      try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); localStorage.setItem(CHG_KEY, new Date().toISOString()); return; }
-      catch (e) {
+    const save = () => localStorage.setItem(STORE_KEY, JSON.stringify(store));
+    function write(p, body) {
+      const prev = store[p];
+      store[p] = body;
+      try { save(); } catch (e) {
         if (prev === undefined) delete store[p]; else store[p] = prev;
         throw { code: "quota_exceeded", message: "storage full" };
       }
+      writeLS(CHG_KEY, new Date().toISOString());
+      notify();
+      if (changeHook) changeHook();
     }
     function query(col, filters) {
       const depth = col.split("/").length + 1;
       const run = () => {
-        const docs = Object.keys(store).filter((k) => k.startsWith(col + "/") && k.split("/").length === depth)
-          .filter((k) => filters.every(([f, , v]) => store[k] && store[k][f] === v)).sort().map(snapDoc);
+        const docs = Object.keys(store).filter((k) => k.startsWith(col + "/") && k.split("/").length === depth && live(store[k]))
+          .filter((k) => filters.every(([f, , v]) => store[k][f] === v)).sort().map(snapDoc);
         return { docs, size: docs.length, empty: !docs.length, docChanges: () => [], metadata: meta };
       };
       return {
@@ -1292,12 +1395,11 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       return {
         id: p.split("/").pop(), path: p,
         get: async () => snapDoc(p),
-        set: async (d) => { const prev = store[p]; store[p] = clone(d); persist(p, prev); notify(); },
-        delete: async () => { const prev = store[p]; delete store[p]; persist(p, prev); notify(); },
+        set: async (d) => { const body = clone(d); delete body._u; delete body._deleted; body._u = Date.now(); write(p, body); },
+        delete: async () => { if (store[p] !== undefined) write(p, { _deleted: true, _u: Date.now() }); },
         onSnapshot: (next) => { const s = () => next(snapDoc(p)); subs.add(s); setTimeout(s, 0); return () => subs.delete(s); },
       };
     }
-    // another tab or window of the app changed the data
     window.addEventListener("storage", (ev) => {
       if (ev.key !== STORE_KEY || !ev.newValue) return;
       try { store = JSON.parse(ev.newValue); notify(); } catch (e) {}
@@ -1306,62 +1408,366 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       ok: () => ok,
       doc: docRef,
       collection: (c) => query(c, []),
-      all: () => clone(store),
-      replaceAll: (obj) => {
-        const prev = JSON.stringify(store);
-        localStorage.setItem(STORE_KEY, JSON.stringify(obj));
-        try { localStorage.setItem(PREV_KEY, prev); } catch (e) {}
-        store = clone(obj); notify();
+      onLocalChange: (fn) => { changeHook = fn; },
+      raw: () => clone(store),
+      liveOnly: () => { const o = {}; for (const k in store) if (live(store[k])) { o[k] = clone(store[k]); delete o[k]._u; } return o; },
+      // Take records from the online copy that are newer than ours. Our own newer edits stay.
+      mergeIn: (obj) => {
+        let changed = false;
+        for (const k in obj) {
+          const a = store[k], b = obj[k];
+          if (a === undefined || (b._u || 0) >= (a._u || 0)) { if (JSON.stringify(a) !== JSON.stringify(b)) { store[k] = clone(b); changed = true; } }
+        }
+        if (changed) { save(); notify(); }
+        return changed;
+      },
+      // A device that has never been used adopts the online register as it is.
+      adopt: (obj) => { store = clone(obj); save(); notify(); },
+      // The user restored a file or an earlier version: it becomes the newest state everywhere.
+      restoreAll: (obj) => {
+        const now = Date.now(), next = {};
+        for (const k in obj) if (live(obj[k])) { const r = clone(obj[k]); delete r._u; r._u = now; next[k] = r; }
+        for (const k in store) if (!(k in next)) next[k] = { _deleted: true, _u: now };
+        const before = store;
+        store = next;
+        try { save(); } catch (e) { store = before; throw e; }
+        writeLS(CHG_KEY, new Date().toISOString());
+        notify();
+        if (changeHook) changeHook();
       },
     };
   })();
 
-  /* ---------- backup and restore ---------- */
-  const readLS = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
-  const writeLS = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
+  /* ======================================================================
+     Online sync through a private GitHub repository (register.json).
+     Each sync: read the online file, merge record by record (newest wins),
+     save the merge back. Every save is a commit, so every version is kept.
+     ====================================================================== */
+  const DEFAULT_OWNER = "Birunthaban-jpg", DEFAULT_REPO = "pirampady-sc-data", FILE = "register.json";
+  let cfg = null;
+  try { cfg = JSON.parse(readLS(SYNC_KEY) || "null"); } catch (e) { cfg = null; }
+  if (cfg && !(cfg.owner && cfg.repo && cfg.token)) cfg = null;
+  const saveCfg = () => { if (cfg) writeLS(SYNC_KEY, JSON.stringify(cfg)); else delLS(SYNC_KEY); };
+  const SY = { state: cfg ? "busy" : "off", msg: "", running: false, again: false, timer: null };
+
+  const b64e = (str) => { const bytes = new TextEncoder().encode(str); let bin = ""; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(bin); };
+  const b64d = (b64) => { const bin = atob(String(b64).replace(/\s/g, "")); const bytes = new Uint8Array(bin.length); for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i); return new TextDecoder().decode(bytes); };
+  function deviceName() {
+    const ua = navigator.userAgent;
+    if (/iPhone/.test(ua)) return "iPhone";
+    if (/iPad/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1)) return "iPad";
+    if (/Android/.test(ua)) return "Android phone";
+    if (/Macintosh/.test(ua)) return "Mac";
+    if (/Windows/.test(ua)) return "Windows PC";
+    return "computer";
+  }
+  class SyncError extends Error { constructor(kind, msg) { super(msg); this.kind = kind; } }
+  function gh(c, path, opts) {
+    const o = opts || {};
+    return fetch(`https://api.github.com/repos/${encodeURIComponent(c.owner)}/${encodeURIComponent(c.repo)}${path}`, {
+      method: o.method || "GET",
+      cache: "no-store",
+      body: o.body,
+      headers: { Accept: "application/vnd.github+json", Authorization: `Bearer ${c.token}`, "X-GitHub-Api-Version": "2022-11-28", ...(o.body ? { "Content-Type": "application/json" } : {}) },
+    });
+  }
+  function ghErr(res) {
+    if (res.status === 401) return new SyncError("auth", "GitHub didn't accept the access token. It may have expired or been copied wrongly. Replace it under “Replace the access token”.");
+    if (res.status === 403 || res.status === 429) {
+      if (res.headers.get("x-ratelimit-remaining") === "0" || res.status === 429) return new SyncError("busy", "GitHub is limiting requests for a few minutes. Sync will try again by itself.");
+      return new SyncError("auth", "The token isn't allowed to change this repository. Create it again with Contents set to “Read and write”.");
+    }
+    if (res.status === 404) return new SyncError("missing", "GitHub can't find that repository with this token. Check the username and repository name, and that the token was given access to it.");
+    return new SyncError("server", `GitHub had a problem (error ${res.status}). Sync will try again.`);
+  }
+  async function pull(c) {
+    const res = await gh(c, `/contents/${FILE}`);
+    if (res.status === 404) {
+      const repo = await gh(c, "");
+      if (!repo.ok) throw ghErr(repo);
+      return { sha: null, store: null };
+    }
+    if (!res.ok) throw ghErr(res);
+    const j = await res.json();
+    let data = null;
+    try { data = JSON.parse(b64d(j.content || "")); } catch (e) { throw new SyncError("server", "The online register file is damaged. Restore an earlier version below."); }
+    return { sha: j.sha, store: data && data.store && typeof data.store === "object" ? data.store : {} };
+  }
+  async function push(c, store, sha) {
+    const when = new Date().toLocaleString("en-GB", { day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+    const body = { message: `Saved from ${deviceName()} · ${when}`, content: b64e(JSON.stringify({ app: "pirampady-sc", format: 2, savedAt: new Date().toISOString(), store }, null, 1)) };
+    if (sha) body.sha = sha;
+    const res = await gh(c, `/contents/${FILE}`, { method: "PUT", body: JSON.stringify(body) });
+    if (res.status === 409 || res.status === 422) return null;   // the other device saved first: read again and merge
+    if (!res.ok) throw ghErr(res);
+    const j = await res.json();
+    return (j.content && j.content.sha) || "saved";
+  }
+  function mergeStores(local, remote) {
+    const out = {};
+    let remoteChanged = false;
+    for (const k of new Set([...Object.keys(local), ...Object.keys(remote)])) {
+      const a = local[k], b = remote[k];
+      const pick = a === undefined ? b : b === undefined ? a : (b._u || 0) >= (a._u || 0) ? b : a;
+      out[k] = pick;
+      if (JSON.stringify(pick) !== JSON.stringify(b)) remoteChanged = true;
+    }
+    return { out, remoteChanged };
+  }
+  async function syncNow() {
+    if (!cfg) { setSync("off"); return; }
+    if (SY.running) { SY.again = true; return; }
+    clearTimeout(SY.timer);
+    if (navigator.onLine === false) { setSync("offline"); return; }
+    SY.running = true;
+    setSync("busy");
+    try {
+      let done = false;
+      for (let attempt = 0; attempt < 4 && !done; attempt++) {
+        const remote = await pull(cfg);
+        const firstTime = !cfg.joined;
+        if (remote.store && firstTime && !readLS(CHG_KEY)) {
+          LocalDB.adopt(remote.store);        // a new device takes the online register as it is
+          cfg.sha = remote.sha;
+          done = true;
+          break;
+        }
+        const local = LocalDB.raw();
+        const m = mergeStores(local, remote.store || {});
+        if (remote.store) LocalDB.mergeIn(remote.store);
+        if (!remote.store || m.remoteChanged) {
+          const sha = await push(cfg, m.out, remote.sha);
+          if (!sha) continue;
+          cfg.sha = sha;
+        } else cfg.sha = remote.sha;
+        done = true;
+      }
+      if (!done) throw new SyncError("server", "Your devices kept saving at the same moment. Tap “Sync now” to try again.");
+      cfg.joined = true;
+      cfg.last = new Date().toISOString();
+      saveCfg();
+      delLS(DIRTY_KEY);
+      verCache = null;
+      setSync("ok");
+    } catch (e) {
+      if (e instanceof SyncError) setSync(e.kind === "busy" ? "offline" : "error", e.message);
+      else if (e && e.name === "TypeError") setSync("offline", "");
+      else setSync("error", "Sync stopped unexpectedly. Tap “Sync now” to try again.");
+    } finally {
+      SY.running = false;
+      if (SY.again) { SY.again = false; scheduleSync(600); }
+    }
+  }
+  function scheduleSync(ms) { if (!cfg) return; clearTimeout(SY.timer); SY.timer = setTimeout(syncNow, ms == null ? 2500 : ms); }
+  LocalDB.onLocalChange(() => {
+    writeLS(DIRTY_KEY, "1");
+    if (cfg) { if (SY.state !== "error") setSync("busy"); scheduleSync(); }
+    renderNag();
+  });
+
+  const hhmm = (iso) => { const d = new Date(iso); return isNaN(d) ? "" : d.toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit" }); };
   function fmtWhen(iso) {
     if (!iso) return "never";
     const d = new Date(iso);
     if (isNaN(d)) return "never";
     return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }) + ", " + d.toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit" });
   }
+  function setSync(state, msg) {
+    SY.state = state;
+    if (msg !== undefined) SY.msg = msg;
+    renderSyncChip();
+    if ($("syncDlg").open) renderSyncDlg();
+  }
+  function renderSyncChip() {
+    const chip = $("syncChip"), t = $("syncTxt");
+    const pending = !!readLS(DIRTY_KEY);
+    const map = {
+      off: ["off", "Only on this device · set up sync"],
+      busy: ["busy", "Syncing…"],
+      ok: ["ok", cfg && cfg.last ? `Synced ${hhmm(cfg.last)}` : "Synced"],
+      offline: ["off", pending ? "Offline · changes will sync later" : "Offline · will sync later"],
+      error: ["err", "Sync problem · tap to fix"],
+    };
+    const [cls, txt] = map[SY.state] || map.off;
+    chip.dataset.s = cls;
+    t.textContent = txt;
+  }
+
+  /* ---------- Sync & backup dialog ---------- */
+  function renderSyncDlg() {
+    const on = !!cfg;
+    $("syncSetup").hidden = on;
+    $("syncOn").hidden = !on;
+    let st;
+    if (!on) st = "This register is only on this device. Connect to share it between your phone and Mac and keep every version online.";
+    else if (SY.state === "error") st = SY.msg;
+    else if (SY.state === "busy") st = "Syncing with GitHub…";
+    else if (SY.state === "offline") st = `No internet right now. Changes are saved on this device and will sync when you're back online.${cfg.last ? ` Last synced ${fmtWhen(cfg.last)}.` : ""}`;
+    else st = `Synced with ${cfg.owner}/${cfg.repo}. Last synced ${fmtWhen(cfg.last)}.`;
+    $("syncState").textContent = st;
+    $("syncState").style.color = on && SY.state === "error" ? "var(--due)" : "";
+    $("appVer").textContent = `App version ${APP_VERSION} · works offline · this device: ${deviceName()}`;
+  }
+  function openSync() {
+    $("sOwner").value = (cfg && cfg.owner) || DEFAULT_OWNER;
+    $("sRepo").value = (cfg && cfg.repo) || DEFAULT_REPO;
+    $("sToken").value = ""; $("sCode").value = ""; $("sNewTok").value = "";
+    for (const id of ["sErr", "sErr2", "bakErr", "bakConfirm", "sOffConfirm"]) $(id).hidden = true;
+    $("verBox").open = false; $("tokBox").open = false;
+    $("bakFile").value = "";
+    renderSyncDlg();
+    $("syncDlg").showModal();
+  }
+  function showErr(id, msg) { $(id).textContent = msg; $(id).hidden = !msg; }
+  async function connect(c, errId) {
+    showErr(errId, "");
+    if (!c.owner || !c.repo || !c.token) { showErr(errId, "Fill in the username, repository and access token."); return; }
+    const btns = [$("sConnect"), $("sUseCode")];
+    btns.forEach((b) => b.setAttribute("aria-busy", "true"));
+    try {
+      const res = await gh(c, "");
+      if (!res.ok) throw ghErr(res);
+      const repo = await res.json();
+      if (repo.private === false) throw new SyncError("public", `“${c.owner}/${c.repo}” is public, so anyone could read the members' payments. Make it private on GitHub (Settings → General → Change visibility), then connect again.`);
+      cfg = { owner: c.owner, repo: c.repo, token: c.token, joined: false };
+      saveCfg();
+      await syncNow();
+      if (SY.state === "error") {
+        const msg = SY.msg;
+        cfg = null; saveCfg(); setSync("off");
+        showErr(errId, msg);
+        return;
+      }
+      renderSyncDlg();
+      toast(SY.state === "ok" ? "Connected. This device now syncs online." : "Connected. It will sync when you're online.");
+    } catch (e) {
+      showErr(errId, e instanceof SyncError ? e.message : "Couldn't reach GitHub. Check the internet connection and try again.");
+    } finally { btns.forEach((b) => b.removeAttribute("aria-busy")); }
+  }
+  $("sConnect").addEventListener("click", () => connect({ owner: $("sOwner").value.trim(), repo: $("sRepo").value.trim(), token: $("sToken").value.trim() }, "sErr"));
+  $("sUseCode").addEventListener("click", () => {
+    const raw = $("sCode").value.trim();
+    let c = null;
+    try { if (raw.startsWith("PSC1.")) { const o = JSON.parse(b64d(raw.slice(5))); c = { owner: o.o, repo: o.r, token: o.t }; } } catch (e) {}
+    if (!c || !c.owner || !c.repo || !c.token) { showErr("sErr", "That setup code isn't complete. Copy it again on your other device and paste the whole code."); return; }
+    connect(c, "sErr");
+  });
+  $("sNow").addEventListener("click", () => { showErr("sErr2", ""); syncNow(); });
+  $("sCopy").addEventListener("click", () => {
+    if (!cfg) return;
+    const code = "PSC1." + b64e(JSON.stringify({ o: cfg.owner, r: cfg.repo, t: cfg.token }));
+    const out = $("sCodeOut");
+    const fallback = () => { out.classList.remove("vh"); out.value = code; out.focus(); out.select(); toast("Select the code and copy it."); };
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(code).then(() => toast("Setup code copied. Paste it on your other device under “Use a setup code”."), fallback);
+    else fallback();
+  });
+  $("sSaveTok").addEventListener("click", async () => {
+    const t = $("sNewTok").value.trim();
+    if (!t || !cfg) { showErr("sErr2", "Paste the new access token first."); return; }
+    const test = { ...cfg, token: t };
+    try {
+      const res = await gh(test, "");
+      if (!res.ok) throw ghErr(res);
+      cfg.token = t; saveCfg();
+      $("sNewTok").value = ""; $("tokBox").open = false; showErr("sErr2", "");
+      toast("New token saved.");
+      syncNow();
+    } catch (e) { showErr("sErr2", e instanceof SyncError ? e.message : "Couldn't reach GitHub. Check the internet connection."); }
+  });
+  $("sOff").addEventListener("click", () => { $("sOffConfirm").hidden = false; });
+  $("sOffNo").addEventListener("click", () => { $("sOffConfirm").hidden = true; });
+  $("sOffYes").addEventListener("click", () => {
+    cfg = null; saveCfg(); clearTimeout(SY.timer); setSync("off");
+    $("sOffConfirm").hidden = true; renderSyncDlg(); renderNag();
+    toast("This device no longer syncs. Its register stays here.");
+  });
+
+  /* ---------- earlier versions (GitHub history) ---------- */
+  let verCache = null, verPage = 1, verPending = null;
+  async function loadVersions(more) {
+    const list = $("verList");
+    if (!cfg) return;
+    if (!more) { verPage = 1; if (verCache) { drawVersions(); return; } list.innerHTML = `<li class="hint">Loading versions…</li>`; }
+    try {
+      const res = await gh(cfg, `/commits?path=${FILE}&per_page=20&page=${verPage}`);
+      if (!res.ok) throw ghErr(res);
+      const rows = (await res.json()).map((x) => ({ sha: x.sha, when: (x.commit.committer && x.commit.committer.date) || (x.commit.author && x.commit.author.date), msg: (x.commit.message || "").split("\n")[0] }));
+      verCache = more && verCache ? verCache.concat(rows) : rows;
+      $("verMore").hidden = rows.length < 20;
+      drawVersions();
+    } catch (e) {
+      list.innerHTML = `<li class="err">${esc(e instanceof SyncError ? e.message : "Couldn't load versions. Check the internet connection.")}</li>`;
+    }
+  }
+  function drawVersions() {
+    const list = $("verList");
+    if (!verCache || !verCache.length) { list.innerHTML = `<li class="hint">No versions saved yet.</li>`; return; }
+    list.innerHTML = verCache.map((v, k) => `<li>
+        <div class="vmeta"><b>${esc(fmtWhen(v.when))}</b><span>${esc(v.msg.replace(/ · \d.*$/, ""))}${k === 0 ? " · current" : ""}</span></div>
+        ${k === 0 ? "" : `<button type="button" class="btn" data-ver="${esc(v.sha)}">Restore</button>`}
+        ${verPending === v.sha ? `<div class="bakbox vconfirm"><p>Restore the register as it was on ${esc(fmtWhen(v.when))}? Your phone and Mac will both change to this version. Today's version stays in the list, so you can switch back.</p><div class="inrow"><button type="button" class="btn primary" data-ver-yes="${esc(v.sha)}">Restore this version</button><button type="button" class="btn" data-ver-no>Cancel</button></div></div>` : ""}
+      </li>`).join("");
+  }
+  $("verBox").addEventListener("toggle", () => { if ($("verBox").open) { verPending = null; loadVersions(false); } });
+  $("verMore").addEventListener("click", () => { verPage++; loadVersions(true); });
+  $("verList").addEventListener("click", async (ev) => {
+    const b = ev.target.closest("button");
+    if (!b) return;
+    if (b.dataset.ver) { verPending = b.dataset.ver; drawVersions(); return; }
+    if (b.hasAttribute("data-ver-no")) { verPending = null; drawVersions(); return; }
+    const sha = b.dataset.verYes;
+    if (!sha || !cfg) return;
+    b.setAttribute("aria-busy", "true");
+    try {
+      const res = await gh(cfg, `/contents/${FILE}?ref=${encodeURIComponent(sha)}`);
+      if (!res.ok) throw ghErr(res);
+      const j = await res.json();
+      const data = JSON.parse(b64d(j.content || ""));
+      if (!data || !data.store) throw new SyncError("server", "That version couldn't be read.");
+      const when = verCache.find((v) => v.sha === sha);
+      LocalDB.restoreAll(data.store);
+      verPending = null; verCache = null;
+      await syncNow();
+      $("syncDlg").close();
+      toast(`Restored the register from ${when ? fmtWhen(when.when) : "that version"}.`);
+    } catch (e) {
+      b.removeAttribute("aria-busy");
+      showErr("sErr2", e instanceof SyncError ? e.message : "Couldn't restore that version. Check the internet connection.");
+    }
+  });
+
+  /* ---------- backup file and Excel export ---------- */
   function countRecords(store) {
     let members = 0, pays = 0;
     for (const k in store) {
+      if (!live(store[k])) continue;
       if (k.startsWith("members/") && !store[k].removed) members++;
       if (k.startsWith("payments/")) for (const i in (store[k].m || {})) if (store[k].m[i] > 0) pays++;
     }
     return { members, pays };
   }
   function renderNag() {
+    if (cfg) { $("bakNag").hidden = true; return; }
     const last = readLS(BAK_KEY), changed = readLS(CHG_KEY);
     const days = last ? (Date.now() - new Date(last).getTime()) / 864e5 : Infinity;
-    const needs = changed && (!last || new Date(changed) > new Date(last)) && days > 7;
+    const needs = !!changed && (!last || new Date(changed) > new Date(last)) && days > 7;
     $("bakNag").hidden = !needs;
-    if (needs) $("bakNagTxt").textContent = last ? `Last backup was ${Math.floor(days)} days ago. The register is only on this device.` : "You haven't saved a backup yet. The register is only on this device.";
-  }
-  function openBackup() {
-    const c = countRecords(LocalDB.all());
-    $("bakState").textContent = `Saved on this device only: ${c.members} members, ${c.pays} monthly payments. Last backup: ${fmtWhen(readLS(BAK_KEY))}.`;
-    $("bakConfirm").hidden = true; $("bakErr").hidden = true; $("bakFile").value = "";
-    $("appVer").textContent = `App version ${APP_VERSION} · works offline`;
-    $("bakDlg").showModal();
+    if (needs) $("bakNagTxt").textContent = "This register is only on this device. Turn on online sync so it's safe and shared with your other device.";
   }
   $("bakSave").addEventListener("click", async () => {
     const now = new Date();
-    const body = JSON.stringify({ app: "pirampady-sc", format: 1, savedAt: now.toISOString(), store: LocalDB.all() }, null, 1);
+    const body = JSON.stringify({ app: "pirampady-sc", format: 2, savedAt: now.toISOString(), store: LocalDB.liveOnly() }, null, 1);
     const name = `Pirampady_SC_backup_${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}.json`;
     const how = await deliverFile(new Blob([body], { type: "application/json" }), name, "application/json");
     if (how === "cancelled") return;
     writeLS(BAK_KEY, now.toISOString());
     renderNag();
-    $("bakDlg").close();
     toast(how === "downloaded" ? "Backup saved to your Downloads." : "Backup file ready. Keep it somewhere safe.");
   });
   let pendingRestore = null;
   $("bakFile").addEventListener("change", () => {
     const f = $("bakFile").files && $("bakFile").files[0];
-    $("bakErr").hidden = true; $("bakConfirm").hidden = true; pendingRestore = null;
+    showErr("bakErr", ""); $("bakConfirm").hidden = true; pendingRestore = null;
     if (!f) return;
     const fr = new FileReader();
     fr.onload = () => {
@@ -1369,29 +1775,29 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       try { data = JSON.parse(fr.result); } catch (e) {}
       const st = data && data.app === "pirampady-sc" && data.store && typeof data.store === "object" ? data.store : null;
       const valid = st && Object.keys(st).every((k) => /^(members|payments|electricity|settings)\/[A-Za-z0-9_.:@+~-]+$/.test(k) && st[k] && typeof st[k] === "object");
-      if (!valid) { $("bakErr").textContent = "That file isn't a Pirampady SC backup. Choose the .json file saved with “Save backup file”."; $("bakErr").hidden = false; return; }
+      if (!valid) { showErr("bakErr", "That file isn't a Pirampady SC backup. Choose the .json file made with “Save backup file”."); return; }
       const c = countRecords(st);
       pendingRestore = st;
-      $("bakConfirmTxt").textContent = `Replace everything on this device with the backup from ${fmtWhen(data.savedAt)}? It has ${c.members} members and ${c.pays} monthly payments.`;
+      $("bakConfirmTxt").textContent = `Replace the register with the backup from ${fmtWhen(data.savedAt)}? It has ${c.members} members and ${c.pays} monthly payments.${cfg ? " Your other device will change too." : ""}`;
       $("bakConfirm").hidden = false;
     };
-    fr.onerror = () => { $("bakErr").textContent = "That file couldn't be read. Try choosing it again."; $("bakErr").hidden = false; };
+    fr.onerror = () => showErr("bakErr", "That file couldn't be read. Try choosing it again.");
     fr.readAsText(f);
   });
   $("bakCancel").addEventListener("click", () => { pendingRestore = null; $("bakConfirm").hidden = true; $("bakFile").value = ""; });
   $("bakReplace").addEventListener("click", () => {
     if (!pendingRestore) return;
-    const before = LocalDB.all();
-    try { LocalDB.replaceAll(pendingRestore); }
-    catch (e) { $("bakErr").textContent = "This device's storage is full, so the backup couldn't be restored."; $("bakErr").hidden = false; return; }
+    const before = LocalDB.liveOnly();
+    try { LocalDB.restoreAll(pendingRestore); }
+    catch (e) { showErr("bakErr", "This device's storage is full, so the backup couldn't be restored."); return; }
     pendingRestore = null;
-    $("bakDlg").close();
+    $("syncDlg").close();
     writeLS(BAK_KEY, new Date().toISOString());
     renderNag();
-    toast("Backup restored on this device.", () => { LocalDB.replaceAll(before); toast("Went back to the register you had before."); });
+    toast("Backup restored.", () => { LocalDB.restoreAll(before); toast("Went back to the register you had before."); });
   });
   $("csvSave").addEventListener("click", async () => {
-    const st = LocalDB.all();
+    const st = LocalDB.liveOnly();
     const names = {};
     for (const k in st) if (k.startsWith("members/")) names[k.slice(8)] = st[k].name;
     const q = (v) => { const t = String(v ?? ""); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
@@ -1407,7 +1813,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       const e = st[k];
       for (let i = 0; i < 12; i++) { const x = e.m && e.m[i]; if (x && (x.amount > 0 || x.signed)) rows.push(["Electricity", e.year, MONTHS_FULL[i], "", x.amount || 0, "", x.signed ? "Signed by Selvarajah" : "Not signed"]); }
     }
-    const csv = "\ufeff" + rows.map((r) => r.map(q).join(",")).join("\r\n");
+    const csv = "﻿" + rows.map((r) => r.map(q).join(",")).join("\r\n");
     const d = new Date();
     await deliverFile(new Blob([csv], { type: "text/csv" }), `Pirampady_SC_payments_${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}.csv`, "text/csv");
   });
@@ -1416,8 +1822,15 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
   S.db = LocalDB; S.dbState = LocalDB.ok() ? "ready" : "none";
   render();
   if (S.dbState === "ready") { startMembers(); subYear(); }
+  renderSyncChip();
   renderNag();
   try { if (navigator.storage && navigator.storage.persist) navigator.storage.persist(); } catch (e) {}
+  if (cfg) syncNow();
+  window.addEventListener("online", () => { if (cfg) syncNow(); });
+  window.addEventListener("offline", () => { if (cfg && !SY.running) setSync("offline"); });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && cfg) syncNow(); });
+  setInterval(() => { if (cfg && document.visibilityState === "visible") syncNow(); }, 60000);
+  window.__pscSync = { syncNow, SY, get cfg() { return cfg; }, LocalDB };
 
   /* ---------- offline support and updates ---------- */
   if ("serviceWorker" in navigator && location.protocol !== "file:") {

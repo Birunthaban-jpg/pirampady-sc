@@ -10,7 +10,8 @@ Members pay Rs. 650 a month. Some pay part of it, some pay ahead. The club also 
 - **Electricity bill and signature** recorded for each month.
 - **A4 landscape PDF** of the filled register (club logo, ticks, totals), shared straight to WhatsApp from a phone.
 - **Backup and restore** with a single JSON file, plus a CSV export for Excel.
-- **Works fully offline**, and the data never leaves the device.
+- **Phone and Mac share one register**, synced through a private GitHub repository, and every change is kept as a version you can restore.
+- **Works fully offline.** Changes are saved on the device first and synced once it's back online.
 
 ## How it works
 
@@ -19,7 +20,10 @@ Members pay Rs. 650 a month. Some pay part of it, some pay ahead. The club also 
 | App shell | One `index.html` with plain JavaScript, no framework or build step |
 | Offline | Service worker (`sw.js`) caches the app, fonts and libraries on first visit |
 | Install | Web app manifest and icons, so it can be added to the iPhone home screen or the Mac Dock |
-| Storage | `localStorage`, with each record stored under a path like `payments/2026-m01` |
+| Storage | `localStorage`, with each record stored under a path like `payments/2026-m01` and stamped with its last-change time |
+| Sync | GitHub Contents API on a **private** data repo (`register.json`). Each sync reads the file, merges record by record (newest change wins, deletions travel as tombstones), and writes back with the file's `sha`, so a clash is detected and merged again |
+| Version history | Every sync is a commit; the app lists them and can restore any version |
+| Access | A fine-grained personal access token limited to the data repo (Contents: read and write), kept only on the user's devices |
 | Part payments | Each month keeps a list of payments (amount and date); the month total is their sum |
 | Dues | `fee × months owed so far − paid this year`, counted per member and never below zero in the total |
 | PDF | [jsPDF](https://github.com/parallax/jsPDF) and [jsPDF-AutoTable](https://github.com/simonbengtsson/jsPDF-AutoTable), bundled in `vendor/` |
