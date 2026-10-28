@@ -239,6 +239,20 @@ input[type="date"] { min-width: 0; width: 100%; max-width: 100%; }
 .quick.rest { border-color: var(--warn); color: var(--warn); }
 .quick.rest:hover { background: var(--warn-bg); }
 .empty-filter { padding: 20px; text-align: center; color: var(--muted); }
+.resting { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; border-top: 1px dashed var(--line); padding: 10px 12px; font-size: 13px; color: var(--muted); }
+.resting span { font-weight: 600; margin-right: 2px; }
+.resting button { border: 1px solid var(--line); background: var(--surface-2); color: var(--muted); border-radius: 999px; padding: 4px 10px; font-size: 13px; font-weight: 600; }
+.cellbtn.ina { font-size: 15px; }
+.memlist .tag-ina { display: inline-block; font-size: 12px; font-weight: 700; color: var(--muted); background: var(--surface-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 8px; }
+.memlist .opts button.pause { width: auto; padding: 0 8px; font-size: 12px; font-weight: 700; }
+.memlist .confirm.calm { background: var(--surface-2); color: var(--ink); }
+.memlist .confirm.calm .yes { background: var(--brand); color: var(--brand-ink); }
+.memlist .confirm select { height: 34px; font-size: 14px; padding: 0 8px; }
+.memlist .confirm small { flex-basis: 100%; font-weight: 500; color: var(--muted); }
+.btn.sm { height: 34px; padding: 0 10px; font-size: 13px; border-radius: 8px; }
+.memlist .nm-static { min-width: 0; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+.memlist .nm-static b { overflow-wrap: anywhere; }
+.memhead { margin: 10px 0 2px; font-size: 13px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .04em; }
 
 /* Whole-year sheet */
 .sheet-wrap { position: relative; overflow-x: auto; border-radius: 16px; }
@@ -590,8 +604,9 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       <input id="newName" autocomplete="off" placeholder="New member's name" aria-label="New member's name">
       <button type="submit" class="btn primary">Add</button>
     </form>
-    <p class="hint">Change a name and tap outside the box to save it. “Pays from” is the first month a member owes, so dues are not counted before they joined.</p>
+    <p class="hint">Change a name and tap outside the box to save it. “Pays from” is the first month a member owes, so dues are not counted before they joined. If someone stops coming, tap “Mark inactive”: no fee is counted while they are inactive.</p>
     <ol class="memlist" id="memList"></ol>
+    <div id="inaBox" hidden><p class="memhead" id="inaHead">Inactive</p><ol class="memlist" id="inaList"></ol></div>
     <details id="remBox" hidden><summary id="remSum">Removed members</summary><ul class="removed" id="remList"></ul></details>
   </div>
 </dialog>
@@ -889,7 +904,24 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     const last = y < CY ? 11 : CM;
     return last >= first ? [first, last] : null;
   }
-  const isOwed = (m, y, i) => { const r = owedRange(m, y); return !!r && i >= r[0] && i <= r[1]; };
+  /* ---------- inactive members ---------- */
+  // m.off = [{ f: {y, m}, b: {y, m} | null }]: the member stopped coming from month f until month b (b not included;
+  // null = still inactive). No fee is counted for those months; payments made in them still count as normal.
+  const ymOf = (o) => o.y * 12 + o.m;
+  const validYM = (o) => !!o && Number.isInteger(o.y) && Number.isInteger(o.m) && o.m >= 0 && o.m <= 11;
+  function offList(m) { return Array.isArray(m && m.off) ? m.off.filter((p) => p && validYM(p.f) && (p.b == null || validYM(p.b))) : []; }
+  function isOff(m, y, i) { const v = y * 12 + i; return offList(m).some((p) => ymOf(p.f) <= v && (!p.b || v < ymOf(p.b))); }
+  const openOff = (m) => offList(m).find((p) => !p.b) || null;
+  const isInactive = (m) => !m.removed && !!openOff(m);
+  // inactive at the last month that counts for the viewed year (this month for the current year)
+  const offAtEnd = (m, y) => isOff(m, y, y < CY ? 11 : y > CY ? 0 : CM);
+  const ymLabel = (o) => `${MONTHS_FULL[o.m]} ${o.y}`;
+  const isOwed = (m, y, i) => { const r = owedRange(m, y); return !!r && i >= r[0] && i <= r[1] && !isOff(m, y, i); };
+  // the months of the viewed year a member actually owes (inactive months left out)
+  function owedMonths(m, y) { const r = owedRange(m, y), out = []; if (r) for (let k = r[0]; k <= r[1]; k++) if (!isOff(m, y, k)) out.push(k); return out; }
+  // inactive months inside the counted range, e.g. [10, 11]
+  function offMonths(m, y) { const r = owedRange(m, y), out = []; if (r) for (let k = r[0]; k <= r[1]; k++) if (isOff(m, y, k)) out.push(k); return out; }
+  const spanTxt = (ks) => !ks.length ? "" : ks.length === 1 ? MONTHS[ks[0]] : `${MONTHS[ks[0]]}–${MONTHS[ks[ks.length - 1]]}`;
   function paidTotal(mid) { const mp = payMap(mid); let t = 0; for (const k in mp) if (mp[k] > 0) t += mp[k]; return t; }
   // Due = fee × months owed so far this year − everything paid this year.
   // Owed months run from the member's start (or January) to the current month (December for past years).
@@ -900,7 +932,14 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     const fee = feeFor(y), out = [];
     let carry = 0, src = -1;
     for (let k = 0; k < 12; k++) {
-      const cash = amt(m.id, k), cin = carry, pool = cash + carry;
+      const cash = amt(m.id, k);
+      // an inactive month owes nothing: any extra passes through untouched, and money paid in it is kept for later months
+      if (isOff(m, y, k)) {
+        out.push({ cash, cin: 0, covered: 0, cout: cash > 0 ? carry + cash : 0, src: -1, off: true });
+        if (cash > 0) { carry += cash; src = k; }
+        continue;
+      }
+      const cin = carry, pool = cash + carry;
       const covered = Math.min(fee, pool), cout = pool - covered;
       out.push({ cash, cin, covered, cout, src: cin > 0 ? src : -1 });
       if (cash > 0 && cout > 0) src = k;
@@ -912,8 +951,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
   function dueOf(m, y) {
     const paid = paidTotal(m.id);
     if (m.removed) return { owed: 0, paid, due: 0, months: 0 };
-    const r = owedRange(m, y);
-    const months = r ? r[1] - r[0] + 1 : 0;
+    const months = owedMonths(m, y).length;
     const owed = months * feeFor(y);
     return { owed, paid, due: owed - paid, months };
   }
@@ -931,7 +969,15 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     return allMembers().filter((m) => {
       const hasPay = paidTotal(m.id) > 0;
       if (m.removed) return hasPay;
-      return startOf(m).y <= y || hasPay;
+      if (hasPay) return true;
+      if (startOf(m).y > y) return false;
+      // inactive for every month of this year they would otherwise owe, and paid nothing: leave them off the sheet
+      if (offList(m).length) {
+        const st = startOf(m), first = st.y < y ? 0 : st.m;
+        for (let k = first; k < 12; k++) if (!isOff(m, y, k)) return true;
+        return false;
+      }
+      return true;
     });
   }
   function monthTotal(i) { let t = 0; for (const m of yearMembers()) t += amt(m.id, i); return t; }
@@ -1004,6 +1050,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
   function statusFor(m, i) {
     const fee = feeFor(S.year), c = cov(m, i), a = c.cash;
     const from = c.src >= 0 ? MONTHS[c.src] : "earlier", to = i < 11 ? MONTHS[i + 1] : "next year";
+    if (c.off) return a > 0 ? { cls: "adv", pill: `Inactive · ${fmt(a)} kept for later`, cell: fmt(a) } : { cls: "off ina", pill: "Inactive · no fee", cell: "–" };
     if (c.covered >= fee) {
       if (a === 0) return { cls: "adv", pill: `✓ Paid ahead (from ${from})`, cell: "✓" };
       if (c.cout > 0) return { cls: "ok", pill: `✓ Paid · ${fmt(c.cout)} to ${to}`, cell: "✓" };
@@ -1030,7 +1077,11 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
 
     let paidFull = 0, collected = 0, expected = 0, toPay = 0;
     const rows = [];
-    for (const [idx, m] of ms.entries()) {
+    // members who are inactive this month (and paid nothing in it) are kept out of the list and named underneath
+    // (taken from everyone, so someone inactive all year, who isn't on this year's sheet, is still named here)
+    const resting = allMembers().filter((m) => !m.removed && isOff(m, S.year, i) && amt(m.id, i) === 0);
+    const shown = ms.filter((m) => !(cov(m, i).off && amt(m.id, i) === 0));
+    for (const [idx, m] of shown.entries()) {
       const a = amt(m.id, i), owed = isOwed(m, S.year, i), cv = cov(m, i), got = cv.covered;
       collected += a;
       if (owed) expected += fee;
@@ -1038,10 +1089,10 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       const pending = got < fee && (owed || got > 0);
       if (pending) toPay++;
       if (S.filter === "todo" && !pending) continue;
-      if (S.filter === "paid" && got === 0) continue;
+      if (S.filter === "paid" && got === 0 && a === 0) continue;
       const st = statusFor(m, i);
       let quick = "";
-      if (S.canWrite && !m.removed && got === 0)
+      if (S.canWrite && !m.removed && got === 0 && !cv.off)
         quick = `<button type="button" class="quick" data-act="quick" data-id="${esc(m.id)}" aria-label="Mark ${esc(m.name)} paid Rs. ${fmt(fee)} for ${MONTHS_FULL[i]}">✓ ${fmt(fee)}</button>`;
       else if (S.canWrite && got > 0 && got < fee)
         quick = `<button type="button" class="quick rest" data-act="rest" data-id="${esc(m.id)}" aria-label="${esc(m.name)} paid the remaining Rs. ${fmt(fee - got)} for ${MONTHS_FULL[i]}">+ ${fmt(fee - got)}</button>`;
@@ -1049,8 +1100,10 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     }
     const owedCount = ms.filter((m) => isOwed(m, S.year, i) || cov(m, i).covered > 0).length;
     const e = elec(i);
-    const label = { all: `All ${ms.length}`, todo: `Still to pay ${toPay}`, paid: `Paid ${ms.filter((m) => cov(m, i).covered > 0).length}` };
-    const list = rows.length ? `<ul class="mlist">${rows.join("")}</ul>` : `<p class="empty-filter">${S.filter === "todo" ? "Everyone has paid for this month." : "No payments recorded for this month yet."}</p>`;
+    const label = { all: `All ${shown.length}`, todo: `Still to pay ${toPay}`, paid: `Paid ${ms.filter((m) => cov(m, i).covered > 0 || amt(m.id, i) > 0).length}` };
+    const restRow = resting.length && S.filter !== "paid"
+      ? `<div class="resting"><span>Inactive in ${MONTHS[i]} · no fee:</span>${resting.map((m) => `<button type="button" data-act="pay" data-id="${esc(m.id)}" data-m="${i}"${S.canWrite ? "" : " disabled"} aria-label="${esc(m.name)} is inactive in ${MONTHS_FULL[i]}. Tap to record a payment anyway">${esc(m.name)}</button>`).join("")}</div>` : "";
+    const list = (rows.length ? `<ul class="mlist">${rows.join("")}</ul>` : `<p class="empty-filter">${S.filter === "todo" ? "Everyone has paid for this month." : "No payments recorded for this month yet."}</p>`) + restRow;
     return `
       <div style="display:grid;gap:12px">
         <div class="months" role="group" aria-label="Month">${chips}</div>
@@ -1101,8 +1154,9 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       if (d.due > 0) dc = `<td class="dcol due">${fmt(d.due)}</td>`;
       else if (d.due < 0) dc = `<td class="dcol adv" title="Paid ahead">+${fmt(-d.due)}</td>`;
       else if (d.months > 0) dc = `<td class="dcol ok" aria-label="Paid up">✓</td>`;
-      return `<tr><td class="c-no">${idx + 1}</td><th class="c-name" scope="row">${esc(m.name)}${m.private ? '<span class="lock" title="Name kept private">🔒</span>' : ""}${m.removed ? "<small>left</small>" : ""}</th>${cells}<td class="tot">${d.paid ? fmt(d.paid) : "–"}</td>${dc}</tr>`;
+      return `<tr><td class="c-no">${idx + 1}</td><th class="c-name" scope="row">${esc(m.name)}${m.private ? '<span class="lock" title="Name kept private">🔒</span>' : ""}${m.removed ? "<small>left</small>" : offAtEnd(m, y) ? "<small>inactive</small>" : ""}</th>${cells}<td class="tot">${d.paid ? fmt(d.paid) : "–"}</td>${dc}</tr>`;
     }).join("");
+    const anyOff = ms.some((m) => coverage(m, y).some((c) => c.off));
     let yc = 0, ye = 0;
     const colRow = MONTHS.map((_, k) => { const t = monthTotal(k); yc += t; return `<td class="mc">${t ? fmt(t) : "–"}</td>`; }).join("");
     const elRow = MONTHS.map((_, k) => { const e = elec(k); ye += e.amount; return `<td class="mc"><button type="button" class="cellbtn${e.amount ? "" : " off"}" data-act="elec" data-m="${k}" aria-label="Electricity ${MONTHS_FULL[k]}"${S.canWrite ? "" : " disabled"}>${e.amount ? fmt(e.amount) : S.canWrite ? "+" : "–"}</button></td>`; }).join("");
@@ -1125,6 +1179,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
           <span><i style="background:var(--warn-bg);color:var(--warn)">325</i> Part paid (rest still due)</span>
           <span><i style="background:var(--adv-bg);color:var(--adv)">✓</i> Paid from an earlier extra</span>
           <span><i style="background:var(--due-bg)">&nbsp;</i> Not paid yet</span>
+          ${anyOff ? `<span><i style="color:var(--muted)">–</i> Inactive, no fee</span>` : ""}
           <span>Tap any box to change it</span>
         </div>
       </section>`;
@@ -1171,9 +1226,9 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
   }
   const longDate = (t) => { if (!t) return ""; const [y, mo, d] = t.split("-").map(Number); return `${d} ${MONTHS[mo - 1]} ${y}`; };
   function standingLine(m, y) {
-    const d = dueOf(m, y), r = owedRange(m, y);
-    if (!r) return d.paid > 0 ? `Paid ahead: Rs. ${fmt(d.paid)}` : "";
-    const upto = MONTHS_FULL[r[1]];
+    const d = dueOf(m, y), om = owedMonths(m, y);
+    if (!om.length) return d.paid > 0 ? `Paid ahead: Rs. ${fmt(d.paid)}` : offMonths(m, y).length ? "Inactive · no fee counted" : "";
+    const upto = MONTHS_FULL[om[om.length - 1]];
     if (d.due > 0) return `Still to pay (up to ${upto} ${y}): Rs. ${fmt(d.due)}`;
     if (d.due < 0) return `All paid up to ${upto} ✓ (Rs. ${fmt(-d.due)} paid ahead)`;
     return `All paid up to ${upto} ${y} ✓`;
@@ -1185,7 +1240,8 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     if (p.t) L.push(`Date: ${longDate(p.t)}`);
     if (p.c) L.push(`Collected by: ${p.c}`);
     L.push("");
-    if (a >= fee) L.push(`${MONTHS_FULL[i]}: paid in full ✓`);
+    if (c.off) L.push(`${MONTHS_FULL[i]}: inactive, no fee`);
+    else if (a >= fee) L.push(`${MONTHS_FULL[i]}: paid in full ✓`);
     else L.push(`${MONTHS_FULL[i]}: Rs. ${fmt(a)} of Rs. ${fmt(fee)} paid · Rs. ${fmt(fee - a)} left`);
     if (c.cout > 0) L.push(`Extra Rs. ${fmt(c.cout)} carried to ${i < 11 ? MONTHS_FULL[i + 1] : "next year"}`);
     const st = standingLine(m, y);
@@ -1203,7 +1259,8 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     for (const k of [...months].sort((a, b) => a - b)) {
       const a = amt(m.id, k), parts = partsOf(m.id, k), c = cvs[k];
       let line = `${MONTHS[k]}: `;
-      if (c.covered === 0) line += "not paid";
+      if (c.off) line += "inactive (no fee)";
+      else if (c.covered === 0) line += "not paid";
       else if (c.covered >= fee) line += a === 0 ? `paid ✓ (from ${c.src >= 0 ? MONTHS[c.src] : "earlier"} extra)` : `Rs. ${fmt(a)} ✓`;
       else line += `Rs. ${fmt(c.covered)} (Rs. ${fmt(fee - c.covered)} left)`;
       if (c.cin > 0 && a > 0) line += ` · incl. Rs. ${fmt(c.cin)} from ${c.src >= 0 ? MONTHS[c.src] : "earlier"}`;
@@ -1254,9 +1311,10 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       const ph = normPhone(m.phone);
       const status = d.due > 0 ? `<span class="due">Owes Rs. ${fmt(d.due)}</span>`
         : d.months > 0 || d.paid > 0 ? `<span class="ok">Paid up ✓${d.due < 0 ? ` · Rs. ${fmt(-d.due)} ahead` : ""}</span>` : `<span>Nothing due yet</span>`;
+      const ina = offAtEnd(m, y) ? `<span>Inactive</span>` : "";
       const when = sent[`${y}:${m.id}`];
       return `<li>
-        <button type="button" class="who" data-sp="${esc(m.id)}" aria-expanded="${slipOpen === m.id}"><b>${esc(m.name)}${m.private ? '<span class="lock" title="Name kept private">🔒</span>' : ""}</b>${status}${ph ? "" : "<span>No WhatsApp number saved</span>"}</button>
+        <button type="button" class="who" data-sp="${esc(m.id)}" aria-expanded="${slipOpen === m.id}"><b>${esc(m.name)}${m.private ? '<span class="lock" title="Name kept private">🔒</span>' : ""}</b>${status}${ina}${ph ? "" : "<span>No WhatsApp number saved</span>"}</button>
         <span class="sendbtns"><button type="button" class="send" data-spdf="${esc(m.id)}" aria-label="Send ${esc(m.name)}'s slip as a PDF">PDF slip</button><button type="button" class="send alt" data-ss="${esc(m.id)}" aria-label="Send ${esc(m.name)}'s slip as a text message">Text</button></span>
         ${when ? `<span class="sent">✓ Sent ${esc(fmtSent(when))}</span>` : ""}
         ${slipOpen === m.id ? `<pre>${esc(statementText(m))}</pre>` : ""}
@@ -1322,6 +1380,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     const fee = feeFor(S.year), m = allMembers().find((x) => x.id === mid);
     if (!m) return "Payment saved.";
     const c = cov(m, i);
+    if (c.off) return `${m.name} is inactive in ${MONTHS[i]}, so Rs. ${fmt(c.cash)} is kept for later months.`;
     if (c.covered >= fee && c.cout > 0) return `${m.name} has paid ${MONTHS[i]} in full. Rs. ${fmt(c.cout)} extra goes to ${i < 11 ? MONTHS[i + 1] : "next year"}.`;
     if (c.covered >= fee) return `${m.name} has paid in full for ${MONTHS[i]}.`;
     return `${m.name} paid for ${MONTHS[i]}. Rs. ${fmt(fee - c.covered)} left.`;
@@ -1340,7 +1399,8 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     bar.className = a > 0 && a < fee ? "part" : "";
     const fromTxt = c.cin > 0 ? ` (Rs. ${fmt(c.cin)} carried from ${c.src >= 0 ? MONTHS[c.src] : "earlier"})` : "";
     const toTxt = c.cout > 0 ? ` · Rs. ${fmt(c.cout)} extra goes to ${i < 11 ? MONTHS[i + 1] : "next year"}` : "";
-    $("payStateTxt").textContent = a === 0 ? (isOwed(m, S.year, i) ? `Not paid yet · Rs. ${fmt(fee)} to pay` : "Not due this month (you can still record an advance)")
+    $("payStateTxt").textContent = c.off ? (c.cash > 0 ? `Inactive this month · no fee · Rs. ${fmt(c.cash)} kept for later months` : "Inactive this month · no fee (you can still record a payment)")
+      : a === 0 ? (isOwed(m, S.year, i) ? `Not paid yet · Rs. ${fmt(fee)} to pay` : "Not due this month (you can still record an advance)")
       : a >= fee ? `Paid in full${fromTxt}${toTxt}`
       : `Paid Rs. ${fmt(a)} of Rs. ${fmt(fee)}${fromTxt} · Rs. ${fmt(fee - a)} left`;
     const list = $("payParts");
@@ -1349,11 +1409,11 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     $("payBy").value = getCollector();
     $("paySlip").hidden = !(m.phone || parts.length || isOwed(m, S.year, i));
     const main = $("payMain");
-    main.hidden = a >= fee;
+    main.hidden = a >= fee || !!c.off;
     main.textContent = a === 0 ? `Paid in full · Rs. ${fmt(fee)}` : `Paid the rest · Rs. ${fmt(fee - a)}`;
-    $("payAmtLbl").textContent = a === 0 ? "Paid only part? Enter the amount (Rs.)" : "Add another payment (Rs.)";
+    $("payAmtLbl").textContent = c.off ? "Record a payment (Rs.)" : a === 0 ? "Paid only part? Enter the amount (Rs.)" : "Add another payment (Rs.)";
     $("payAmt").placeholder = a === 0 ? `e.g. ${fmt(Math.round(fee / 2))}` : a < fee ? `e.g. ${fmt(fee - a)}` : "e.g. 650";
-    $("payHint").hidden = a >= fee;
+    $("payHint").hidden = a >= fee || !!c.off;
     $("payHint").textContent = a === 0 ? "If they pay the rest later, open this again and tap “Paid the rest”." : "Each payment is kept separately with its date.";
     $("payErr").hidden = true;
     $("payClear").hidden = parts.length < 2;
@@ -1657,7 +1717,8 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     $("bdNames").innerHTML = allMembers().filter((m) => !m.removed).map((m) => `<option value="${esc(m.name)}"></option>`).join("");
     const before = bdFundBefore(ev);
     $("bdSum").innerHTML = `<div><span>Collected${t.n ? ` from ${t.n}` : ""}</span><span>${rs(t.collected)}</span></div><div><span>Spent</span><span>− ${rs(t.spent)}</span></div><div class="after"><span>Left from this birthday</span><span style="color:${t.left < 0 ? "var(--due)" : "var(--ok)"}">${t.left < 0 ? "−" : ""}${rs(Math.abs(t.left))}</span></div><div><span>Birthday fund after this</span><span>${rsSigned(before + t.left)}</span></div>`;
-    const members = allMembers().filter((m) => !m.removed);
+    // inactive members are left out unless they gave for this birthday
+    const members = allMembers().filter((m) => !m.removed && (!isOff(m, CY, CM) || (ev.c && ev.c[m.id] && ev.c[m.id].a > 0)));
     const paid = members.filter((m) => ev.c && ev.c[m.id] && ev.c[m.id].a > 0).length;
     $("bdHint").textContent = per ? `Tap ✓ when someone gives Rs. ${fmt(per)}, or type a different amount.` : "Type how much each person gave. Leave it empty if they didn't give.";
     $("bdContribHead").textContent = `Contributions · ${paid + (ev.g || []).filter((g) => g.a > 0).length} paid`;
@@ -1811,13 +1872,41 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     }
     return opts.join("");
   }
+  // month choices between two {y, m} points, as "y-m" values
+  function ymOptions(from, to, sel) {
+    const out = [];
+    for (let v = ymOf(from); v <= ymOf(to); v++) {
+      const y = Math.floor(v / 12), k = v % 12;
+      out.push(`<option value="${y}-${k}"${sel === `${y}-${k}` ? " selected" : ""}>${MONTHS[k]} ${y}</option>`);
+    }
+    return out.join("");
+  }
+  const lastChoice = () => ({ y: CY + 1, m: 11 });
+  // a sensible "stopped coming from" month: the first month this year they haven't fully paid, else next month
+  function suggestOff(m) {
+    const st = startOf(m), fee = feeFor(CY);
+    if (st.y > CY || (st.y === CY && st.m > CM)) return st;
+    if (S.year === CY) {
+      const r = owedRange(m, CY), cvs = coverage(m, CY);
+      if (r) for (let k = r[0]; k <= r[1]; k++) if (!cvs[k].off && cvs[k].covered < fee) return { y: CY, m: k };
+    } else return { y: CY, m: CM };
+    return CM < 11 ? { y: CY, m: CM + 1 } : { y: CY + 1, m: 0 };
+  }
+  let offAsk = null;   // { id, mode: "off" | "back" }
   function renderMembers() {
-    const all = allMembers(), act = all.filter((m) => !m.removed), rem = all.filter((m) => m.removed);
-    $("memTitle").textContent = `Members (${act.length})`;
+    const all = allMembers(), act = all.filter((m) => !m.removed && !openOff(m)), ina = all.filter((m) => isInactive(m)), rem = all.filter((m) => m.removed);
+    $("memTitle").textContent = ina.length ? `Members (${act.length} active · ${ina.length} inactive)` : `Members (${act.length})`;
+    const rmAsk = (m) => confirmId === m.id
+      ? `<div class="confirm">Remove ${esc(m.name)}? Their past payments stay in the register. <button type="button" class="yes" data-mact="rm-yes" data-id="${esc(m.id)}">Remove</button><button type="button" class="no2" data-mact="rm-no">Keep</button></div>` : "";
     $("memList").innerHTML = act.map((m, idx) => {
       const sel = m.start && Number.isInteger(m.start.y) ? `${m.start.y}-${m.start.m}` : "";
-      const confirm = confirmId === m.id
-        ? `<div class="confirm">Remove ${esc(m.name)}? Their past payments stay in the register. <button type="button" class="yes" data-mact="rm-yes" data-id="${esc(m.id)}">Remove</button><button type="button" class="no2" data-mact="rm-no">Keep</button></div>` : "";
+      let confirm = rmAsk(m);
+      if (offAsk && offAsk.id === m.id && offAsk.mode === "off") {
+        const st = startOf(m), sg = suggestOff(m), first = ymOf(st) <= ymOf(sg) ? st : sg;
+        confirm = `<div class="confirm calm"><label for="mo-${esc(m.id)}">${esc(m.name)} stopped coming from</label><select id="mo-${esc(m.id)}">${ymOptions(first, lastChoice(), `${sg.y}-${sg.m}`)}</select>
+          <button type="button" class="yes" data-mact="off-yes" data-id="${esc(m.id)}">Mark inactive</button><button type="button" class="no2" data-mact="off-no">Cancel</button>
+          <small>No fee is counted from that month. Unpaid months before it still count. If they never came, choose ${MONTHS[st.m]} ${st.y} and they owe nothing.</small></div>`;
+      }
       return `<li>
         <span class="no">${idx + 1}</span>
         <input id="mn-${esc(m.id)}" data-id="${esc(m.id)}" class="nm-in" value="${esc(m.name)}" aria-label="Name of member ${idx + 1}" autocomplete="off">
@@ -1830,22 +1919,45 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
         <span class="sub sub2">
           <input id="mp-${esc(m.id)}" data-id="${esc(m.id)}" class="ph-in" type="tel" inputmode="tel" autocomplete="off" placeholder="WhatsApp no. 07…" value="${esc(m.phone || "")}" aria-label="WhatsApp number of ${esc(m.name)}">
           <label class="pv" for="mv-${esc(m.id)}"><input type="checkbox" id="mv-${esc(m.id)}" data-id="${esc(m.id)}" class="pv-in"${m.private ? " checked" : ""}> 🔒 Keep name private</label>
+          <button type="button" class="btn sm" data-mact="off" data-id="${esc(m.id)}">Mark inactive</button>
         </span>
         ${confirm}
       </li>`;
-    }).join("") || `<li><span></span><span class="hint">No members yet. Add the first name above.</span></li>`;
+    }).join("") || `<li><span></span><span class="hint">${ina.length ? "Everyone is inactive right now." : "No members yet. Add the first name above."}</span></li>`;
+    $("inaBox").hidden = !ina.length;
+    $("inaHead").textContent = `Inactive (${ina.length})`;
+    $("inaList").innerHTML = ina.map((m) => {
+      const o = openOff(m);
+      let confirm = rmAsk(m);
+      if (offAsk && offAsk.id === m.id && offAsk.mode === "back") {
+        const now = { y: CY, m: CM }, sg = ymOf(now) >= ymOf(o.f) ? now : o.f;
+        confirm = `<div class="confirm calm"><label for="mb-${esc(m.id)}">${esc(m.name)} comes back from</label><select id="mb-${esc(m.id)}">${ymOptions(o.f, lastChoice(), `${sg.y}-${sg.m}`)}</select>
+          <button type="button" class="yes" data-mact="back-yes" data-id="${esc(m.id)}">Make active</button><button type="button" class="no2" data-mact="off-no">Cancel</button>
+          <small>Fees count again from that month. The inactive months stay free. Choose ${MONTHS[o.f.m]} ${o.f.y} to cancel the inactive mark completely.</small></div>`;
+      }
+      return `<li>
+        <span class="no">–</span>
+        <span class="nm-static"><b>${esc(m.name)}</b> <span class="tag-ina">Inactive from ${MONTHS[o.f.m]} ${o.f.y}</span></span>
+        <span class="opts">
+          <button type="button" class="pause" data-mact="back" data-id="${esc(m.id)}">Active again</button>
+          <button type="button" class="rm" data-mact="rm" data-id="${esc(m.id)}" aria-label="Remove ${esc(m.name)}">×</button>
+        </span>
+        ${confirm}
+      </li>`;
+    }).join("");
     $("remBox").hidden = !rem.length;
     $("remSum").textContent = `Removed members (${rem.length})`;
     $("remList").innerHTML = rem.map((m) => `<li><span>${esc(m.name)}</span><button type="button" class="btn" data-mact="restore" data-id="${esc(m.id)}">Restore</button></li>`).join("");
   }
   function memberBody(m) { const { id, ...rest } = m; return rest; }
-  function openMembers() { confirmId = null; renderMembers(); $("memDlg").showModal(); }
+  function openMembers() { confirmId = null; offAsk = null; renderMembers(); $("memDlg").showModal(); }
   $("addForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
     const name = $("newName").value.trim().replace(/\s+/g, " ");
     if (!name) { $("newName").focus(); return; }
     const all = allMembers();
-    if (all.some((m) => !m.removed && m.name.toLowerCase() === name.toLowerCase())) { toast(`${name} is already in the list.`); return; }
+    const same = all.find((m) => !m.removed && m.name.toLowerCase() === name.toLowerCase());
+    if (same) { toast(openOff(same) ? `${same.name} is in the inactive list. Tap “Active again” there.` : `${name} is already in the list.`); return; }
     const order = all.reduce((mx, m) => Math.max(mx, m.order || 0), 0) + 1;
     const id = "m" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
     const start = S.year === CY ? { y: CY, m: CM } : { y: S.year, m: 0 };
@@ -1880,22 +1992,52 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     const b = ev.target.closest("[data-mact]");
     if (!b) return;
     const act = b.dataset.mact, id = b.dataset.id;
-    const all = allMembers(), list = all.filter((m) => !m.removed);
+    const all = allMembers(), kept = all.filter((m) => !m.removed), list = kept.filter((m) => !openOff(m));
     const m = all.find((x) => x.id === id);
-    if (act === "rm") { confirmId = id; renderMembers(); return; }
+    if (act === "rm") { confirmId = id; offAsk = null; renderMembers(); return; }
     if (act === "rm-no") { confirmId = null; renderMembers(); return; }
+    if (act === "off" || act === "back") { offAsk = { id, mode: act }; confirmId = null; renderMembers(); const s = $((act === "off" ? "mo-" : "mb-") + id); if (s) s.focus(); return; }
+    if (act === "off-no") { offAsk = null; renderMembers(); return; }
     if (!S.canWrite) { toast("You can view this register, but you can't change it."); return; }
     if (act === "rm-yes" && m) { confirmId = null; writeDoc("members/" + id, { ...memberBody(m), removed: true }); toast(`Removed ${m.name}.`); }
     if (act === "restore" && m) { const order = all.reduce((mx, x) => Math.max(mx, x.order || 0), 0) + 1; writeDoc("members/" + id, { ...memberBody(m), removed: false, order }); toast(`Restored ${m.name}.`); }
+    if (act === "off-yes" && m) {
+      const s = $("mo-" + id), [y, k] = (s ? s.value : "").split("-").map(Number);
+      if (!Number.isInteger(y) || !Number.isInteger(k)) return;
+      const f = { y, m: k };
+      // keep earlier, finished breaks; drop any that start on or after the new one (it covers them)
+      const off = offList(m).filter((p) => p.b && ymOf(p.f) < ymOf(f)).map((p) => (ymOf(p.b) > ymOf(f) ? { f: p.f, b: f } : p));
+      off.push({ f, b: null });
+      offAsk = null;
+      writeDoc("members/" + id, { ...memberBody(m), off });
+      toast(`${m.name} is inactive from ${ymLabel(f)}. No fee is counted from then.`);
+    }
+    if (act === "back-yes" && m) {
+      const s = $("mb-" + id), [y, k] = (s ? s.value : "").split("-").map(Number), o = openOff(m);
+      if (!Number.isInteger(y) || !Number.isInteger(k) || !o) return;
+      const b = { y, m: k };
+      const off = offList(m).filter((p) => p !== o);
+      if (ymOf(b) > ymOf(o.f)) off.push({ f: o.f, b });
+      offAsk = null;
+      writeDoc("members/" + id, { ...memberBody(m), off });
+      toast(ymOf(b) > ymOf(o.f) ? `${m.name} is active again from ${ymLabel(b)}. ${spanTxtYM(o.f, b)} stays free.` : `${m.name} is active again. The inactive mark is cancelled.`);
+    }
     if ((act === "up" || act === "down") && m) {
       const idx = list.findIndex((x) => x.id === id), j = act === "up" ? idx - 1 : idx + 1;
       if (j < 0 || j >= list.length) return;
-      // renumber the whole active list so orders stay clean
-      const next = list.slice(); [next[idx], next[j]] = [next[j], next[idx]];
-      next.forEach((x, k) => { if (x.order !== k + 1) writeDoc("members/" + x.id, { ...memberBody(x), order: k + 1 }); });
+      // swap the two in the full list (inactive members keep their place) and renumber it so orders stay clean
+      const next = kept.slice(), a1 = next.indexOf(list[idx]), a2 = next.indexOf(list[j]);
+      [next[a1], next[a2]] = [next[a2], next[a1]];
+      next.forEach((x, n) => { if (x.order !== n + 1) writeDoc("members/" + x.id, { ...memberBody(x), order: n + 1 }); });
     }
     renderMembers(); render();
   });
+  // "Nov 2026" or "Nov–Dec 2026" or "Dec 2026–Jan 2027" for the months from f up to (not including) b
+  function spanTxtYM(f, b) {
+    const e = ymOf(b) - 1, ey = Math.floor(e / 12), em = e % 12;
+    if (e === ymOf(f)) return `${MONTHS[f.m]} ${f.y}`;
+    return f.y === ey ? `${MONTHS[f.m]}–${MONTHS[em]} ${f.y}` : `${MONTHS[f.m]} ${f.y}–${MONTHS[em]} ${ey}`;
+  }
 
   /* ---------- settings ---------- */
   function openSettings() {
@@ -2046,14 +2188,15 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     const avail = H - 37 - (signing ? 24 : 13);
     const rowH = Math.max(4.6, Math.min(7.5, avail / (nm + 5 + (priv.length ? 1 : 0) + 1.6)));
     const body = [];
-    let dueTotal = 0;
+    let dueTotal = 0, anyOff = false;
     ms.forEach((m, idx) => {
-      const row = [String(idx + 1), m.name + (m.removed ? " (left)" : "")];
+      const row = [String(idx + 1), m.name + (m.removed ? " (left)" : offAtEnd(m, y) ? " (inactive)" : "")];
       const cvs = coverage(m, y);
       for (let k = 0; k < 12; k++) {
         const c = cvs[k];
         if (c.covered >= fee) row.push({ content: "", tick: c.cash > 0 ? GREEN : BLUE });
         else if (c.covered > 0) row.push({ content: fmt(c.covered), styles: { textColor: AMBER, fontStyle: "bold" } });
+        else if (c.off) { anyOff = true; row.push(c.cash > 0 ? { content: fmt(c.cash), styles: { textColor: BLUE, fontStyle: "bold" } } : { content: "-", styles: { textColor: GREY } }); }
         else row.push("");
       }
       const d = dueOf(m, y);
@@ -2140,6 +2283,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     seg(fmt(Math.round(fee / 2)), AMBER, true); seg(" = part paid", GREY); lx += 7;
     drawTick(doc, lx + 1.6, ly - 1.1, 3, BLUE); lx += 4.5; seg("= covered by extra paid earlier", GREY); lx += 7;
     seg("Due", RED, true); seg(y === CY ? ` = still to pay up to ${MONTHS_FULL[CM]} ${y}` : " = still to pay for the year", GREY);
+    if (anyOff) { lx += 7; seg("-", GREY, true); seg(" = inactive, no fee", GREY); }
     doc.setFont("helvetica", "normal"); doc.setTextColor(...GREY);
     if (signing && ly + 14 <= H - 2) {
       const sgy = ly + 10.5;
@@ -2187,6 +2331,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
   function drawSlip(doc, m) {
     const C = PDF_C, W = 148, H = 210, M = 12;
     const y = S.year, fee = feeFor(y), d = dueOf(m, y), r = owedRange(m, y);
+    const om = owedMonths(m, y), last = om.length ? om[om.length - 1] : -1, offs = offMonths(m, y);
     slipWatermark(doc, W, 78, 96);
     slipHeader(doc, W, M, `Subscription slip  ·  ${y}`);
     // member box with status stamp
@@ -2196,10 +2341,13 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     const nameLines = doc.splitTextToSize(m.name, W - 2 * M - 50);
     doc.text(nameLines[0], M + 5, 53.5);
     doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...C.GREY);
-    doc.text(`Monthly fee Rs. ${fmt(fee)}${r ? `  ·  counted ${MONTHS[r[0]]}–${MONTHS[r[1]]} ${y}` : ""}`, M + 5, 59.5);
-    const upto = r ? `${MONTHS[r[1]].toUpperCase()} ${y}` : String(y);
+    const sub = [`Monthly fee Rs. ${fmt(fee)}`];
+    if (r && !offs.length) sub.push(`counted ${MONTHS[r[0]]}–${MONTHS[r[1]]} ${y}`);
+    else if (r) sub.push(`inactive ${spanTxt(offs)} (no fee)`);
+    doc.text(sub.join("  ·  "), M + 5, 59.5);
+    const upto = last >= 0 ? `${MONTHS[last].toUpperCase()} ${y}` : String(y);
     if (d.due > 0) stamp(doc, W - M - 41, 42, 37, 19, false, `Rs. ${fmt(d.due)}`, `TO PAY · UP TO ${upto}`);
-    else if (r || d.paid > 0) stamp(doc, W - M - 41, 42, 37, 19, true, "PAID UP", d.due < 0 ? `+ Rs. ${fmt(-d.due)} AHEAD` : `UP TO ${upto}`);
+    else if (om.length || d.paid > 0) stamp(doc, W - M - 41, 42, 37, 19, true, "PAID UP", d.due < 0 ? `+ Rs. ${fmt(-d.due)} AHEAD` : `UP TO ${upto}`);
     // months table
     const months = new Set();
     if (r) for (let k = r[0]; k <= r[1]; k++) months.add(k);
@@ -2211,7 +2359,8 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       const a = amt(m.id, k), parts = partsOf(m.id, k), n = Math.max(1, parts.length), c = cvs[k];
       const from = c.src >= 0 ? MONTHS[c.src] : "earlier";
       let status;
-      if (c.covered === 0) status = { content: isOwed(m, y, k) ? "Not paid" : "-", styles: { textColor: isOwed(m, y, k) ? C.RED : C.GREY, fontStyle: "bold" } };
+      if (c.off) status = { content: a > 0 && c.cout > 0 ? `Inactive, no fee\n+${fmt(c.cout)} to ${k < 11 ? MONTHS[k + 1] : "next yr"}` : "Inactive (no fee)", styles: { textColor: a > 0 ? C.BLUE : C.GREY, fontStyle: a > 0 ? "bold" : "normal" } };
+      else if (c.covered === 0) status = { content: isOwed(m, y, k) ? "Not paid" : "-", styles: { textColor: isOwed(m, y, k) ? C.RED : C.GREY, fontStyle: "bold" } };
       else if (c.covered >= fee) status = { content: c.cout > 0 && a > 0 ? `Paid\n+${fmt(c.cout)} to ${k < 11 ? MONTHS[k + 1] : "next yr"}` : "Paid", tick: a > 0 ? C.GREEN : C.BLUE, styles: { textColor: a > 0 ? C.GREEN : C.BLUE, fontStyle: "bold", cellPadding: { top: 1.6, bottom: 1.6, left: 7.5, right: 2 } } };
       else status = { content: `Rs. ${fmt(fee - c.covered)} left`, styles: { textColor: C.AMBER, fontStyle: "bold" } };
       status.rowSpan = n;
@@ -2246,11 +2395,12 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       ty += 6.5;
     };
     row(`Total paid in ${y}`, `Rs. ${fmt(d.paid)}`, C.INK, false);
-    if (r) {
-      if (d.due > 0) row(`Still to pay (up to ${MONTHS_FULL[r[1]]} ${y})`, `Rs. ${fmt(d.due)}`, C.RED, true);
+    if (om.length) {
+      if (d.due > 0) row(`Still to pay (up to ${MONTHS_FULL[last]} ${y})`, `Rs. ${fmt(d.due)}`, C.RED, true);
       else if (d.due < 0) row(`Paid ahead`, `Rs. ${fmt(-d.due)}`, C.BLUE, true);
-      else row(`All paid up to ${MONTHS_FULL[r[1]]} ${y}`, "Thank you", C.GREEN, true);
-    }
+      else row(`All paid up to ${MONTHS_FULL[last]} ${y}`, "Thank you", C.GREEN, true);
+    } else if (d.paid > 0) row(`Paid ahead`, `Rs. ${fmt(d.paid)}`, C.BLUE, true);
+    else if (offs.length) row("Inactive", "No fee counted", C.GREY, true);
     const by = [...new Set([...months].flatMap((k) => partsOf(m.id, k).map((p) => p.c).filter(Boolean)))];
     if (by.length) { doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...C.GREY); doc.text(`Collected by: ${by.join(", ")}`, M + 2, ty); ty += 5; }
     // signature block, bottom right above the footer
@@ -2304,12 +2454,13 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     doc.setFont("helvetica", "bold"); doc.setFontSize(17); doc.setTextColor(...C.INK); doc.text(`Rs. ${fmt(p.a)}.00`, W - M - 4, yy + 5.5, { align: "right" });
     yy += 17;
     let monthTxt, monthCol;
-    if (a >= fee) { monthTxt = "Paid in full"; monthCol = C.GREEN; }
+    if (rc.off) { monthTxt = "Inactive, no fee"; monthCol = C.GREY; }
+    else if (a >= fee) { monthTxt = "Paid in full"; monthCol = C.GREEN; }
     else { monthTxt = `Rs. ${fmt(a)} of ${fmt(fee)} paid · Rs. ${fmt(fee - a)} left`; monthCol = C.AMBER; }
     line(`${MONTHS_FULL[i]}`, monthTxt, { size: 8.5, color: monthCol });
     if (rc.cout > 0) line("Extra carried to", `${i < 11 ? MONTHS_FULL[i + 1] : "next year"} · Rs. ${fmt(rc.cout)}`, { size: 8.5, color: C.BLUE });
-    const d = dueOf(m, y), r = owedRange(m, y);
-    if (r) line(d.due > 0 ? `Still to pay (to ${MONTHS[r[1]]})` : "Balance", d.due > 0 ? `Rs. ${fmt(d.due)}` : d.due < 0 ? `Rs. ${fmt(-d.due)} ahead` : "All paid up", { size: 8.5, color: d.due > 0 ? C.RED : C.GREEN });
+    const d = dueOf(m, y), om = owedMonths(m, y);
+    if (om.length) line(d.due > 0 ? `Still to pay (to ${MONTHS[om[om.length - 1]]})` : "Balance", d.due > 0 ? `Rs. ${fmt(d.due)}` : d.due < 0 ? `Rs. ${fmt(-d.due)} ahead` : "All paid up", { size: 8.5, color: d.due > 0 ? C.RED : C.GREEN });
     if (p.c && !sigImg.url) line("Collected by", p.c, { size: 9 });
     // signature
     yy = Math.max(yy + 15, H - 22);
@@ -2547,7 +2698,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
   for (const d of document.querySelectorAll("dialog.dlg")) {
     d.addEventListener("click", (ev) => { if (ev.target === d) d.close(); });
   }
-  $("memDlg").addEventListener("close", () => { confirmId = null; });
+  $("memDlg").addEventListener("close", () => { confirmId = null; offAsk = null; });
 
   /* ---------- data ---------- */
   let unsubPay = null, unsubElec = null, unsubExp = null;
@@ -2596,7 +2747,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.8.2";
+  const APP_VERSION = "1.9.0";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty";
   const SEED = {};
