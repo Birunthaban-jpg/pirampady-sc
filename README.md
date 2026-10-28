@@ -11,6 +11,7 @@ Members pay Rs. 650 a month. Some pay part of it, some pay ahead. The club also 
 - **A4 landscape PDF** of the filled register (club logo, ticks, totals), shared straight to WhatsApp from a phone.
 - **PDF receipts** (A6) for each payment, with a receipt number, who collected the money and the member's balance.
 - **PDF slips** (A5) for each member, sent one by one through WhatsApp, so every member sees only their own payments and dues; all slips can also be saved as one PDF for printing. A plain-text version is available too.
+- **Styled signature** (e.g. *Y.Birunthaban*) printed on every receipt and slip, in a choice of five script styles.
 - **Private members:** a member can ask not to be named; the shared PDF shows their money as "Private contributions" so the totals still add up.
 - **Backup and restore** with a single JSON file, plus a CSV export for Excel.
 - **Phone and Mac share one register**, synced through a private GitHub repository, and every change is kept as a version you can restore.
@@ -32,7 +33,8 @@ Members pay Rs. 650 a month. Some pay part of it, some pay ahead. The club also 
 | Privacy | No member data is in this public repository; it lives only in the private data repo and on the user's devices |
 | Dues | `fee × months owed so far − paid this year`, counted per member and never below zero in the total |
 | PDF | [jsPDF](https://github.com/parallax/jsPDF) and [jsPDF-AutoTable](https://github.com/simonbengtsson/jsPDF-AutoTable), bundled in `vendor/` |
-| Fonts | Barlow and Barlow Condensed (SIL Open Font License), bundled in `fonts/` |
+| Fonts | Barlow and Barlow Condensed, plus five script fonts for the signature (Herr Von Muellerhoff, Mrs Saint Delafield, Great Vibes, Alex Brush, Allura), all SIL Open Font License, bundled in `fonts/` |
+| Signature | Drawn from the chosen script font onto a canvas, trimmed to the ink and placed into the PDFs as a PNG |
 
 ## Run it
 

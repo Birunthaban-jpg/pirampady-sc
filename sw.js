@@ -1,5 +1,5 @@
 // Offline support for Pirampady SC Subscriptions. Bump VERSION on every release.
-const VERSION = "1.3.0";
+const VERSION = "1.4.0";
 const CACHE = "psc-" + VERSION;
 const FILES = [
   "./",
@@ -18,7 +18,12 @@ const FILES = [
   "fonts/barlow-latin-400-normal.woff2",
   "fonts/barlow-latin-500-normal.woff2",
   "fonts/barlow-latin-600-normal.woff2",
-  "fonts/barlow-latin-700-normal.woff2"
+  "fonts/barlow-latin-700-normal.woff2",
+  "fonts/sig-1.woff2",
+  "fonts/sig-2.woff2",
+  "fonts/sig-3.woff2",
+  "fonts/sig-4.woff2",
+  "fonts/sig-5.woff2"
 ];
 
 self.addEventListener("install", (event) => {

@@ -20,6 +20,11 @@
 @font-face { font-family: "Barlow"; font-weight: 700; font-style: normal; font-display: swap; src: url("fonts/barlow-latin-700-normal.woff2") format("woff2"); }
 @font-face { font-family: "Barlow Condensed"; font-weight: 600; font-style: normal; font-display: swap; src: url("fonts/barlow-condensed-latin-600-normal.woff2") format("woff2"); }
 @font-face { font-family: "Barlow Condensed"; font-weight: 700; font-style: normal; font-display: swap; src: url("fonts/barlow-condensed-latin-700-normal.woff2") format("woff2"); }
+@font-face { font-family: "PSC Sig 1"; font-weight: 400; font-style: normal; font-display: block; src: url("fonts/sig-1.woff2") format("woff2"); }
+@font-face { font-family: "PSC Sig 2"; font-weight: 400; font-style: normal; font-display: block; src: url("fonts/sig-2.woff2") format("woff2"); }
+@font-face { font-family: "PSC Sig 3"; font-weight: 400; font-style: normal; font-display: block; src: url("fonts/sig-3.woff2") format("woff2"); }
+@font-face { font-family: "PSC Sig 4"; font-weight: 400; font-style: normal; font-display: block; src: url("fonts/sig-4.woff2") format("woff2"); }
+@font-face { font-family: "PSC Sig 5"; font-weight: 400; font-style: normal; font-display: block; src: url("fonts/sig-5.woff2") format("woff2"); }
 /* Layout: club header → year totals → Month (collect) / Whole year (sheet) views; dialogs become bottom sheets on phones. */
 :root {
   --bg: #F6F3EF; --surface: #FFFFFF; --surface-2: #FBF8F4; --ink: #1F1A15; --muted: #6C6359;
@@ -270,6 +275,11 @@ dialog.dlg::backdrop { background: var(--scrim); }
 .sliplist .sent { grid-column: 1 / -1; font-size: 12px; color: var(--ok); font-weight: 600; }
 .sliplist pre { grid-column: 1 / -1; margin: 4px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); font: 13px/1.45 var(--f-body); white-space: pre-wrap; }
 .memlist .sub2 { flex-wrap: wrap; }
+.sigstyles { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 6px; }
+.sigopt { display: grid; gap: 2px; justify-items: start; padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); min-width: 0; text-align: left; }
+.sigopt span { font-size: 24px; line-height: 1.25; color: var(--adv); white-space: nowrap; overflow: hidden; text-overflow: clip; max-width: 100%; }
+.sigopt small { font-size: 11px; color: var(--muted); font-weight: 600; }
+.sigopt[aria-pressed="true"] { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft); }
 .memlist .sub2 input.ph-in { height: 34px; font-size: 14px; padding: 0 8px; width: 160px; flex: none; }
 .memlist .sub2 .pv { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ink); }
 .memlist .sub2 .pv input { width: 18px; height: 18px; accent-color: var(--brand); }
@@ -481,6 +491,12 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       </div>
       <p class="hint">Dues are counted from this month up to the current month. A member's own “pays from” month in Members overrides it.</p>
     </div>
+    <div class="field">
+      <label for="sigText">Signature on receipts and slips</label>
+      <input id="sigText" autocomplete="off" placeholder="Leave empty for no signature">
+      <div class="sigstyles" id="sigStyles" role="group" aria-label="Signature style"></div>
+      <p class="hint">Printed in dark-blue ink above the signature line. Shared with your other devices.</p>
+    </div>
     <p class="err" id="setErr" hidden></p>
     <div class="foot-row"><span></span><button type="submit" class="btn primary">Save</button></div>
   </form>
@@ -662,10 +678,12 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
   }
 
   /* ---------- reads ---------- */
+  const DEFAULT_SIG = "Y.Birunthaban";
   function settings() {
     const o = overlay.get("settings/club");
     const s = o || S.settingsServer || {};
-    return { fees: s.fees || {}, start: s.start && Number.isInteger(s.start.y) ? s.start : { y: CY, m: 0 } };
+    const sig = s.sig && typeof s.sig === "object" ? { text: typeof s.sig.text === "string" ? s.sig.text : DEFAULT_SIG, style: s.sig.style >= 1 && s.sig.style <= 5 ? s.sig.style : 1 } : { text: DEFAULT_SIG, style: 1 };
+    return { fees: s.fees || {}, start: s.start && Number.isInteger(s.start.y) ? s.start : { y: CY, m: 0 }, sig };
   }
   function feeFor(y) {
     const fees = settings().fees;
@@ -1357,7 +1375,51 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     for (let y = CY - 3; y <= CY + 1; y++) ys += `<option value="${y}"${y === st.start.y ? " selected" : ""}>${y}</option>`;
     $("startY").innerHTML = ys;
     $("setErr").hidden = true;
+    $("sigText").value = st.sig.text;
+    sigStyleSel = st.sig.style;
+    drawSigChoices();
     $("setDlg").showModal();
+  }
+  let sigStyleSel = 1;
+  const SIG_NAMES = ["Pen", "Flowing", "Elegant", "Brush", "Neat"];
+  function drawSigChoices() {
+    const t = $("sigText").value.trim() || "Your signature";
+    $("sigStyles").innerHTML = SIG_NAMES.map((n, k) => `<button type="button" class="sigopt" data-sig="${k + 1}" aria-pressed="${sigStyleSel === k + 1}" aria-label="${n} style"><span style="font-family:'PSC Sig ${k + 1}', cursive">${esc(t)}</span><small>${n}</small></button>`).join("");
+  }
+  $("sigText").addEventListener("input", drawSigChoices);
+  $("sigStyles").addEventListener("click", (ev) => { const b = ev.target.closest("[data-sig]"); if (!b) return; sigStyleSel = +b.dataset.sig; drawSigChoices(); });
+
+  /* ---------- signature image for PDFs (drawn from the chosen script font) ---------- */
+  let sigImg = { key: "", url: null, ratio: 0 };
+  async function renderSignature() {
+    const sg = settings().sig, text = (sg.text || "").trim(), key = `${sg.style}|${text}`;
+    if (key === sigImg.key) return;
+    if (!text) { sigImg = { key, url: null, ratio: 0 }; return; }
+    const fam = `"PSC Sig ${sg.style}"`;
+    try { if (document.fonts && document.fonts.load) await document.fonts.load(`120px ${fam}`, text); } catch (e) {}
+    try {
+      const c = document.createElement("canvas"), ctx = c.getContext("2d");
+      ctx.font = `120px ${fam}, cursive`;
+      const w = Math.ceil(ctx.measureText(text).width) + 160, h = 240;
+      c.width = w; c.height = h;
+      ctx.font = `120px ${fam}, cursive`; ctx.fillStyle = "#1A3078"; ctx.fillText(text, 80, 160);
+      // trim to the ink so it sits neatly on the line
+      const px = ctx.getImageData(0, 0, w, h).data;
+      let x0 = w, y0 = h, x1 = 0, y1 = 0;
+      for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) if (px[(yy * w + xx) * 4 + 3] > 8) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy; }
+      if (x1 <= x0) { sigImg = { key, url: null, ratio: 0 }; return; }
+      const t = document.createElement("canvas"); t.width = x1 - x0 + 8; t.height = y1 - y0 + 8;
+      t.getContext("2d").drawImage(c, x0 - 4, y0 - 4, t.width, t.height, 0, 0, t.width, t.height);
+      sigImg = { key, url: t.toDataURL("image/png"), ratio: t.height / t.width };
+    } catch (e) { sigImg = { key, url: null, ratio: 0 }; }
+  }
+  // draws the signature centred above a line from x to x+w at baseline y; returns true if drawn
+  function drawSignature(doc, x, y, w, maxH) {
+    if (!sigImg.url) return false;
+    let iw = w * 0.92, ih = iw * sigImg.ratio;
+    if (ih > maxH) { ih = maxH; iw = ih / sigImg.ratio; }
+    doc.addImage(sigImg.url, "PNG", x + (w - iw) / 2, y - ih + 1.2, iw, ih);
+    return true;
   }
   $("setForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
@@ -1365,7 +1427,8 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     if (!(fee > 0)) { $("setErr").textContent = "Enter the monthly fee in rupees, for example 650."; $("setErr").hidden = false; return; }
     const st = settings();
     const fees = { ...st.fees, [String(S.year)]: fee };
-    writeDoc("settings/club", { fees, start: { y: +$("startY").value, m: +$("startM").value } });
+    writeDoc("settings/club", { fees, start: { y: +$("startY").value, m: +$("startM").value }, sig: { text: $("sigText").value.trim().replace(/\s+/g, " "), style: sigStyleSel } });
+    renderSignature();
     $("setDlg").close();
     render();
     toast("Settings saved.");
@@ -1600,7 +1663,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     doc.autoTable({
       startY: 69, margin: { left: M, right: M, bottom: 24 }, theme: "grid",
       head: [["Month", "Paid on", "Amount", "Receipt no.", "Status"]], body,
-      styles: { font: "helvetica", fontSize: 8.3, textColor: C.INK, lineColor: C.LINE, lineWidth: 0.15, valign: "middle", cellPadding: { top: 1.6, bottom: 1.6, left: 2, right: 2 }, fillColor: false },
+      styles: { font: "helvetica", fontSize: body.length > 8 ? 7.6 : 8.3, textColor: C.INK, lineColor: C.LINE, lineWidth: 0.15, valign: "middle", cellPadding: { top: body.length > 8 ? 0.9 : 1.6, bottom: body.length > 8 ? 0.9 : 1.6, left: 2, right: 2 }, fillColor: false },
       headStyles: { fillColor: C.BROWN, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8.3 },
       columnStyles: { 0: { cellWidth: 23 }, 1: { cellWidth: 24 }, 2: { cellWidth: 19, halign: "right" }, 3: { cellWidth: 28, fontSize: 7.6 }, 4: { cellWidth: "auto" } },
       didParseCell: (data) => { if (data.section === "head" && data.column.index === 2) data.cell.styles.halign = "right"; },
@@ -1626,7 +1689,15 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       else row(`All paid up to ${MONTHS_FULL[r[1]]} ${y}`, "Thank you", C.GREEN, true);
     }
     const by = [...new Set([...months].flatMap((k) => partsOf(m.id, k).map((p) => p.c).filter(Boolean)))];
-    if (by.length) { doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...C.GREY); doc.text(`Collected by: ${by.join(", ")}`, M + 2, ty); }
+    if (by.length) { doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...C.GREY); doc.text(`Collected by: ${by.join(", ")}`, M + 2, ty); ty += 5; }
+    // signature block, bottom right above the footer
+    const sy = Math.max(ty + 15, H - 27);
+    if (sy <= H - 23 && sigImg.url) {
+      drawSignature(doc, W - M - 50, sy, 50, 13);
+      doc.setDrawColor(...C.GREY); doc.setLineWidth(0.25); doc.setLineDashPattern([0.8, 0.8], 0); doc.line(W - M - 50, sy, W - M, sy); doc.setLineDashPattern([], 0);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...C.GREY);
+      doc.text("Club collector", W - M - 25, sy + 3.6, { align: "center" });
+    }
     // footer
     doc.setDrawColor(...C.LINE); doc.setLineWidth(0.3); doc.line(M, H - 19, W - M, H - 19);
     doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...C.BROWN);
@@ -1676,13 +1747,15 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     line(`${MONTHS_FULL[i]}`, monthTxt, { size: 8.5, color: monthCol });
     const d = dueOf(m, y), r = owedRange(m, y);
     if (r) line(d.due > 0 ? `Still to pay (to ${MONTHS[r[1]]})` : "Balance", d.due > 0 ? `Rs. ${fmt(d.due)}` : d.due < 0 ? `Rs. ${fmt(-d.due)} ahead` : "All paid up", { size: 8.5, color: d.due > 0 ? C.RED : C.GREEN });
-    if (p.c) line("Collected by", p.c, { size: 9 });
+    if (p.c && !sigImg.url) line("Collected by", p.c, { size: 9 });
     // signature
-    yy = Math.max(yy + 4, H - 27);
-    doc.setDrawColor(...C.GREY); doc.setLineWidth(0.25); doc.setLineDashPattern([0.8, 0.8], 0); doc.line(W - M - 40, yy, W - M, yy); doc.setLineDashPattern([], 0);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...C.GREY); doc.text("Collector's signature", W - M - 20, yy + 3.8, { align: "center" });
+    yy = Math.max(yy + 15, H - 22);
+    drawSignature(doc, W - M - 46, yy, 46, 13);
+    doc.setDrawColor(...C.GREY); doc.setLineWidth(0.25); doc.setLineDashPattern([0.8, 0.8], 0); doc.line(W - M - 46, yy, W - M, yy); doc.setLineDashPattern([], 0);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...C.GREY);
+    doc.text(sigImg.url && p.c ? `Collected by ${p.c}` : "Collector's signature", W - M - 23, yy + 3.8, { align: "center" });
     doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...C.BROWN);
-    doc.text("Thank you!", W / 2, H - 9, { align: "center" });
+    doc.text("Thank you!", M + 1, yy + 3.8);
     return doc.output("blob");
   }
   function sharePdf(blob, name) {
@@ -1770,7 +1843,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       S.membersServer = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((m) => typeof m.name === "string");
       S.membersLoaded = true; render();
     }, onSubErr);
-    unsubSet = S.db.doc("settings/club").onSnapshot((d) => { S.settingsServer = d.exists ? d.data() : null; render(); }, onSubErr);
+    unsubSet = S.db.doc("settings/club").onSnapshot((d) => { S.settingsServer = d.exists ? d.data() : null; render(); renderSignature(); }, onSubErr);
   }
 
   /* ======================================================================
@@ -1778,7 +1851,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.3.0";
+  const APP_VERSION = "1.4.0";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty";
   const SEED = {};
