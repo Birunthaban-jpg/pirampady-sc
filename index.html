@@ -245,8 +245,29 @@ dialog.dlg::backdrop { background: var(--scrim); }
 .prog i { display: block; height: 100%; width: 0; background: var(--ok); border-radius: 6px; }
 .prog i.part { background: var(--gold); }
 .parts { list-style: none; margin: -4px 0 0; padding: 0; display: grid; gap: 4px; }
-.parts li { display: grid; grid-template-columns: minmax(0, 1fr) auto 36px; align-items: center; gap: 10px; padding: 6px 4px 6px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; }
-.parts li span { color: var(--muted); }
+.parts li { display: grid; grid-template-columns: minmax(0, 1fr) auto auto 32px; align-items: center; gap: 8px; padding: 6px 4px 6px 12px; border: 1px solid var(--line); border-radius: 10px; font-size: 14px; }
+.parts li span { color: var(--muted); min-width: 0; }
+.parts li span small { display: block; font-size: 11.5px; letter-spacing: .03em; font-variant-numeric: tabular-nums; }
+.parts li button.rc { width: auto; padding: 0 10px; background: var(--ok-bg); color: var(--ok); font-size: 13px; font-weight: 700; }
+.byrow input { height: 40px; }
+.lock { font-size: 12px; margin-left: 4px; }
+.slipbar { display: flex; justify-content: space-between; align-items: center; gap: 8px; flex-wrap: wrap; }
+.slipbar .btn { height: 36px; font-size: 14px; }
+.sliplist { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.sliplist li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; padding: 8px 8px 8px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.sliplist .who { min-width: 0; border: 0; background: none; padding: 0; text-align: left; display: grid; gap: 2px; }
+.sliplist .who b { font-size: 15px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sliplist .who span { font-size: 13px; color: var(--muted); }
+.sliplist .who span.due { color: var(--due); font-weight: 600; }
+.sliplist .who span.ok { color: var(--ok); font-weight: 600; }
+.sliplist .send { height: 38px; padding: 0 14px; border-radius: 10px; border: 0; background: var(--ok); color: var(--surface); font-weight: 700; white-space: nowrap; }
+.sliplist .send.share { background: var(--brand); color: var(--brand-ink); }
+.sliplist .sent { grid-column: 1 / -1; font-size: 12px; color: var(--ok); font-weight: 600; }
+.sliplist pre { grid-column: 1 / -1; margin: 4px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); font: 13px/1.45 var(--f-body); white-space: pre-wrap; }
+.memlist .sub2 { flex-wrap: wrap; }
+.memlist .sub2 input.ph-in { height: 34px; font-size: 14px; padding: 0 8px; width: 160px; flex: none; }
+.memlist .sub2 .pv { display: inline-flex; align-items: center; gap: 6px; font-weight: 600; color: var(--ink); }
+.memlist .sub2 .pv input { width: 18px; height: 18px; accent-color: var(--brand); }
 .parts li b { font-variant-numeric: tabular-nums; }
 .parts li button { width: 32px; height: 32px; border-radius: 8px; border: 0; background: var(--due-bg); color: var(--due); font-size: 18px; line-height: 1; }
 .field { display: grid; gap: 6px; }
@@ -373,6 +394,10 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       <p id="payStateTxt">Not paid yet</p>
     </div>
     <ul class="parts" id="payParts" hidden></ul>
+    <div class="field byrow">
+      <label for="payBy">Collected by</label>
+      <input id="payBy" autocomplete="off" placeholder="Your name (shown on the receipt)">
+    </div>
     <button type="button" class="btn primary big" id="payMain">Paid in full · Rs. 650</button>
     <div class="field">
       <label for="payAmt" id="payAmtLbl">Paid only part? Enter the amount (Rs.)</label>
@@ -385,6 +410,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     </div>
     <div class="foot-row">
       <button type="button" class="btn danger" id="payClear">Remove all payments for this month</button>
+      <button type="button" class="btn" id="paySlip">Send this member's slip</button>
     </div>
   </form>
 </dialog>
@@ -446,6 +472,19 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     <p class="err" id="setErr" hidden></p>
     <div class="foot-row"><span></span><button type="submit" class="btn primary">Save</button></div>
   </form>
+</dialog>
+
+<dialog class="dlg" id="slipDlg" aria-labelledby="slipTitle">
+  <div class="inner">
+    <div class="dlg-head">
+      <div><p class="eyebrow" id="slipWhen">2026</p><h3 id="slipTitle">Send slips</h3></div>
+      <button type="button" class="close" data-close aria-label="Close">×</button>
+    </div>
+    <p class="hint">Each member gets only their own payments and what they still owe, so nobody sees anyone else's. Tap <b>WhatsApp</b> or <b>Send</b>, send the message, then come back for the next one. Tap a name to preview the slip.</p>
+    <div class="filter" id="slipFilter" role="group" aria-label="Show"></div>
+    <ul class="sliplist" id="slipList"></ul>
+    <p class="hint">Save members' WhatsApp numbers under <b>Members</b> to open each chat directly.</p>
+  </div>
 </dialog>
 
 <dialog class="dlg" id="syncDlg" aria-labelledby="syncTitle">
@@ -541,7 +580,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
   </div>
 </dialog>
 
-<div class="toast" id="toast" role="status" aria-live="polite" hidden><span id="toastMsg"></span><button type="button" id="toastBtn" hidden>Undo</button></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden><span id="toastMsg"></span><button type="button" id="toastBtn2" hidden>Send receipt</button><button type="button" id="toastBtn" hidden>Undo</button></div>
 
 <script src="vendor/jspdf.umd.min.js"></script>
 <script src="vendor/jspdf.plugin.autotable.min.js"></script>
@@ -636,11 +675,24 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     return S.payServer[mid] || { m: {}, h: {} };
   }
   const payMap = (mid) => payDoc(mid).m;
+  // One payment: a = amount, t = date (YYYY-MM-DD), r = receipt number, c = who collected it.
+  const keepPart = (x) => { const o = { a: x.a, t: x.t || null }; if (x.r) o.r = x.r; if (x.c) o.c = x.c; return o; };
   function partsOf(mid, i) {
     const d = payDoc(mid), h = d.h[i], tot = d.m[i] > 0 ? d.m[i] : 0;
-    if (Array.isArray(h) && h.length) return h.filter((x) => x && x.a > 0).map((x) => ({ a: x.a, t: x.t || null }));
+    if (Array.isArray(h) && h.length) return h.filter((x) => x && x.a > 0).map(keepPart);
     return tot ? [{ a: tot, t: null }] : [];
   }
+  const RC_CHARS = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+  function newReceipt(year, i) {
+    let s = "";
+    const buf = new Uint32Array(4);
+    (window.crypto || {}).getRandomValues ? crypto.getRandomValues(buf) : buf.forEach((_, k) => { buf[k] = Math.floor(Math.random() * 1e9); });
+    for (const n of buf) s += RC_CHARS[n % RC_CHARS.length];
+    return `PSC-${String(year).slice(2)}${String(i + 1).padStart(2, "0")}-${s}`;
+  }
+  const COLLECTOR_KEY = "psc.collector";
+  const getCollector = () => { try { return localStorage.getItem(COLLECTOR_KEY) || ""; } catch (e) { return ""; } };
+  const setCollector = (v) => { try { localStorage.setItem(COLLECTOR_KEY, v); } catch (e) {} };
   function todayStr() { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; }
   function dayLabel(t) { if (!t) return "Earlier"; const [y, mo, d] = t.split("-").map(Number); return `${d} ${MONTHS[mo - 1]}${y !== CY ? " " + y : ""}`; }
   const amt = (mid, i) => { const v = payMap(mid)[i]; return typeof v === "number" && v > 0 ? v : 0; };
@@ -713,7 +765,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     }
     const ms = yearMembers();
     if (!ms.length) {
-      main.innerHTML = `<div class="card notice"><h2>No members yet</h2><p>Open <b>Members</b> and add the first name to start recording payments.</p></div>`;
+      main.innerHTML = `<div class="card notice"><h2>No members on this device yet</h2><p>Tap <b>Sync</b> and connect to load the club's register, or add the first name under <b>Members</b>.</p></div>`;
       return;
     }
     // keep the user's own sideways scroll across live updates; only re-centre when the month, year or view changes
@@ -787,7 +839,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
         quick = `<button type="button" class="quick" data-act="quick" data-id="${esc(m.id)}" aria-label="Mark ${esc(m.name)} paid Rs. ${fmt(fee)} for ${MONTHS_FULL[i]}">✓ ${fmt(fee)}</button>`;
       else if (S.canWrite && a > 0 && a < fee)
         quick = `<button type="button" class="quick rest" data-act="rest" data-id="${esc(m.id)}" aria-label="${esc(m.name)} paid the remaining Rs. ${fmt(fee - a)} for ${MONTHS_FULL[i]}">+ ${fmt(fee - a)}</button>`;
-      rows.push(`<li><button type="button" class="mrow" data-act="pay" data-id="${esc(m.id)}" data-m="${i}"${S.canWrite ? "" : " disabled"}><span class="no">${idx + 1}</span><span class="nm">${esc(m.name)}${m.removed ? "<small>left</small>" : ""}</span><span class="pill ${st.cls}">${st.pill}</span></button>${quick}</li>`);
+      rows.push(`<li><button type="button" class="mrow" data-act="pay" data-id="${esc(m.id)}" data-m="${i}"${S.canWrite ? "" : " disabled"}><span class="no">${idx + 1}</span><span class="nm">${esc(m.name)}${m.private ? '<span class="lock" title="Name kept private">🔒</span>' : ""}${m.removed ? "<small>left</small>" : ""}</span><span class="pill ${st.cls}">${st.pill}</span></button>${quick}</li>`);
     }
     const owedCount = ms.filter((m) => isOwed(m, S.year, i) || amt(m.id, i) > 0).length;
     const e = elec(i);
@@ -808,8 +860,11 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
             <button type="button" class="btn" data-act="elec" data-m="${i}"${S.canWrite ? "" : " disabled"}>${e.amount || e.signed ? "Edit" : "Record bill"}</button>
           </div>
         </section>
-        <div class="filter" role="group" aria-label="Show">
-          ${["all", "todo", "paid"].map((f) => `<button type="button" data-act="filter" data-f="${f}" aria-pressed="${S.filter === f}">${label[f]}</button>`).join("")}
+        <div class="slipbar">
+          <div class="filter" role="group" aria-label="Show">
+            ${["all", "todo", "paid"].map((f) => `<button type="button" data-act="filter" data-f="${f}" aria-pressed="${S.filter === f}">${label[f]}</button>`).join("")}
+          </div>
+          <button type="button" class="btn" data-act="slips">Send slips</button>
         </div>
         <section class="card">${list}</section>
       </div>`;
@@ -830,7 +885,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       if (d.due > 0) dc = `<td class="dcol due">${fmt(d.due)}</td>`;
       else if (d.due < 0) dc = `<td class="dcol adv" title="Paid ahead">+${fmt(-d.due)}</td>`;
       else if (d.months > 0) dc = `<td class="dcol ok" aria-label="Paid up">✓</td>`;
-      return `<tr><td class="c-no">${idx + 1}</td><th class="c-name" scope="row">${esc(m.name)}${m.removed ? "<small>left</small>" : ""}</th>${cells}<td class="tot">${d.paid ? fmt(d.paid) : "–"}</td>${dc}</tr>`;
+      return `<tr><td class="c-no">${idx + 1}</td><th class="c-name" scope="row">${esc(m.name)}${m.private ? '<span class="lock" title="Name kept private">🔒</span>' : ""}${m.removed ? "<small>left</small>" : ""}</th>${cells}<td class="tot">${d.paid ? fmt(d.paid) : "–"}</td>${dc}</tr>`;
     }).join("");
     let yc = 0, ye = 0;
     const colRow = MONTHS.map((_, k) => { const t = monthTotal(k); yc += t; return `<td class="mc">${t ? fmt(t) : "–"}</td>`; }).join("");
@@ -857,33 +912,176 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
   }
 
   /* ---------- toast ---------- */
-  let toastTimer = null, toastUndo = null;
-  function toast(msg, undo, label) {
+  let toastTimer = null, toastUndo = null, toastAlt = null;
+  // toast(message, undoFn?, undoLabel?, {label, fn}?) — the optional second action is e.g. "Send receipt"
+  function toast(msg, undo, label, alt) {
     $("toastMsg").textContent = msg;
     toastUndo = undo || null;
+    toastAlt = alt || null;
     $("toastBtn").textContent = label || "Undo";
     $("toastBtn").hidden = !undo;
+    $("toastBtn2").textContent = alt ? alt.label : "";
+    $("toastBtn2").hidden = !alt;
     $("toast").hidden = false;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(() => { $("toast").hidden = true; toastUndo = null; }, undo ? 6000 : 3500);
+    toastTimer = setTimeout(() => { $("toast").hidden = true; toastUndo = null; toastAlt = null; }, alt ? 10000 : undo ? 6000 : 3500);
   }
-  $("toastBtn").addEventListener("click", () => { const u = toastUndo; $("toast").hidden = true; toastUndo = null; if (u) u(); });
+  $("toastBtn").addEventListener("click", () => { const u = toastUndo; $("toast").hidden = true; toastUndo = null; toastAlt = null; if (u) u(); });
+  $("toastBtn2").addEventListener("click", () => { const a = toastAlt; $("toast").hidden = true; toastUndo = null; toastAlt = null; if (a) a.fn(); });
+
+  /* ---------- WhatsApp messages: receipts and member slips ---------- */
+  function normPhone(p) {
+    let d = String(p || "").replace(/[^0-9]/g, "");
+    if (d.startsWith("00")) d = d.slice(2);
+    if (d.length === 10 && d.startsWith("0")) d = "94" + d.slice(1);       // 07X XXX XXXX (Sri Lanka)
+    else if (d.length === 9 && d.startsWith("7")) d = "94" + d;
+    return d.length >= 10 && d.length <= 15 ? d : "";
+  }
+  function openLink(href) { const a = document.createElement("a"); a.href = href; a.target = "_blank"; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove(); }
+  function copyText(t, okMsg) {
+    const fail = () => toast("Couldn't copy the message. Add the member's WhatsApp number in Members to send it directly.");
+    if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(t).then(() => toast(okMsg), fail); else fail();
+  }
+  // Opens WhatsApp straight to the member when a number is saved; otherwise the share sheet (phone) or copies (computer).
+  function sendText(m, text) {
+    const ph = normPhone(m && m.phone);
+    if (ph) { openLink(`https://wa.me/${ph}?text=${encodeURIComponent(text)}`); return "wa"; }
+    if (window.matchMedia("(pointer: coarse)").matches && navigator.share) { navigator.share({ text }).catch(() => {}); return "share"; }
+    copyText(text, "Message copied. Paste it into the member's WhatsApp chat.");
+    return "copied";
+  }
+  const longDate = (t) => { if (!t) return ""; const [y, mo, d] = t.split("-").map(Number); return `${d} ${MONTHS[mo - 1]} ${y}`; };
+  function standingLine(m, y) {
+    const d = dueOf(m, y), r = owedRange(m, y);
+    if (!r) return d.paid > 0 ? `Paid ahead: Rs. ${fmt(d.paid)}` : "";
+    const upto = MONTHS_FULL[r[1]];
+    if (d.due > 0) return `Still to pay (up to ${upto} ${y}): Rs. ${fmt(d.due)}`;
+    if (d.due < 0) return `All paid up to ${upto} ✓ (Rs. ${fmt(-d.due)} paid ahead)`;
+    return `All paid up to ${upto} ${y} ✓`;
+  }
+  function receiptText(m, i, p) {
+    const y = S.year, fee = feeFor(y), a = amt(m.id, i);
+    const L = ["*Pirampady Sports Club*", `Payment receipt${p.r ? " · " + p.r : ""}`, "",
+      `Received: Rs. ${fmt(p.a)}`, `From: ${m.name}`, `For: ${MONTHS_FULL[i]} ${y} subscription`];
+    if (p.t) L.push(`Date: ${longDate(p.t)}`);
+    if (p.c) L.push(`Collected by: ${p.c}`);
+    L.push("");
+    if (a === fee) L.push(`${MONTHS_FULL[i]}: paid in full ✓`);
+    else if (a < fee) L.push(`${MONTHS_FULL[i]}: Rs. ${fmt(a)} of Rs. ${fmt(fee)} paid · Rs. ${fmt(fee - a)} left`);
+    else L.push(`${MONTHS_FULL[i]}: Rs. ${fmt(a)} paid (Rs. ${fmt(a - fee)} extra)`);
+    const st = standingLine(m, y);
+    if (st) L.push(st);
+    L.push("", "Thank you!");
+    return L.join("\n");
+  }
+  function statementText(m) {
+    const y = S.year, fee = feeFor(y), r = owedRange(m, y);
+    const months = new Set();
+    if (r) for (let k = r[0]; k <= r[1]; k++) months.add(k);
+    for (let k = 0; k < 12; k++) if (amt(m.id, k) > 0) months.add(k);
+    const L = ["*Pirampady Sports Club*", `Subscription slip · ${y}`, "", `*${m.name}*`, `Monthly fee: Rs. ${fmt(fee)}`, ""];
+    for (const k of [...months].sort((a, b) => a - b)) {
+      const a = amt(m.id, k), parts = partsOf(m.id, k);
+      let line = `${MONTHS[k]}: `;
+      if (a === 0) line += "not paid";
+      else if (a === fee) line += `Rs. ${fmt(a)} ✓`;
+      else if (a < fee) line += `Rs. ${fmt(a)} (Rs. ${fmt(fee - a)} left)`;
+      else line += `Rs. ${fmt(a)} (Rs. ${fmt(a - fee)} extra)`;
+      if (a > 0 && parts.length === 1) {
+        const extra = [parts[0].t ? dayLabel(parts[0].t) : "", parts[0].r || ""].filter(Boolean).join(" · ");
+        if (extra) line += ` · ${extra}`;
+      }
+      L.push(line);
+      if (a > 0 && parts.length > 1) for (const p of parts) L.push(`   – Rs. ${fmt(p.a)}${p.t ? ` on ${dayLabel(p.t)}` : " (earlier)"}${p.r ? ` · ${p.r}` : ""}`);
+    }
+    if (!months.size) L.push("Nothing due yet.");
+    const d = dueOf(m, y);
+    L.push("", `Total paid in ${y}: Rs. ${fmt(d.paid)}`);
+    const st = standingLine(m, y);
+    if (st) L.push(st);
+    L.push("", "Thank you!");
+    return L.join("\n");
+  }
+  function sendReceipt(mid, i, k) {
+    const m = allMembers().find((x) => x.id === mid);
+    if (!m) return;
+    const parts = partsOf(mid, i);
+    const idx = k == null ? parts.length - 1 : k;
+    const p = parts[idx];
+    if (!p) return;
+    if (!p.r) { parts[idx] = { ...p, r: newReceipt(S.year, i) }; setParts(mid, i, parts); }   // older payments get a number when first sent
+    const how = sendText(m, receiptText(m, i, parts[idx]));
+    if (how === "wa") markSent(mid);
+  }
+  /* ---------- send slips one by one ---------- */
+  let slipFilter = "due", slipOpen = null;
+  function fmtSent(iso) {
+    const d = new Date(iso);
+    if (isNaN(d)) return "";
+    const t = d.toLocaleTimeString("en-GB", { hour: "numeric", minute: "2-digit" });
+    return d.toDateString() === new Date().toDateString() ? `today ${t}` : `${d.getDate()} ${MONTHS[d.getMonth()]}, ${t}`;
+  }
+  function renderSlips() {
+    const y = S.year;
+    $("slipWhen").textContent = y === CY ? `${y} · up to ${MONTHS_FULL[CM]}` : String(y);
+    const info = yearMembers().filter((m) => !m.removed).map((m) => ({ m, d: dueOf(m, y) }));
+    const groups = { due: info.filter((x) => x.d.due > 0), paid: info.filter((x) => x.d.due <= 0), all: info };
+    $("slipFilter").innerHTML = [["due", "Still to pay"], ["paid", "Paid up"], ["all", "All"]]
+      .map(([f, l]) => `<button type="button" data-sf="${f}" aria-pressed="${slipFilter === f}">${l} ${groups[f].length}</button>`).join("");
+    const sent = sentMap();
+    $("slipList").innerHTML = groups[slipFilter].map(({ m, d }) => {
+      const ph = normPhone(m.phone);
+      const status = d.due > 0 ? `<span class="due">Owes Rs. ${fmt(d.due)}</span>`
+        : d.months > 0 || d.paid > 0 ? `<span class="ok">Paid up ✓${d.due < 0 ? ` · Rs. ${fmt(-d.due)} ahead` : ""}</span>` : `<span>Nothing due yet</span>`;
+      const when = sent[`${y}:${m.id}`];
+      return `<li>
+        <button type="button" class="who" data-sp="${esc(m.id)}" aria-expanded="${slipOpen === m.id}"><b>${esc(m.name)}${m.private ? '<span class="lock" title="Name kept private">🔒</span>' : ""}</b>${status}${ph ? "" : "<span>No WhatsApp number saved</span>"}</button>
+        <button type="button" class="send${ph ? "" : " share"}" data-ss="${esc(m.id)}" aria-label="Send ${esc(m.name)}'s slip">${ph ? "WhatsApp" : "Send"}</button>
+        ${when ? `<span class="sent">✓ Sent ${esc(fmtSent(when))}</span>` : ""}
+        ${slipOpen === m.id ? `<pre>${esc(statementText(m))}</pre>` : ""}
+      </li>`;
+    }).join("") || `<li class="hint" style="border:0">${slipFilter === "due" ? "Nobody owes anything right now." : "No members in this list."}</li>`;
+  }
+  function openSlips() { slipOpen = null; renderSlips(); $("slipDlg").showModal(); }
+  $("slipFilter").addEventListener("click", (ev) => { const b = ev.target.closest("[data-sf]"); if (!b) return; slipFilter = b.dataset.sf; slipOpen = null; renderSlips(); });
+  $("slipList").addEventListener("click", (ev) => {
+    const p = ev.target.closest("[data-sp]");
+    if (p) { slipOpen = slipOpen === p.dataset.sp ? null : p.dataset.sp; renderSlips(); return; }
+    const s = ev.target.closest("[data-ss]");
+    if (!s) return;
+    const m = allMembers().find((x) => x.id === s.dataset.ss);
+    if (!m) return;
+    sendText(m, statementText(m));
+    markSent(m.id);
+    renderSlips();
+  });
+
+  const SENT_KEY = "psc.sent.v1";
+  function sentMap() { try { return JSON.parse(localStorage.getItem(SENT_KEY) || "{}") || {}; } catch (e) { return {}; } }
+  function markSent(mid) { const s = sentMap(); s[`${S.year}:${mid}`] = new Date().toISOString(); try { localStorage.setItem(SENT_KEY, JSON.stringify(s)); } catch (e) {} }
 
   /* ---------- payment editing ---------- */
   // Replace the list of payments for one member and month; the month total is their sum.
   function setParts(mid, i, list) {
     const d = payDoc(mid), m = { ...d.m }, h = { ...d.h };
-    const clean = list.filter((x) => x && x.a > 0).map((x) => ({ a: x.a, t: x.t || null }));
+    const clean = list.filter((x) => x && x.a > 0).map(keepPart);
     const tot = clean.reduce((s, x) => s + x.a, 0);
     if (tot > 0) { m[i] = tot; h[i] = clean; } else { delete m[i]; delete h[i]; }
     writeDoc(payPath(S.year, mid), Object.keys(m).length ? { year: S.year, member: mid, m, h } : null);
     render();
   }
   const nameOf = (mid) => { const m = allMembers().find((x) => x.id === mid); return m ? m.name : "Member"; };
+  // Records a payment with today's date, a new receipt number and the collector; returns an undo.
   function addPart(mid, i, a) {
     const before = partsOf(mid, i);
-    setParts(mid, i, [...before, { a, t: todayStr() }]);
+    const part = { a, t: todayStr(), r: newReceipt(S.year, i) };
+    const by = getCollector().trim();
+    if (by) part.c = by;
+    setParts(mid, i, [...before, part]);
     return () => setParts(mid, i, before);
+  }
+  function paidToast(mid, i, undo) {
+    toast(afterAddMsg(mid, i), undo, "Undo", { label: "Send receipt", fn: () => sendReceipt(mid, i) });
   }
   function afterAddMsg(mid, i) {
     const fee = feeFor(S.year), now = amt(mid, i);
@@ -909,7 +1107,9 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       : `Paid Rs. ${fmt(a)} · Rs. ${fmt(a - fee)} more than the fee`;
     const list = $("payParts");
     list.hidden = !parts.length;
-    list.innerHTML = parts.map((p, k) => `<li><span>${parts.length > 1 ? `Payment ${k + 1} · ` : ""}${dayLabel(p.t)}</span><b>${rs(p.a)}</b><button type="button" data-k="${k}" aria-label="Delete this Rs. ${fmt(p.a)} payment">×</button></li>`).join("");
+    list.innerHTML = parts.map((p, k) => `<li><span>${parts.length > 1 ? `Payment ${k + 1} · ` : ""}${dayLabel(p.t)}${p.c ? ` · by ${esc(p.c)}` : ""}${p.r ? `<small>${esc(p.r)}</small>` : ""}</span><b>${rs(p.a)}</b><button type="button" class="rc" data-rk="${k}" aria-label="Send receipt for this Rs. ${fmt(p.a)} payment">Receipt</button><button type="button" data-k="${k}" aria-label="Delete this Rs. ${fmt(p.a)} payment">×</button></li>`).join("");
+    $("payBy").value = getCollector();
+    $("paySlip").hidden = !(m.phone || parts.length || isOwed(m, S.year, i));
     const main = $("payMain");
     main.hidden = a >= fee;
     main.textContent = a === 0 ? `Paid in full · Rs. ${fmt(fee)}` : `Paid the rest · Rs. ${fmt(fee - a)}`;
@@ -932,9 +1132,17 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     if (!payOk()) return;
     const { mid, i } = payCtx, rest = feeFor(S.year) - amt(mid, i);
     if (rest <= 0) return;
+    setCollector($("payBy").value.trim());
     const undo = addPart(mid, i, rest);
     $("payDlg").close();
-    toast(afterAddMsg(mid, i), undo);
+    paidToast(mid, i, undo);
+  });
+  $("payBy").addEventListener("change", () => setCollector($("payBy").value.trim()));
+  $("paySlip").addEventListener("click", () => {
+    if (!payOk()) return;
+    const m = allMembers().find((x) => x.id === payCtx.mid);
+    if (!m) return;
+    if (sendText(m, statementText(m)) === "wa") markSent(m.id);
   });
   $("payForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
@@ -943,11 +1151,14 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     if (!(v > 0)) { $("payErr").textContent = "Enter the amount in rupees, for example 325."; $("payErr").hidden = false; $("payAmt").focus(); return; }
     if (v > 100000) { $("payErr").textContent = "That amount looks too large. Check the number and try again."; $("payErr").hidden = false; return; }
     const { mid, i } = payCtx;
+    setCollector($("payBy").value.trim());
     const undo = addPart(mid, i, v);
     $("payDlg").close();
-    toast(afterAddMsg(mid, i), undo);
+    paidToast(mid, i, undo);
   });
   $("payParts").addEventListener("click", (ev) => {
+    const rb = ev.target.closest("button[data-rk]");
+    if (rb && payOk()) { sendReceipt(payCtx.mid, payCtx.i, +rb.dataset.rk); fillPay(); return; }
     const b = ev.target.closest("button[data-k]");
     if (!b || !payOk()) return;
     const { mid, i } = payCtx, before = partsOf(mid, i), k = +b.dataset.k;
@@ -967,13 +1178,13 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     const i = S.month;
     if (amt(mid, i) > 0) return;
     const undo = addPart(mid, i, feeFor(S.year));
-    toast(afterAddMsg(mid, i), undo);
+    paidToast(mid, i, undo);
   }
   function quickRest(mid) {
     const i = S.month, rest = feeFor(S.year) - amt(mid, i);
     if (rest <= 0) return;
     const undo = addPart(mid, i, rest);
-    toast(afterAddMsg(mid, i), undo);
+    paidToast(mid, i, undo);
   }
 
   /* ---------- electricity ---------- */
@@ -1039,6 +1250,10 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
           <button type="button" class="rm" data-mact="rm" data-id="${esc(m.id)}" aria-label="Remove ${esc(m.name)}">×</button>
         </span>
         <span class="sub"><label for="ms-${esc(m.id)}">Pays from</label><select id="ms-${esc(m.id)}" data-id="${esc(m.id)}" class="st-in">${startOptions(sel)}</select></span>
+        <span class="sub sub2">
+          <input id="mp-${esc(m.id)}" data-id="${esc(m.id)}" class="ph-in" type="tel" inputmode="tel" autocomplete="off" placeholder="WhatsApp no. 07…" value="${esc(m.phone || "")}" aria-label="WhatsApp number of ${esc(m.name)}">
+          <label class="pv" for="mv-${esc(m.id)}"><input type="checkbox" id="mv-${esc(m.id)}" data-id="${esc(m.id)}" class="pv-in"${m.private ? " checked" : ""}> 🔒 Keep name private</label>
+        </span>
         ${confirm}
       </li>`;
     }).join("") || `<li><span></span><span class="hint">No members yet. Add the first name above.</span></li>`;
@@ -1074,9 +1289,16 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       let start = null;
       if (t.value) { const [y, k] = t.value.split("-").map(Number); start = { y, m: k }; }
       writeDoc("members/" + id, { ...memberBody(m), start }); render();
+    } else if (t.classList.contains("ph-in")) {
+      const raw = t.value.trim();
+      if (raw && !normPhone(raw)) { toast("That number doesn't look complete. Enter it like 077 123 4567."); return; }
+      if (raw !== (m.phone || "")) { writeDoc("members/" + id, { ...memberBody(m), phone: raw }); toast(raw ? `Saved ${m.name}'s WhatsApp number.` : `Removed ${m.name}'s number.`); }
+    } else if (t.classList.contains("pv-in")) {
+      writeDoc("members/" + id, { ...memberBody(m), private: t.checked }); render();
+      toast(t.checked ? `${m.name}'s name is now private. It won't appear in the PDF you share.` : `${m.name}'s name will show in the PDF again.`);
     }
   });
-  $("memList").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && ev.target.classList.contains("nm-in")) { ev.preventDefault(); ev.target.blur(); } });
+  $("memList").addEventListener("keydown", (ev) => { if (ev.key === "Enter" && (ev.target.classList.contains("nm-in") || ev.target.classList.contains("ph-in"))) { ev.preventDefault(); ev.target.blur(); } });
   $("memDlg").addEventListener("click", (ev) => {
     const b = ev.target.closest("[data-mact]");
     if (!b) return;
@@ -1154,7 +1376,9 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     const W = 297, H = 210;
     const BROWN = [107, 58, 0], CREAM = [255, 247, 218], GREEN = [29, 122, 61], AMBER = [152, 86, 0], BLUE = [29, 93, 166], RED = [176, 40, 31], GREY = [110, 103, 95];
     const LOGO = LOGO_DATA;
-    const y = S.year, fee = feeFor(y), ms = yearMembers();
+    const y = S.year, fee = feeFor(y), everyone = yearMembers();
+    // members who asked not to be named are left out and shown together as "Private contributions"
+    const ms = everyone.filter((m) => !m.private), priv = everyone.filter((m) => m.private);
 
     // header
     if (LOGO) doc.addImage(LOGO, "JPEG", 10, 6, 28, 24.8);
@@ -1177,7 +1401,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     // rows
     const nm = ms.length;
     const avail = H - 37 - 13;
-    const rowH = Math.max(4.6, Math.min(7.5, avail / (nm + 4 + 1.6)));
+    const rowH = Math.max(4.6, Math.min(7.5, avail / (nm + 4 + (priv.length ? 1 : 0) + 1.6)));
     const body = [];
     let dueTotal = 0;
     ms.forEach((m, idx) => {
@@ -1199,6 +1423,15 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     });
     const sumStyle = { fillColor: CREAM, fontStyle: "bold" };
     const label = (t) => ({ content: t, colSpan: 2, styles: { ...sumStyle, halign: "left", textColor: BROWN } });
+    if (priv.length) {
+      const pr = [label("Private contributions (Rs.)")];
+      let pt = 0, pd = 0;
+      for (let k = 0; k < 12; k++) { let s = 0; for (const m of priv) s += amt(m.id, k); pr.push({ content: s ? fmt(s) : "-", styles: sumStyle }); }
+      for (const m of priv) { const d = dueOf(m, y); pt += d.paid; if (d.due > 0) pd += d.due; }
+      dueTotal += pd;
+      pr.push({ content: pt ? fmt(pt) : "-", styles: sumStyle }, { content: pd ? fmt(pd) : "-", styles: { ...sumStyle, textColor: RED } });
+      body.push(pr);
+    }
     let yc = 0, ye = 0;
     const r1 = [label("Total collected (Rs.)")], r2 = [label("Paid for electricity (Rs.)")], r3 = [label("Selvarajah's signature")], r4 = [label("Balance (Rs.)")];
     for (let k = 0; k < 12; k++) {
@@ -1261,6 +1494,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     seg("Due", RED, true); seg(y === CY ? ` = still to pay up to ${MONTHS_FULL[CM]} ${y}` : " = still to pay for the year", GREY);
     doc.setFont("helvetica", "normal"); doc.setTextColor(...GREY);
     doc.text("Pirampady Sports Club", W - 10, ly, { align: "right" });
+    if (priv.length && ly + 4.5 < H - 3) doc.text("Private contributions = payments by members who asked not to be named. They are included in the totals.", 10, ly + 4.5);
     return doc.output("blob");
   }
   async function downloadPdf() {
@@ -1294,6 +1528,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     else if (act === "quick") quickPay(b.dataset.id);
     else if (act === "rest") quickRest(b.dataset.id);
     else if (act === "elec") openElec(+b.dataset.m);
+    else if (act === "slips") openSlips();
     else if (act === "members") { if (!S.db) { toast("Members can't load in this view."); return; } openMembers(); }
     else if (act === "settings") { if (!S.canWrite || !S.db) { toast("You can view this register, but you can't change its settings."); return; } openSettings(); }
     else if (act === "pdf") downloadPdf();
@@ -1343,10 +1578,10 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.1.1";
+  const APP_VERSION = "1.2.0";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty";
-  const SEED = {"members/m01":{"name":"Kaja","order":1,"removed":false,"start":null},"members/m02":{"name":"Thivakaran","order":2,"removed":false,"start":null},"members/m03":{"name":"Birunthaban","order":3,"removed":false,"start":null},"members/m04":{"name":"Keerthan","order":4,"removed":false,"start":null},"members/m05":{"name":"Chan Shankee","order":5,"removed":false,"start":null},"members/m06":{"name":"Dilojan","order":6,"removed":false,"start":null},"members/m07":{"name":"Sivaluxan","order":7,"removed":false,"start":null},"members/m08":{"name":"Siva Siburu","order":8,"removed":false,"start":null},"members/m09":{"name":"Shankar","order":9,"removed":false,"start":null},"members/m10":{"name":"Kugankukathas","order":10,"removed":false,"start":null},"members/m11":{"name":"Mathu","order":11,"removed":false,"start":null},"members/m12":{"name":"Nanthan","order":12,"removed":false,"start":null},"members/m13":{"name":"Naren","order":13,"removed":false,"start":null},"members/m14":{"name":"Luxshan","order":14,"removed":false,"start":null},"members/m15":{"name":"Kutty Pirathees","order":15,"removed":false,"start":null},"members/m16":{"name":"Saravana (Sana)","order":16,"removed":false,"start":null},"members/m17":{"name":"Thuva","order":17,"removed":false,"start":null},"members/m18":{"name":"Aathy","order":18,"removed":false,"start":null},"members/m19":{"name":"Thuvarakethan","order":19,"removed":false,"start":null},"members/m20":{"name":"Vinoban","order":20,"removed":false,"start":null},"members/m21":{"name":"Amalaraj","order":21,"removed":false,"start":null},"members/m22":{"name":"Vinshan","order":22,"removed":false,"start":null},"members/m23":{"name":"Nadesh (Doctor)","order":23,"removed":false,"start":null},"members/m24":{"name":"Patrick","order":24,"removed":false,"start":null},"members/m25":{"name":"Senthu","order":25,"removed":false,"start":null},"payments/2026-m01":{"m":{"9":650},"member":"m01","year":2026},"payments/2026-m04":{"m":{"9":500},"member":"m04","year":2026},"payments/2026-m05":{"m":{"9":650},"member":"m05","year":2026},"payments/2026-m07":{"m":{"9":500},"member":"m07","year":2026},"payments/2026-m10":{"h":{"9":[{"a":250,"t":"2026-10-27"}]},"m":{"9":250},"member":"m10","year":2026},"payments/2026-m15":{"h":{"9":[{"a":650,"t":"2026-10-27"}]},"m":{"9":650},"member":"m15","year":2026},"payments/2026-m20":{"h":{"9":[{"a":700,"t":"2026-10-27"}]},"m":{"9":700},"member":"m20","year":2026},"payments/2026-m21":{"h":{"9":[{"a":650,"t":"2026-10-27"}]},"m":{"9":650},"member":"m21","year":2026},"payments/2026-m23":{"h":{"9":[{"a":500,"t":"2026-10-27"}]},"m":{"9":500},"member":"m23","year":2026},"settings/club":{"fees":{"2026":650},"start":{"m":9,"y":2026}}};
+  const SEED = {};
   const readLS = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const writeLS = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
   const delLS = (k) => { try { localStorage.removeItem(k); } catch (e) {} };

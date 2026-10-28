@@ -9,6 +9,9 @@ Members pay Rs. 650 a month. Some pay part of it, some pay ahead. The club also 
 - **Automatic sums:** total collected, electricity paid, balance in hand, and dues counted from the club's start month up to the current month.
 - **Electricity bill and signature** recorded for each month.
 - **A4 landscape PDF** of the filled register (club logo, ticks, totals), shared straight to WhatsApp from a phone.
+- **Receipts on WhatsApp** with a receipt number and who collected the money, sent straight to the member's chat.
+- **Slips for each member**, sent one by one, so every member sees only their own payments and dues.
+- **Private members:** a member can ask not to be named; the shared PDF shows their money as "Private contributions" so the totals still add up.
 - **Backup and restore** with a single JSON file, plus a CSV export for Excel.
 - **Phone and Mac share one register**, synced through a private GitHub repository, and every change is kept as a version you can restore.
 - **Works fully offline.** Changes are saved on the device first and synced once it's back online.
@@ -24,7 +27,9 @@ Members pay Rs. 650 a month. Some pay part of it, some pay ahead. The club also 
 | Sync | GitHub Contents API on a **private** data repo (`register.json`). Each sync reads the file, merges record by record (newest change wins, deletions travel as tombstones), and writes back with the file's `sha`, so a clash is detected and merged again |
 | Version history | Every sync is a commit; the app lists them and can restore any version |
 | Access | A fine-grained personal access token limited to the data repo (Contents: read and write), kept only on the user's devices |
-| Part payments | Each month keeps a list of payments (amount and date); the month total is their sum |
+| Part payments | Each month keeps a list of payments (amount, date, receipt number, collector); the month total is their sum |
+| Receipts and slips | Plain-text messages opened in WhatsApp with `wa.me` links when a number is saved, or the share sheet otherwise |
+| Privacy | No member data is in this public repository; it lives only in the private data repo and on the user's devices |
 | Dues | `fee × months owed so far − paid this year`, counted per member and never below zero in the total |
 | PDF | [jsPDF](https://github.com/parallax/jsPDF) and [jsPDF-AutoTable](https://github.com/simonbengtsson/jsPDF-AutoTable), bundled in `vendor/` |
 | Fonts | Barlow and Barlow Condensed (SIL Open Font License), bundled in `fonts/` |
