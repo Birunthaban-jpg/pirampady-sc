@@ -187,6 +187,9 @@ button:disabled { cursor: default; }
 .exp-amt { font-variant-numeric: tabular-nums; }
 .exp-item small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
 .sugs { display: flex; gap: 6px; flex-wrap: wrap; }
+.dlg form > *, .dlg .inner > *, .field, .inrow > * { min-width: 0; }
+input[type="date"] { min-width: 0; width: 100%; max-width: 100%; }
+.field > input, .field > select { width: 100%; min-width: 0; }
 .bd-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .bd-card { width: 100%; display: grid; gap: 6px; text-align: left; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
 .bd-card:hover { border-color: var(--line-strong); }
@@ -551,11 +554,11 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     </div>
     <div class="inrow">
       <div class="field" style="flex:1;min-width:0"><label for="bdDate">Date</label><input id="bdDate" type="date"></div>
-      <div class="field" style="flex:1;min-width:0"><label for="bdPer">Per person (Rs.)</label><input id="bdPer" inputmode="numeric" autocomplete="off" placeholder="e.g. 100"></div>
+      <div class="field" style="flex:1;min-width:0"><label for="bdPer">Same for everyone? (optional)</label><input id="bdPer" inputmode="numeric" autocomplete="off" placeholder="Leave empty"></div>
     </div>
     <div class="state calc" id="bdSum"></div>
     <span class="lbl2" id="bdContribHead">Contributions</span>
-    <p class="hint" style="margin-top:-8px">Tap ✓ when someone gives the amount per person, or type a different amount.</p>
+    <p class="hint" style="margin-top:-8px" id="bdHint">Type how much each person gave.</p>
     <ul class="bd-people" id="bdList"></ul>
     <button type="button" class="btn ghost" id="bdGuestBtn">+ Someone who isn't a member</button>
     <div class="inrow" id="bdGuestForm" hidden>
@@ -1631,7 +1634,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     if (!S.canWrite) return;
     const id = "b" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
     const d = todayStr();
-    const ev = { id, name: "", date: d, per: 100, no: newReceipt(+d.slice(0, 4), +d.slice(5, 7) - 1).replace("PSC-", "BDY-"), c: {}, g: [], x: [] };
+    const ev = { id, name: "", date: d, per: 0, no: newReceipt(+d.slice(0, 4), +d.slice(5, 7) - 1).replace("PSC-", "BDY-"), c: {}, g: [], x: [] };
     bdWrite(ev);
     bdOpen(id, true);
   }
@@ -1655,12 +1658,13 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     $("bdSum").innerHTML = `<div><span>Collected${t.n ? ` from ${t.n}` : ""}</span><span>${rs(t.collected)}</span></div><div><span>Spent</span><span>− ${rs(t.spent)}</span></div><div class="after"><span>Left from this birthday</span><span style="color:${t.left < 0 ? "var(--due)" : "var(--ok)"}">${t.left < 0 ? "−" : ""}${rs(Math.abs(t.left))}</span></div><div><span>Birthday fund after this</span><span>${rsSigned(before + t.left)}</span></div>`;
     const members = allMembers().filter((m) => !m.removed);
     const paid = members.filter((m) => ev.c && ev.c[m.id] && ev.c[m.id].a > 0).length;
+    $("bdHint").textContent = per ? `Tap ✓ when someone gives Rs. ${fmt(per)}, or type a different amount.` : "Type how much each person gave. Leave it empty if they didn't give.";
     $("bdContribHead").textContent = `Contributions · ${paid + (ev.g || []).filter((g) => g.a > 0).length} paid`;
     $("bdList").innerHTML = members.map((m) => {
       const v = ev.c && ev.c[m.id] && ev.c[m.id].a > 0 ? ev.c[m.id].a : 0;
       return `<li class="${v ? "on" : ""}"><span class="bd-nm">${esc(m.name)}</span>
         <input class="bd-amt" data-mid="${esc(m.id)}" inputmode="numeric" autocomplete="off" value="${v ? v : ""}" placeholder="${per ? fmt(per) : "Rs."}" aria-label="Amount from ${esc(m.name)}">
-        ${v ? `<button type="button" class="bd-x" data-clear="${esc(m.id)}" aria-label="Remove ${esc(m.name)}'s contribution">×</button>` : `<button type="button" class="bd-ok" data-tick="${esc(m.id)}" aria-label="${esc(m.name)} gave Rs. ${fmt(per || 0)}"${per ? "" : " disabled"}>✓${per ? " " + fmt(per) : ""}</button>`}
+        ${v ? `<button type="button" class="bd-x" data-clear="${esc(m.id)}" aria-label="Remove ${esc(m.name)}'s contribution">×</button>` : per ? `<button type="button" class="bd-ok" data-tick="${esc(m.id)}" aria-label="${esc(m.name)} gave Rs. ${fmt(per)}">✓ ${fmt(per)}</button>` : "<span></span>"}
       </li>`;
     }).join("") + (ev.g || []).map((g, k) => `<li class="on guest"><span class="bd-nm">${esc(g.n)} <small>guest</small></span><input class="bd-gamt" data-g="${k}" inputmode="numeric" autocomplete="off" value="${g.a}" aria-label="Amount from ${esc(g.n)}"><button type="button" class="bd-x" data-gdel="${k}" aria-label="Remove ${esc(g.n)}">×</button></li>`).join("");
     $("bdGuestForm").hidden = !bdGuestOpen;
@@ -2591,7 +2595,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.8.0";
+  const APP_VERSION = "1.8.1";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty";
   const SEED = {};
