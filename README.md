@@ -5,6 +5,7 @@ An installable, offline-first web app for running the monthly subscription regis
 Members pay Rs. 650 a month. Some pay part of it, some pay ahead. The club also pays an electricity bill each month, signed for by the provider. This app replaces the paper register:
 
 - **Month view:** record a full payment with one tap, record part payments, and complete them later with one tap.
+- **Extra payments carry forward:** paying Rs. 750 against Rs. 650 marks the month paid and puts Rs. 100 towards the next month; a large advance fills the following months in order. Cash still counts in the month it was received, so the club balance stays correct.
 - **Whole-year view:** the full register, with each member's total paid and what is still due.
 - **Automatic sums:** total collected, electricity paid, balance in hand, and dues counted from the club's start month up to the current month.
 - **Electricity bill and signature** recorded for each month, with the date paid and an optional note.
@@ -34,6 +35,7 @@ Members pay Rs. 650 a month. Some pay part of it, some pay ahead. The club also 
 | Part payments | Each month keeps a list of payments (amount, date, receipt number, collector); the month total is their sum |
 | Receipts and slips | PDFs drawn on the device with jsPDF and handed to the share sheet (Web Share API) so they can be sent in WhatsApp; text versions open the member's chat with a `wa.me` link |
 | Privacy | No member data is in this public repository; it lives only in the private data repo and on the user's devices |
+| Carry forward | Each month is covered by its own payments plus any extra left from earlier months (`covered = min(fee, paid + carried)`), so only extras move forward and shortfalls stay on their month |
 | Dues | `fee × months owed so far − paid this year`, counted per member and never below zero in the total |
 | PDF | [jsPDF](https://github.com/parallax/jsPDF) and [jsPDF-AutoTable](https://github.com/simonbengtsson/jsPDF-AutoTable), bundled in `vendor/` |
 | Fonts | Barlow and Barlow Condensed, plus five script fonts for the signature (Herr Von Muellerhoff, Mrs Saint Delafield, Great Vibes, Alex Brush, Allura), all SIL Open Font License, bundled in `fonts/` |
