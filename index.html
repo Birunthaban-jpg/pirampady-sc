@@ -177,6 +177,7 @@ button:disabled { cursor: default; }
 .elec-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; border-top: 1px solid var(--line); padding-top: 12px; }
 .elec-row p { margin: 0; font-size: 14px; }
 .elec-row p b { font-variant-numeric: tabular-nums; }
+.elec-btns { display: inline-flex; gap: 8px; flex-wrap: wrap; }
 
 .filter { display: flex; gap: 6px; flex-wrap: wrap; }
 .filter button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; height: 34px; padding: 0 14px; font-weight: 600; font-size: 14px; color: var(--muted); }
@@ -289,7 +290,7 @@ dialog.dlg::backdrop { background: var(--scrim); }
 .field label, .lbl2 { font-size: 13px; font-weight: 600; color: var(--muted); }
 .inrow { display: flex; gap: 8px; }
 .inrow > input, .inrow > select { flex: 1; min-width: 0; }
-input[type="text"], input:not([type]), select { height: 46px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface); font-size: 16px; }
+input[type="text"], input[type="tel"], input[type="date"], input:not([type]), select { height: 46px; padding: 0 12px; border-radius: 10px; border: 1px solid var(--line-strong); background: var(--surface); font-size: 16px; }
 input:focus, select:focus { border-color: var(--brand); outline: none; box-shadow: 0 0 0 3px var(--brand-soft); }
 .check { display: flex; align-items: center; gap: 10px; font-weight: 600; min-height: 44px; }
 .check input { width: 22px; height: 22px; accent-color: var(--brand); }
@@ -449,11 +450,23 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       <input id="elecAmt" inputmode="numeric" autocomplete="off" placeholder="e.g. 3000">
       <p class="err" id="elecErr" hidden></p>
     </div>
+    <div class="inrow">
+      <div class="field" style="flex:1;min-width:0">
+        <label for="elecDate">Paid on</label>
+        <input id="elecDate" type="date">
+      </div>
+      <div class="field" style="flex:1.4;min-width:0">
+        <label for="elecNote">Note (optional)</label>
+        <input id="elecNote" autocomplete="off" placeholder="e.g. bill no. 12345">
+      </div>
+    </div>
     <label class="check" for="elecSigned"><input type="checkbox" id="elecSigned"> Selvarajah signed for this payment</label>
     <div class="foot-row">
       <button type="button" class="btn danger" id="elecClear">Clear this month</button>
       <button type="submit" class="btn primary">Save</button>
     </div>
+    <button type="button" class="btn" id="elecSlip">Save and share account slip (PDF)</button>
+    <p class="hint">The account slip shows members the bill, how much was collected this month and the balance in hand. It shows totals only, not who paid.</p>
   </form>
 </dialog>
 
@@ -732,7 +745,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     if (overlay.has(p)) { const b = overlay.get(p); return b ? b.m || {} : {}; }
     return S.elecServer || {};
   }
-  const elec = (i) => { const e = elecMap()[i]; return { amount: e && e.amount > 0 ? e.amount : 0, signed: !!(e && e.signed) }; };
+  const elec = (i) => { const e = elecMap()[i]; return { amount: e && e.amount > 0 ? e.amount : 0, signed: !!(e && e.signed), t: (e && e.t) || null, note: (e && e.note) || "" }; };
 
   function startOf(m) { return m.start && Number.isInteger(m.start.y) ? m.start : settings().start; }
   // months [first..last] of the viewed year that a member owes (last = current month for this year)
@@ -888,7 +901,10 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
           </div>
           <div class="elec-row">
             <p>Electricity bill: <b>${e.amount ? rs(e.amount) : "not paid yet"}</b> · ${e.signed ? '<span style="color:var(--ok);font-weight:700">✓ Signed by Selvarajah</span>' : "Selvarajah has not signed"}</p>
-            <button type="button" class="btn" data-act="elec" data-m="${i}"${S.canWrite ? "" : " disabled"}>${e.amount || e.signed ? "Edit" : "Record bill"}</button>
+            <span class="elec-btns">
+              <button type="button" class="btn" data-act="acct" data-m="${i}">Account slip</button>
+              <button type="button" class="btn" data-act="elec" data-m="${i}"${S.canWrite ? "" : " disabled"}>${e.amount || e.signed ? "Edit" : "Record bill"}</button>
+            </span>
           </div>
         </section>
         <div class="slipbar">
@@ -1242,31 +1258,49 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     $("elecState").textContent = `Collected from members this month: Rs. ${fmt(monthTotal(i))}`;
     $("elecAmt").value = e.amount ? String(e.amount) : "";
     $("elecSigned").checked = e.signed;
+    $("elecDate").value = e.t || (S.year === CY && i === CM ? todayStr() : "");
+    $("elecNote").value = e.note || "";
     $("elecErr").hidden = true;
     $("elecClear").hidden = !(e.amount || e.signed);
     $("elecDlg").showModal();
   }
-  function setElec(i, amount, signed) {
+  function setElec(i, amount, signed, t, note) {
     const mp = { ...elecMap() };
-    if (amount > 0 || signed) mp[i] = { amount: amount > 0 ? amount : 0, signed: !!signed }; else delete mp[i];
+    if (amount > 0 || signed) {
+      const rec = { amount: amount > 0 ? amount : 0, signed: !!signed };
+      if (t) rec.t = t;
+      if (note) rec.note = note;
+      mp[i] = rec;
+    } else delete mp[i];
     writeDoc("electricity/" + S.year, { year: S.year, m: mp });
     render();
   }
-  $("elecForm").addEventListener("submit", (ev) => {
-    ev.preventDefault();
-    if (!elecCtx || elecCtx.year !== S.year) return;
+  // reads the bill form; returns false (and shows why) if the amount isn't valid
+  function saveElecForm() {
+    if (!elecCtx || elecCtx.year !== S.year) return false;
     const raw = $("elecAmt").value.trim();
     const v = raw ? parseAmt(raw) : 0;
-    if (raw && !(v >= 0)) { $("elecErr").textContent = "Enter the bill amount in rupees, for example 3000."; $("elecErr").hidden = false; return; }
-    setElec(elecCtx.i, v || 0, $("elecSigned").checked);
+    if (raw && !(v >= 0)) { $("elecErr").textContent = "Enter the bill amount in rupees, for example 3000."; $("elecErr").hidden = false; return false; }
+    const t = /^\d{4}-\d{2}-\d{2}$/.test($("elecDate").value) ? $("elecDate").value : (v > 0 ? todayStr() : "");
+    setElec(elecCtx.i, v || 0, $("elecSigned").checked, t, $("elecNote").value.trim().slice(0, 80));
+    return true;
+  }
+  $("elecForm").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    if (saveElecForm()) $("elecDlg").close();
+  });
+  $("elecSlip").addEventListener("click", () => {
+    if (!saveElecForm()) return;
+    const i = elecCtx.i;
     $("elecDlg").close();
+    shareAccountSlip(i);
   });
   $("elecClear").addEventListener("click", () => {
     if (!elecCtx || elecCtx.year !== S.year) return;
     const prev = elec(elecCtx.i), i = elecCtx.i;
     setElec(i, 0, false);
     $("elecDlg").close();
-    toast(`Cleared the electricity record for ${MONTHS[i]}.`, () => setElec(i, prev.amount, prev.signed));
+    toast(`Cleared the electricity record for ${MONTHS[i]}.`, () => setElec(i, prev.amount, prev.signed, prev.t, prev.note));
   });
 
   /* ---------- members ---------- */
@@ -1758,6 +1792,116 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     doc.text("Thank you!", M + 1, yy + 3.8);
     return doc.output("blob");
   }
+  // Money in the club before a month: everything collected minus every bill, across all years kept on this device.
+  function balanceBefore(y, i) {
+    let bal = 0;
+    const raw = S.db && typeof S.db.raw === "function" ? S.db.raw() : null;
+    if (raw) {
+      for (const k in raw) {
+        const d = raw[k];
+        if (!d || d._deleted || typeof d.year !== "number") continue;
+        const before = (mk) => d.year < y || (d.year === y && +mk < i);
+        if (k.startsWith("payments/")) for (const mk in d.m || {}) { if (before(mk) && d.m[mk] > 0) bal += d.m[mk]; }
+        if (k.startsWith("electricity/")) for (const mk in d.m || {}) { const e = d.m[mk]; if (before(mk) && e && e.amount > 0) bal -= e.amount; }
+      }
+      return bal;
+    }
+    for (let k = 0; k < i; k++) bal += monthTotal(k) - elec(k).amount;
+    return bal;
+  }
+  function monthStats(i) {
+    const y = S.year, fee = feeFor(y), ms = yearMembers();
+    let full = 0, partN = 0, partSum = 0, extra = 0, owed = 0, shortN = 0, shortSum = 0, collected = 0, payers = 0;
+    for (const m of ms) {
+      const a = amt(m.id, i), isO = isOwed(m, y, i);
+      collected += a;
+      if (a > 0) payers++;
+      if (isO || a > 0) owed++;
+      if (a >= fee) full++;
+      else if (a > 0) { partN++; partSum += a; }
+      if (a > fee) extra += a - fee;
+      if (isO && a < fee) { shortN++; shortSum += fee - a; }
+    }
+    return { fee, full, partN, partSum, extra, owed, shortN, shortSum, collected, payers };
+  }
+  // A5 "monthly account" for the whole club: the bill, the month's collections (totals only) and the balance.
+  function buildAccountSlip(i) {
+    const C = PDF_C, { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
+    const W = 148, H = 210, M = 12, y = S.year, e = elec(i), st = monthStats(i);
+    const opening = balanceBefore(y, i), closing = opening + st.collected - e.amount;
+    const mName = `${MONTHS_FULL[i]} ${y}`;
+    slipWatermark(doc, W, 80, 96);
+    slipHeader(doc, W, M, `Monthly account  \u00B7  ${mName}`);
+    // electricity box
+    doc.setFillColor(...C.CREAM); doc.roundedRect(M, 39, W - 2 * M, 27, 2.5, 2.5, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...C.GREY); doc.text("ELECTRICITY BILL PAID", M + 5, 46);
+    doc.setFontSize(18); doc.setTextColor(...C.INK); doc.text(e.amount ? `Rs. ${fmt(e.amount)}` : "Not paid yet", M + 5, 54.5);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...C.GREY);
+    const sub = [e.t ? `Paid on ${longDate(e.t)}` : "", e.note].filter(Boolean).join("  \u00B7  ");
+    if (sub) doc.text(doc.splitTextToSize(sub, W - 2 * M - 52)[0], M + 5, 61);
+    if (e.signed) stamp(doc, W - M - 43, 42, 39, 21, true, "SIGNED", "SELVARAJAH");
+    else if (e.amount) stamp(doc, W - M - 43, 42, 39, 21, false, "NOT SIGNED", "SELVARAJAH");
+    // collections table
+    const sumStyle = { fontStyle: "bold" };
+    const body = [
+      ["Members paid in full", `${st.full} of ${st.owed}`],
+      ...(st.partN ? [[`Part payments (${st.partN} member${st.partN > 1 ? "s" : ""})`, `Rs. ${fmt(st.partSum)}`]] : []),
+      ...(st.extra ? [["Paid extra / in advance", `Rs. ${fmt(st.extra)}`]] : []),
+      [{ content: `Total collected in ${MONTHS_FULL[i]}`, styles: sumStyle }, { content: `Rs. ${fmt(st.collected)}`, styles: sumStyle }],
+      ...(st.shortN ? [[{ content: `Still to collect (${st.shortN} member${st.shortN > 1 ? "s" : ""})`, styles: { textColor: C.RED } }, { content: `Rs. ${fmt(st.shortSum)}`, styles: { textColor: C.RED } }]] : []),
+    ];
+    doc.autoTable({
+      startY: 71, margin: { left: M, right: M }, theme: "grid",
+      head: [[`Collections \u00B7 ${mName}`, { content: "", styles: { halign: "right" } }]], body,
+      styles: { font: "helvetica", fontSize: 9, textColor: C.INK, lineColor: C.LINE, lineWidth: 0.15, cellPadding: { top: 2, bottom: 2, left: 3, right: 3 }, fillColor: false },
+      headStyles: { fillColor: C.BROWN, textColor: [255, 255, 255], fontStyle: "bold" },
+      columnStyles: { 1: { halign: "right", cellWidth: 40 } },
+    });
+    // calculation
+    let ty = doc.lastAutoTable.finalY + 8;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(...C.BROWN); doc.text("CALCULATION", M, ty);
+    ty += 3;
+    const prevName = i > 0 ? MONTHS_FULL[i - 1] : `December ${y - 1}`;
+    const calc = [
+      ["", `Balance brought forward (end of ${prevName})`, `Rs. ${opening < 0 ? "-" : ""}${fmt(Math.abs(opening))}`],
+      ["+", `Collected in ${MONTHS_FULL[i]}`, `Rs. ${fmt(st.collected)}`],
+      ["\u2013", `Electricity bill (${MONTHS_FULL[i]})`, `Rs. ${fmt(e.amount)}`],
+    ];
+    doc.autoTable({
+      startY: ty, margin: { left: M, right: M }, theme: "plain", body: calc,
+      styles: { font: "helvetica", fontSize: 9.5, textColor: C.INK, cellPadding: { top: 1.8, bottom: 1.8, left: 2, right: 3 } },
+      columnStyles: { 0: { cellWidth: 7, halign: "center", fontStyle: "bold", textColor: C.BROWN }, 2: { halign: "right", cellWidth: 40 } },
+    });
+    ty = doc.lastAutoTable.finalY + 1;
+    doc.setDrawColor(...C.BROWN); doc.setLineWidth(0.6); doc.line(M, ty, W - M, ty);
+    ty += 2;
+    doc.setFillColor(...(closing < 0 ? [251, 234, 231] : [226, 242, 230])); doc.rect(M, ty, W - 2 * M, 11, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(10.5); doc.setTextColor(...(closing < 0 ? C.RED : C.GREEN));
+    doc.text("=", M + 3.5, ty + 7.3);
+    doc.text(`Balance in hand (end of ${MONTHS_FULL[i]})`, M + 9, ty + 7.3);
+    doc.text(`Rs. ${closing < 0 ? "-" : ""}${fmt(Math.abs(closing))}`, W - M - 3, ty + 7.3, { align: "right" });
+    ty += 11;
+    // signature
+    const sy = Math.max(ty + 20, H - 30);
+    if (sy <= H - 23) {
+      drawSignature(doc, W - M - 50, sy, 50, 13);
+      doc.setDrawColor(...C.GREY); doc.setLineWidth(0.25); doc.setLineDashPattern([0.8, 0.8], 0); doc.line(W - M - 50, sy, W - M, sy); doc.setLineDashPattern([], 0);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...C.GREY);
+      doc.text("Prepared by the club collector", W - M - 25, sy + 3.6, { align: "center" });
+    }
+    // footer
+    doc.setDrawColor(...C.LINE); doc.setLineWidth(0.3); doc.line(M, H - 19, W - M, H - 19);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...C.BROWN);
+    doc.text("Thank you to every member for supporting the club.", W / 2, H - 13, { align: "center" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7.2); doc.setTextColor(...C.GREY);
+    doc.text("Totals only. Individual members' payments are not shown on this slip.", W / 2, H - 8.5, { align: "center" });
+    return doc.output("blob");
+  }
+  function shareAccountSlip(i) {
+    if (!pdfReady()) { toast("The PDF maker didn't load. Close and reopen the app."); return; }
+    sharePdf(buildAccountSlip(i), `Pirampady_SC_account_${MONTHS[i]}_${S.year}.pdf`);
+  }
   function sharePdf(blob, name) {
     if (typeof deliverFile !== "function") { toast("PDFs can't be shared from here."); return; }
     deliverFile(blob, name, "application/pdf", true).then((how) => {
@@ -1802,6 +1946,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     else if (act === "rest") quickRest(b.dataset.id);
     else if (act === "elec") openElec(+b.dataset.m);
     else if (act === "slips") openSlips();
+    else if (act === "acct") shareAccountSlip(+b.dataset.m);
     else if (act === "members") { if (!S.db) { toast("Members can't load in this view."); return; } openMembers(); }
     else if (act === "settings") { if (!S.canWrite || !S.db) { toast("You can view this register, but you can't change its settings."); return; } openSettings(); }
     else if (act === "pdf") downloadPdf();
@@ -1851,7 +1996,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.4.0";
+  const APP_VERSION = "1.5.0";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty";
   const SEED = {};

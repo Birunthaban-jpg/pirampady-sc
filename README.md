@@ -7,7 +7,8 @@ Members pay Rs. 650 a month. Some pay part of it, some pay ahead. The club also 
 - **Month view:** record a full payment with one tap, record part payments, and complete them later with one tap.
 - **Whole-year view:** the full register, with each member's total paid and what is still due.
 - **Automatic sums:** total collected, electricity paid, balance in hand, and dues counted from the club's start month up to the current month.
-- **Electricity bill and signature** recorded for each month.
+- **Electricity bill and signature** recorded for each month, with the date paid and an optional note.
+- **Monthly account slip** (A5 PDF) for the whole club: the electricity bill, the month's collections (totals only, no names) and the calculation, from the balance brought forward to the balance in hand.
 - **A4 landscape PDF** of the filled register (club logo, ticks, totals), shared straight to WhatsApp from a phone.
 - **PDF receipts** (A6) for each payment, with a receipt number, who collected the money and the member's balance.
 - **PDF slips** (A5) for each member, sent one by one through WhatsApp, so every member sees only their own payments and dues; all slips can also be saved as one PDF for printing. A plain-text version is available too.
