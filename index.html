@@ -28,6 +28,7 @@
   --ok: #1D7A3D; --ok-bg: #E2F2E6; --warn: #985600; --warn-bg: #FCEED4;
   --adv: #1D5DA6; --adv-bg: #E2ECF8; --due: #B0281F; --due-bg: #FBEAE7;
   --scrim: rgba(28, 16, 4, .45);
+  --toast-act: #F2C230;
   --shadow: 0 1px 2px rgba(70, 40, 10, .06), 0 6px 20px rgba(70, 40, 10, .06);
   --f-display: "Barlow Condensed", "Arial Narrow", "Roboto Condensed", sans-serif;
   --f-body: "Barlow", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
@@ -39,6 +40,7 @@
   --ok: #63C485; --ok-bg: #16301F; --warn: #F0B04A; --warn-bg: #3A2A10;
   --adv: #82B4F0; --adv-bg: #152842; --due: #F28B82; --due-bg: #3D1B18;
   --scrim: rgba(0, 0, 0, .6);
+  --toast-act: #7A4300;
   --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 20px rgba(0, 0, 0, .25);
   color-scheme: dark;
 } }
@@ -50,6 +52,7 @@
   --ok: #63C485; --ok-bg: #16301F; --warn: #F0B04A; --warn-bg: #3A2A10;
   --adv: #82B4F0; --adv-bg: #152842; --due: #F28B82; --due-bg: #3D1B18;
   --scrim: rgba(0, 0, 0, .6);
+  --toast-act: #7A4300;
   --shadow: 0 1px 2px rgba(0, 0, 0, .3), 0 6px 20px rgba(0, 0, 0, .25);
   color-scheme: dark;
 }
@@ -300,7 +303,9 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
 .removed li { display: flex; justify-content: space-between; align-items: center; gap: 8px; }
 
 .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(18px + env(safe-area-inset-bottom, 0px)); z-index: 50; display: flex; align-items: center; gap: 14px; background: var(--ink); color: var(--bg); padding: 10px 12px 10px 16px; border-radius: 12px; box-shadow: var(--shadow); max-width: calc(100vw - 32px); font-size: 14px; font-weight: 500; }
-.toast button { border: 0; background: transparent; color: var(--gold); font-weight: 700; padding: 6px 8px; }
+.toast button { flex: none; border: 1.5px solid currentColor; background: transparent; color: var(--toast-act); font-weight: 700; font-size: 14px; padding: 6px 12px; border-radius: 8px; white-space: nowrap; }
+.toast { width: min(520px, calc(100vw - 32px)); padding: 12px; flex-wrap: wrap; justify-content: flex-end; gap: 10px; }
+.toast span { flex: 1 1 100%; padding-left: 4px; }
 
 @media (max-width: 760px) {
   .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
@@ -371,6 +376,11 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       <button type="button" class="btn ghost" data-act="settings">Settings</button>
       <button type="button" class="btn ghost" data-act="sync">Sync</button>
     </div>
+  </div>
+
+  <div class="nag" id="updBar" hidden>
+    <span>A new version of the app is ready.</span>
+    <button type="button" class="btn" id="updBtn">Update now</button>
   </div>
 
   <div class="nag" id="bakNag" hidden>
@@ -1578,7 +1588,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.2.0";
+  const APP_VERSION = "1.2.1";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty";
   const SEED = {};
@@ -2069,17 +2079,24 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
 
   /* ---------- offline support and updates ---------- */
   if ("serviceWorker" in navigator && location.protocol !== "file:") {
+    let reloaded = false;
+    navigator.serviceWorker.addEventListener("controllerchange", () => { if (reloaded) return; reloaded = true; location.reload(); });
     navigator.serviceWorker.register("sw.js").then((reg) => {
-      const offer = (w) => toast("A new version of the app is ready.", () => w.postMessage("skipWaiting"), "Update");
-      if (reg.waiting && navigator.serviceWorker.controller) offer(reg.waiting);
+      const apply = (w) => w.postMessage("skipWaiting");
+      const offer = (w) => { $("updBar").hidden = false; $("updBtn").onclick = () => apply(w); };
+      const fresh = () => performance.now() < 10000;   // the app has only just opened: nothing is in progress
+      if (reg.waiting && navigator.serviceWorker.controller) { if (fresh()) apply(reg.waiting); else offer(reg.waiting); }
       reg.addEventListener("updatefound", () => {
         const w = reg.installing;
         if (!w) return;
-        w.addEventListener("statechange", () => { if (w.state === "installed" && navigator.serviceWorker.controller) offer(w); });
+        w.addEventListener("statechange", () => {
+          if (w.state === "installed" && navigator.serviceWorker.controller) { if (fresh()) apply(w); else offer(w); }
+        });
       });
+      const check = () => reg.update().catch(() => {});
+      document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") check(); });
+      setInterval(check, 30 * 60 * 1000);
     }).catch(() => {});
-    let reloaded = false;
-    navigator.serviceWorker.addEventListener("controllerchange", () => { if (reloaded) return; reloaded = true; location.reload(); });
   }
 })();
 </script>

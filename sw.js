@@ -1,5 +1,5 @@
 // Offline support for Pirampady SC Subscriptions. Bump VERSION on every release.
-const VERSION = "1.2.0";
+const VERSION = "1.2.1";
 const CACHE = "psc-" + VERSION;
 const FILES = [
   "./",
@@ -22,7 +22,7 @@ const FILES = [
 ];
 
 self.addEventListener("install", (event) => {
-  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES)));
+  event.waitUntil(caches.open(CACHE).then((c) => c.addAll(FILES.map((f) => new Request(f, { cache: "reload" })))));
 });
 
 self.addEventListener("activate", (event) => {
