@@ -17,7 +17,8 @@ Members pay Rs. 650 a month. Some pay part of it, some pay ahead. The club also 
 - **PDF slips** (A5) for each member, sent one by one through WhatsApp, so every member sees only their own payments and dues; all slips can also be saved as one PDF for printing. A plain-text version is available too.
 - **Styled signatures:** the collector's (e.g. *Y.Birunthaban*) on every receipt, slip and bill, and an "Accounts checked by" signature (e.g. *Kajenthirakumar*) on the monthly account, expense bills and the register, each in a choice of five script styles.
 - **Private members:** a member can ask not to be named; the shared PDF shows their money as "Private contributions" so the totals still add up.
-- **Inactive members:** mark someone who stopped coming as inactive from a chosen month. No fee is counted while they are inactive, they move out of the collection list (named underneath it instead), and they are left off a year's sheet if they were inactive all year and paid nothing. Unpaid months before still count. When they come back, the months in between stay free.
+- **Inactive members:** mark someone who stopped coming as inactive from a chosen month. No fee is counted while they are inactive and they move out of the month's collection list (named underneath it instead). Every member keeps their name on the register and the PDFs; those months simply show "-" (no fee), and nothing shared with members calls anyone inactive. Unpaid months before still count. When they come back, the months in between stay free.
+- **Across years:** money paid ahead carries into the next year, and anything still owed from an earlier year is brought forward into "Still due". A "Before <year>" column shows it on the sheet and the register when anyone has it.
 - **Backup and restore** with a single JSON file, plus a CSV export for Excel.
 - **Phone and Mac share one register**, synced through a private GitHub repository, and every change is kept as a version you can restore.
 - **Works fully offline.** Changes are saved on the device first and synced once it's back online.
@@ -36,8 +37,8 @@ Members pay Rs. 650 a month. Some pay part of it, some pay ahead. The club also 
 | Part payments | Each month keeps a list of payments (amount, date, receipt number, collector); the month total is their sum |
 | Receipts and slips | PDFs drawn on the device with jsPDF and handed to the share sheet (Web Share API) so they can be sent in WhatsApp; text versions open the member's chat with a `wa.me` link |
 | Privacy | No member data is in this public repository; it lives only in the private data repo and on the user's devices |
-| Carry forward | Each month is covered by its own payments plus any extra left from earlier months (`covered = min(fee, paid + carried)`), so only extras move forward and shortfalls stay on their month |
-| Dues | `fee × months owed so far − paid this year`, counted per member and never below zero in the total |
+| Carry forward | Each month is covered by its own payments plus any extra left from earlier months (`covered = min(fee, paid + carried)`), so only extras move forward and shortfalls stay on their month. A year starts with whatever was paid ahead in earlier years |
+| Dues | `fee × months owed so far − paid this year − brought forward`, counted per member and never below zero in the total. Brought forward = everything paid in earlier years minus the full fees of those years (a future year only takes money paid ahead) |
 | Inactive months | Each member keeps a list of inactive periods (`from` month, `back` month or open). Those months are left out of the months owed; money paid in them is carried forward like any extra |
 | PDF | [jsPDF](https://github.com/parallax/jsPDF) and [jsPDF-AutoTable](https://github.com/simonbengtsson/jsPDF-AutoTable), bundled in `vendor/` |
 | Fonts | Barlow and Barlow Condensed, plus five script fonts for the signature (Herr Von Muellerhoff, Mrs Saint Delafield, Great Vibes, Alex Brush, Allura), all SIL Open Font License, bundled in `fonts/` |

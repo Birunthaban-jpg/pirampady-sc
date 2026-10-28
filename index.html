@@ -791,6 +791,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     if (!S.db) { toast("Saving isn't available in this view."); return; }
     if (!S.canWrite) { toast("You can view this register, but you can't change it."); return; }
     overlay.set(path, body);
+    paidIdx = null;
     if (inflight.has(path)) { dirty.add(path); return; }
     flush(path);
   }
@@ -923,14 +924,53 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
   function offMonths(m, y) { const r = owedRange(m, y), out = []; if (r) for (let k = r[0]; k <= r[1]; k++) if (isOff(m, y, k)) out.push(k); return out; }
   const spanTxt = (ks) => !ks.length ? "" : ks.length === 1 ? MONTHS[ks[0]] : `${MONTHS[ks[0]]}–${MONTHS[ks[ks.length - 1]]}`;
   function paidTotal(mid) { const mp = payMap(mid); let t = 0; for (const k in mp) if (mp[k] > 0) t += mp[k]; return t; }
-  // Due = fee × months owed so far this year − everything paid this year.
+  /* ---------- earlier years: what a member brings into the viewed year ---------- */
+  // paid totals per member and year, read once from the local store and rebuilt on every render or change
+  var paidIdx = null;
+  function paidIndex() {
+    if (paidIdx) return paidIdx;
+    const idx = {};
+    const raw = S.db && typeof S.db.raw === "function" ? S.db.raw() : null;
+    if (raw) for (const k in raw) {
+      if (!k.startsWith("payments/")) continue;
+      const d = raw[k];
+      if (!d || d._deleted || typeof d.year !== "number" || !d.member) continue;
+      let t = 0; for (const mk in d.m || {}) if (d.m[mk] > 0) t += d.m[mk];
+      (idx[d.member] = idx[d.member] || {})[d.year] = t;
+    }
+    paidIdx = idx;
+    return idx;
+  }
+  function paidIn(mid, yy) { if (yy === S.year) return paidTotal(mid); const r = paidIndex()[mid]; return (r && r[yy]) || 0; }
+  // months owed across a whole year (to December), inactive months left out
+  function fullYearMonths(m, yy) {
+    const st = startOf(m);
+    if (m.removed || st.y > yy) return 0;
+    let n = 0;
+    for (let k = st.y < yy ? 0 : st.m; k < 12; k++) if (!isOff(m, yy, k)) n++;
+    return n;
+  }
+  // Money a member carries into year y from every earlier year: + = paid ahead, − = still owed from before.
+  // Earlier years count in full (to December), so an advance is never counted twice.
+  function broughtForward(m, y) {
+    if (m.removed) return 0;
+    const pays = paidIndex()[m.id] || {};
+    let first = startOf(m).y;
+    for (const yy in pays) if (+yy < first) first = +yy;
+    let bf = 0;
+    for (let yy = first; yy < y; yy++) bf += paidIn(m.id, yy) - fullYearMonths(m, yy) * feeFor(yy);
+    // a year still to come: only money paid ahead carries in (this year's remaining months aren't due yet)
+    return y > CY ? Math.max(0, bf) : bf;
+  }
+  // Due = fee × months owed so far this year − everything paid this year − anything brought forward from earlier years.
   // Owed months run from the member's start (or January) to the current month (December for past years).
   // Removed members owe nothing further and are never shown as paid ahead.
   // Extra money carries forward: each month takes up to the fee from that month's own payments
   // plus whatever was left over from earlier months. Cash stays in the month it was received.
   function coverage(m, y) {
     const fee = feeFor(y), out = [];
-    let carry = 0, src = -1;
+    // money paid ahead in earlier years starts the year as carry; money still owed from before stays on those years
+    let carry = Math.max(0, broughtForward(m, y)), src = -1;
     for (let k = 0; k < 12; k++) {
       const cash = amt(m.id, k);
       // an inactive month owes nothing: any extra passes through untouched, and money paid in it is kept for later months
@@ -950,10 +990,10 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
   const cov = (m, i) => coverage(m, S.year)[i];
   function dueOf(m, y) {
     const paid = paidTotal(m.id);
-    if (m.removed) return { owed: 0, paid, due: 0, months: 0 };
+    if (m.removed) return { owed: 0, paid, due: 0, months: 0, bf: 0 };
     const months = owedMonths(m, y).length;
-    const owed = months * feeFor(y);
-    return { owed, paid, due: owed - paid, months };
+    const owed = months * feeFor(y), bf = broughtForward(m, y);
+    return { owed, paid, due: owed - paid - bf, months, bf };
   }
   // The months the "Still due" figure counts for the viewed year, e.g. "Jan–Oct".
   function countedLabel(y) {
@@ -969,21 +1009,15 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     return allMembers().filter((m) => {
       const hasPay = paidTotal(m.id) > 0;
       if (m.removed) return hasPay;
-      if (hasPay) return true;
-      if (startOf(m).y > y) return false;
-      // inactive for every month of this year they would otherwise owe, and paid nothing: leave them off the sheet
-      if (offList(m).length) {
-        const st = startOf(m), first = st.y < y ? 0 : st.m;
-        for (let k = first; k < 12; k++) if (!isOff(m, y, k)) return true;
-        return false;
-      }
-      return true;
+      // inactive members stay on the sheet: their names are never taken off for not coming
+      return startOf(m).y <= y || hasPay;
     });
   }
   function monthTotal(i) { let t = 0; for (const m of yearMembers()) t += amt(m.id, i); return t; }
 
   /* ---------- rendering ---------- */
   function render() {
+    paidIdx = null;   // payments may have changed (sync, restore, another tab): read earlier years afresh
     $("yearLbl").textContent = S.year;
     const fee = feeFor(S.year);
     $("feeLine").textContent = `Monthly subscription · Rs. ${fmt(fee)} per member`;
@@ -1030,7 +1064,8 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     }
     const ms = yearMembers();
     let collected = 0, dueSum = 0, behind = 0, elecSum = 0, signed = 0, elecMonths = 0;
-    for (const m of ms) { const d = dueOf(m, S.year); collected += d.paid; if (d.due > 0) { dueSum += d.due; behind++; } }
+    let fromBefore = false;
+    for (const m of ms) { const d = dueOf(m, S.year); collected += d.paid; if (d.due > 0) { dueSum += d.due; behind++; } if (d.bf < 0) fromBefore = true; }
     for (let i = 0; i < 12; i++) { const e = elec(i); elecSum += e.amount; if (e.amount > 0) elecMonths++; if (e.signed) signed++; }
     let expSum = 0;
     for (let i = 0; i < 12; i++) expSum += expTotal(i);
@@ -1039,7 +1074,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     const bal = balanceBefore(S.year, 12), earlier = balanceBefore(S.year, 0);
     const thisMonth = S.year === CY ? `Rs. ${fmt(monthTotal(CM))} in ${MONTHS_FULL[CM]}` : `in ${S.year}`;
     const span = countedLabel(S.year);
-    const dueSub = S.year > CY || !span ? "Nothing due yet" : behind ? `${behind} member${behind > 1 ? "s" : ""} behind · ${span} counted` : `Everyone is paid up · ${span}`;
+    const dueSub = S.year > CY || !span ? "Nothing due yet" : behind ? `${behind} member${behind > 1 ? "s" : ""} behind · ${span}${fromBefore ? " + earlier" : ""} counted` : `Everyone is paid up · ${span}`;
     el.innerHTML = `
       <div class="stat"><span class="lbl">Collected · ${S.year}</span><strong>${rs(collected)}</strong><span class="sub">${thisMonth}</span></div>
       <div class="stat"><span class="lbl">Spent · ${S.year}</span><strong>${rs(spent)}</strong><span class="sub">Electricity ${rs(elecSum)} · Other ${rs(expSum)}</span></div>
@@ -1059,7 +1094,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     }
     if (c.covered > 0) {
       const how = c.cin > 0 ? `${fmt(c.cin)} from ${from}${a ? ` + ${fmt(a)}` : ""}` : `${rs(a)} paid`;
-      return { cls: "warn", pill: `${how} · ${fmt(fee - c.covered)} left`, cell: fmt(c.covered) };
+      return { cls: a > 0 ? "warn" : "adv", pill: `${how} · ${fmt(fee - c.covered)} left`, cell: fmt(c.covered) };
     }
     if (isOwed(m, S.year, i)) return { cls: "due", pill: "Not paid", cell: "" };
     return { cls: "off", pill: "Not due", cell: "" };
@@ -1077,9 +1112,8 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
 
     let paidFull = 0, collected = 0, expected = 0, toPay = 0;
     const rows = [];
-    // members who are inactive this month (and paid nothing in it) are kept out of the list and named underneath
-    // (taken from everyone, so someone inactive all year, who isn't on this year's sheet, is still named here)
-    const resting = allMembers().filter((m) => !m.removed && isOff(m, S.year, i) && amt(m.id, i) === 0);
+    // members who are inactive this month (and paid nothing in it) are kept out of the collection list and named underneath
+    const resting = ms.filter((m) => !m.removed && isOff(m, S.year, i) && amt(m.id, i) === 0);
     const shown = ms.filter((m) => !(cov(m, i).off && amt(m.id, i) === 0));
     for (const [idx, m] of shown.entries()) {
       const a = amt(m.id, i), owed = isOwed(m, S.year, i), cv = cov(m, i), got = cv.covered;
@@ -1141,7 +1175,10 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
 
   function yearHTML(ms) {
     const fee = feeFor(S.year), y = S.year;
-    const head = `<tr><th class="c-no">#</th><th class="c-name">Member</th>${MONTHS.map((mn, k) => `<th class="${y === CY && k === CM ? "is-now" : ""}">${mn}</th>`).join("")}<th>Paid</th><th>${y === CY ? `Due to ${MONTHS[CM]}` : "Due"}</th></tr>`;
+    // "Before <year>": paid ahead (+) or still owed from earlier years; shown only when someone has it
+    const anyBf = ms.some((m) => dueOf(m, y).bf !== 0), cs = anyBf ? 3 : 2;
+    const bfTd = (v) => !anyBf ? "" : v > 0 ? `<td class="dcol adv" title="Paid ahead before ${y}">+${fmt(v)}</td>` : v < 0 ? `<td class="dcol due" title="Still to pay from before ${y}">${fmt(-v)}</td>` : `<td class="dcol off">–</td>`;
+    const head = `<tr><th class="c-no">#</th><th class="c-name">Member</th>${anyBf ? `<th>Before ${y}</th>` : ""}${MONTHS.map((mn, k) => `<th class="${y === CY && k === CM ? "is-now" : ""}">${mn}</th>`).join("")}<th>Paid</th><th>${y === CY ? `Due to ${MONTHS[CM]}` : "Due"}</th></tr>`;
     let dueTotal = 0;
     const body = ms.map((m, idx) => {
       const cells = MONTHS.map((_, k) => {
@@ -1154,7 +1191,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       if (d.due > 0) dc = `<td class="dcol due">${fmt(d.due)}</td>`;
       else if (d.due < 0) dc = `<td class="dcol adv" title="Paid ahead">+${fmt(-d.due)}</td>`;
       else if (d.months > 0) dc = `<td class="dcol ok" aria-label="Paid up">✓</td>`;
-      return `<tr><td class="c-no">${idx + 1}</td><th class="c-name" scope="row">${esc(m.name)}${m.private ? '<span class="lock" title="Name kept private">🔒</span>' : ""}${m.removed ? "<small>left</small>" : offAtEnd(m, y) ? "<small>inactive</small>" : ""}</th>${cells}<td class="tot">${d.paid ? fmt(d.paid) : "–"}</td>${dc}</tr>`;
+      return `<tr><td class="c-no">${idx + 1}</td><th class="c-name" scope="row">${esc(m.name)}${m.private ? '<span class="lock" title="Name kept private">🔒</span>' : ""}${m.removed ? "<small>left</small>" : offAtEnd(m, y) ? "<small>inactive</small>" : ""}</th>${bfTd(d.bf)}${cells}<td class="tot">${d.paid ? fmt(d.paid) : "–"}</td>${dc}</tr>`;
     }).join("");
     const anyOff = ms.some((m) => coverage(m, y).some((c) => c.off));
     let yc = 0, ye = 0;
@@ -1166,11 +1203,11 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     const blRow = MONTHS.map((_, k) => { const b = monthTotal(k) - elec(k).amount - expTotal(k); return `<td class="mc${b < 0 ? " neg" : ""}">${b ? (b < 0 ? "−" : "") + fmt(Math.abs(b)) : "–"}</td>`; }).join("");
     const yb = yc - ye - yx;
     const foot = `
-      <tr><th class="c-name" colspan="2" scope="row">Total collected</th>${colRow}<td class="tot">${fmt(yc)}</td><td class="dcol due">${dueTotal ? fmt(dueTotal) : "–"}</td></tr>
-      <tr><th class="c-name" colspan="2" scope="row">Paid for electricity</th>${elRow}<td class="tot">${fmt(ye)}</td><td></td></tr>
-      <tr><th class="c-name" colspan="2" scope="row">Other expenses</th>${exRow}<td class="tot">${yx ? fmt(yx) : "–"}</td><td></td></tr>
-      <tr><th class="c-name" colspan="2" scope="row">Selvarajah signed</th>${sgRow}<td></td><td></td></tr>
-      <tr><th class="c-name" colspan="2" scope="row">Net (collected − spent)</th>${blRow}<td class="tot${yb < 0 ? " neg" : ""}">${yb < 0 ? "−" : ""}${fmt(Math.abs(yb))}</td><td></td></tr>`;
+      <tr><th class="c-name" colspan="${cs}" scope="row">Total collected</th>${colRow}<td class="tot">${fmt(yc)}</td><td class="dcol due">${dueTotal ? fmt(dueTotal) : "–"}</td></tr>
+      <tr><th class="c-name" colspan="${cs}" scope="row">Paid for electricity</th>${elRow}<td class="tot">${fmt(ye)}</td><td></td></tr>
+      <tr><th class="c-name" colspan="${cs}" scope="row">Other expenses</th>${exRow}<td class="tot">${yx ? fmt(yx) : "–"}</td><td></td></tr>
+      <tr><th class="c-name" colspan="${cs}" scope="row">Selvarajah signed</th>${sgRow}<td></td><td></td></tr>
+      <tr><th class="c-name" colspan="${cs}" scope="row">Net (collected − spent)</th>${blRow}<td class="tot${yb < 0 ? " neg" : ""}">${yb < 0 ? "−" : ""}${fmt(Math.abs(yb))}</td><td></td></tr>`;
     return `
       <section class="card">
         <div class="sheet-wrap"><table class="sheet"><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table></div>
@@ -1179,6 +1216,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
           <span><i style="background:var(--warn-bg);color:var(--warn)">325</i> Part paid (rest still due)</span>
           <span><i style="background:var(--adv-bg);color:var(--adv)">✓</i> Paid from an earlier extra</span>
           <span><i style="background:var(--due-bg)">&nbsp;</i> Not paid yet</span>
+          ${anyBf ? `<span>Before ${y}: <b style="color:var(--adv)">+</b> paid ahead, <b style="color:var(--due)">red</b> still to pay (included in Due)</span>` : ""}
           ${anyOff ? `<span><i style="color:var(--muted)">–</i> Inactive, no fee</span>` : ""}
           <span>Tap any box to change it</span>
         </div>
@@ -1227,7 +1265,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
   const longDate = (t) => { if (!t) return ""; const [y, mo, d] = t.split("-").map(Number); return `${d} ${MONTHS[mo - 1]} ${y}`; };
   function standingLine(m, y) {
     const d = dueOf(m, y), om = owedMonths(m, y);
-    if (!om.length) return d.paid > 0 ? `Paid ahead: Rs. ${fmt(d.paid)}` : offMonths(m, y).length ? "Inactive · no fee counted" : "";
+    if (!om.length) return d.due < 0 ? `Paid ahead: Rs. ${fmt(-d.due)}` : d.due > 0 ? `Still to pay (from before ${y}): Rs. ${fmt(d.due)}` : "";
     const upto = MONTHS_FULL[om[om.length - 1]];
     if (d.due > 0) return `Still to pay (up to ${upto} ${y}): Rs. ${fmt(d.due)}`;
     if (d.due < 0) return `All paid up to ${upto} ✓ (Rs. ${fmt(-d.due)} paid ahead)`;
@@ -1240,7 +1278,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     if (p.t) L.push(`Date: ${longDate(p.t)}`);
     if (p.c) L.push(`Collected by: ${p.c}`);
     L.push("");
-    if (c.off) L.push(`${MONTHS_FULL[i]}: inactive, no fee`);
+    if (c.off) L.push(`${MONTHS_FULL[i]}: no fee this month`);
     else if (a >= fee) L.push(`${MONTHS_FULL[i]}: paid in full ✓`);
     else L.push(`${MONTHS_FULL[i]}: Rs. ${fmt(a)} of Rs. ${fmt(fee)} paid · Rs. ${fmt(fee - a)} left`);
     if (c.cout > 0) L.push(`Extra Rs. ${fmt(c.cout)} carried to ${i < 11 ? MONTHS_FULL[i + 1] : "next year"}`);
@@ -1259,7 +1297,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     for (const k of [...months].sort((a, b) => a - b)) {
       const a = amt(m.id, k), parts = partsOf(m.id, k), c = cvs[k];
       let line = `${MONTHS[k]}: `;
-      if (c.off) line += "inactive (no fee)";
+      if (c.off) line += "no fee";
       else if (c.covered === 0) line += "not paid";
       else if (c.covered >= fee) line += a === 0 ? `paid ✓ (from ${c.src >= 0 ? MONTHS[c.src] : "earlier"} extra)` : `Rs. ${fmt(a)} ✓`;
       else line += `Rs. ${fmt(c.covered)} (Rs. ${fmt(fee - c.covered)} left)`;
@@ -1274,6 +1312,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     }
     if (!months.size) L.push("Nothing due yet.");
     const d = dueOf(m, y);
+    if (d.bf) L.push("", d.bf > 0 ? `Paid ahead before ${y}: Rs. ${fmt(d.bf)}` : `Still to pay from before ${y}: Rs. ${fmt(-d.bf)}`);
     L.push("", `Total paid in ${y}: Rs. ${fmt(d.paid)}`);
     const st = standingLine(m, y);
     if (st) L.push(st);
@@ -2189,13 +2228,19 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     const rowH = Math.max(4.6, Math.min(7.5, avail / (nm + 5 + (priv.length ? 1 : 0) + 1.6)));
     const body = [];
     let dueTotal = 0, anyOff = false;
+    // a "Before <year>" column appears only when someone brings money (or dues) from earlier years
+    const anyBf = everyone.some((m) => dueOf(m, y).bf !== 0), B = anyBf ? 1 : 0;
+    const bfCell = (v, extra) => ({ content: v > 0 ? "+" + fmt(v) : v < 0 ? fmt(-v) : "-", styles: { ...(extra || {}), textColor: v > 0 ? BLUE : v < 0 ? RED : GREY, fontStyle: "bold" } });
     ms.forEach((m, idx) => {
-      const row = [String(idx + 1), m.name + (m.removed ? " (left)" : offAtEnd(m, y) ? " (inactive)" : "")];
+      // every member keeps their name on the register; months with no fee simply show "-"
+      const row = [String(idx + 1), m.name + (m.removed ? " (left)" : "")];
+      if (anyBf) row.push(bfCell(dueOf(m, y).bf));
       const cvs = coverage(m, y);
       for (let k = 0; k < 12; k++) {
         const c = cvs[k];
         if (c.covered >= fee) row.push({ content: "", tick: c.cash > 0 ? GREEN : BLUE });
-        else if (c.covered > 0) row.push({ content: fmt(c.covered), styles: { textColor: AMBER, fontStyle: "bold" } });
+        // part covered: amber when they paid in this month, blue when it is only extra carried from earlier
+        else if (c.covered > 0) row.push({ content: fmt(c.covered), styles: { textColor: c.cash > 0 ? AMBER : BLUE, fontStyle: "bold" } });
         else if (c.off) { anyOff = true; row.push(c.cash > 0 ? { content: fmt(c.cash), styles: { textColor: BLUE, fontStyle: "bold" } } : { content: "-", styles: { textColor: GREY } }); }
         else row.push("");
       }
@@ -2208,9 +2253,10 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       body.push(row);
     });
     const sumStyle = { fillColor: CREAM, fontStyle: "bold" };
-    const label = (t) => ({ content: t, colSpan: 2, styles: { ...sumStyle, halign: "left", textColor: BROWN } });
+    const label = (t) => ({ content: t, colSpan: 2 + B, styles: { ...sumStyle, halign: "left", textColor: BROWN } });
     if (priv.length) {
-      const pr = [label("Private contributions (Rs.)")];
+      const pr = [anyBf ? { ...label("Private contributions (Rs.)"), colSpan: 2 } : label("Private contributions (Rs.)")];
+      if (anyBf) pr.push(bfCell(priv.reduce((s2, m) => s2 + dueOf(m, y).bf, 0), sumStyle));
       let pt = 0, pd = 0;
       for (let k = 0; k < 12; k++) { let s = 0; for (const m of priv) s += amt(m.id, k); pr.push({ content: s ? fmt(s) : "-", styles: sumStyle }); }
       for (const m of priv) { const d = dueOf(m, y); pt += d.paid; if (d.due > 0) pd += d.due; }
@@ -2241,14 +2287,15 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     r4.push({ content: (yb < 0 ? "-" : "") + fmt(Math.abs(yb)), styles: yb < 0 ? { ...sumStyle, textColor: RED } : sumStyle }, { content: "", styles: sumStyle });
     body.push(r1, r2, r2x, r3, r4);
 
-    const colStyles = { 0: { cellWidth: 9, textColor: GREY, fontSize: 7.5 }, 1: { cellWidth: 44, halign: "left", fontStyle: "bold" }, 14: { cellWidth: 25 }, 15: { cellWidth: 25 } };
-    for (let k = 2; k < 14; k++) colStyles[k] = { cellWidth: 14.5 };
+    const colStyles = { 0: { cellWidth: 9, textColor: GREY, fontSize: 7.5 }, 1: { cellWidth: 44, halign: "left", fontStyle: "bold" }, [14 + B]: { cellWidth: 25 }, [15 + B]: { cellWidth: 25 } };
+    for (let k = 2 + B; k < 14 + B; k++) colStyles[k] = { cellWidth: anyBf ? 13.2 : 14.5 };
+    if (anyBf) colStyles[2] = { cellWidth: 15.6 };
     const logoW = 120, logoH = logoW * 372 / 420;
     doc.autoTable({
       startY: 37,
       margin: { left: 10, right: 10, bottom: 12 },
       theme: "grid",
-      head: [["No.", "Member Name", ...MONTHS, "Total Paid", y === CY ? `Due to ${MONTHS[CM]}` : "Due"]],
+      head: [["No.", "Member Name", ...(anyBf ? [`Before ${y}`] : []), ...MONTHS, "Total Paid", y === CY ? `Due to ${MONTHS[CM]}` : "Due"]],
       body,
       styles: { font: "helvetica", fontSize: 8.5, textColor: [30, 26, 22], lineColor: [160, 132, 100], lineWidth: 0.15, halign: "center", valign: "middle", cellPadding: { top: 0.6, bottom: 0.6, left: 1.5, right: 1.5 }, minCellHeight: rowH, fillColor: false },
       headStyles: { fillColor: BROWN, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8.5, minCellHeight: 8, halign: "center" },
@@ -2283,14 +2330,18 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     seg(fmt(Math.round(fee / 2)), AMBER, true); seg(" = part paid", GREY); lx += 7;
     drawTick(doc, lx + 1.6, ly - 1.1, 3, BLUE); lx += 4.5; seg("= covered by extra paid earlier", GREY); lx += 7;
     seg("Due", RED, true); seg(y === CY ? ` = still to pay up to ${MONTHS_FULL[CM]} ${y}` : " = still to pay for the year", GREY);
-    if (anyOff) { lx += 7; seg("-", GREY, true); seg(" = inactive, no fee", GREY); }
+    if (anyOff) { lx += 7; seg("-", GREY, true); seg(" = no fee that month", GREY); }
     doc.setFont("helvetica", "normal"); doc.setTextColor(...GREY);
     if (signing && ly + 14 <= H - 2) {
       const sgy = ly + 10.5;
       sigBlock(doc, W - 10 - 46, sgy, 46, 9.5, 1, "Collector");
       if (checker()) sigBlock(doc, W - 10 - 46 - 54, sgy, 46, 9.5, 2, "Accounts checked by");
     } else doc.text("Pirampady Sports Club", W - 10, ly, { align: "right" });
-    if (priv.length && ly + 4.5 < H - 3) doc.text("Private contributions = payments by members who asked not to be named. They are included in the totals.", 10, ly + 4.5);
+    const notes = [];
+    if (anyBf) notes.push(`Before ${y}: + = paid ahead in earlier years, red = still to pay from earlier years. "Due" includes it.`);
+    if (priv.length) notes.push("Private contributions = payments by members who asked not to be named. They are included in the totals.");
+    doc.setFont("helvetica", "normal"); doc.setTextColor(...GREY);
+    notes.forEach((t, n) => { if (ly + 4.5 * (n + 1) < H - 3) doc.text(t, 10, ly + 4.5 * (n + 1)); });
     return doc.output("blob");
   }
   /* ---------- PDF slips (one member) and PDF receipts (one payment) ---------- */
@@ -2343,11 +2394,11 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...C.GREY);
     const sub = [`Monthly fee Rs. ${fmt(fee)}`];
     if (r && !offs.length) sub.push(`counted ${MONTHS[r[0]]}–${MONTHS[r[1]]} ${y}`);
-    else if (r) sub.push(`inactive ${spanTxt(offs)} (no fee)`);
+    else if (r) sub.push(`no fee for ${spanTxt(offs)}`);
     doc.text(sub.join("  ·  "), M + 5, 59.5);
     const upto = last >= 0 ? `${MONTHS[last].toUpperCase()} ${y}` : String(y);
     if (d.due > 0) stamp(doc, W - M - 41, 42, 37, 19, false, `Rs. ${fmt(d.due)}`, `TO PAY · UP TO ${upto}`);
-    else if (om.length || d.paid > 0) stamp(doc, W - M - 41, 42, 37, 19, true, "PAID UP", d.due < 0 ? `+ Rs. ${fmt(-d.due)} AHEAD` : `UP TO ${upto}`);
+    else if (om.length || d.paid > 0 || d.bf) stamp(doc, W - M - 41, 42, 37, 19, true, "PAID UP", d.due < 0 ? `+ Rs. ${fmt(-d.due)} AHEAD` : `UP TO ${upto}`);
     // months table
     const months = new Set();
     if (r) for (let k = r[0]; k <= r[1]; k++) months.add(k);
@@ -2359,7 +2410,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       const a = amt(m.id, k), parts = partsOf(m.id, k), n = Math.max(1, parts.length), c = cvs[k];
       const from = c.src >= 0 ? MONTHS[c.src] : "earlier";
       let status;
-      if (c.off) status = { content: a > 0 && c.cout > 0 ? `Inactive, no fee\n+${fmt(c.cout)} to ${k < 11 ? MONTHS[k + 1] : "next yr"}` : "Inactive (no fee)", styles: { textColor: a > 0 ? C.BLUE : C.GREY, fontStyle: a > 0 ? "bold" : "normal" } };
+      if (c.off) status = { content: a > 0 && c.cout > 0 ? `No fee\n+${fmt(c.cout)} to ${k < 11 ? MONTHS[k + 1] : "next yr"}` : "No fee", styles: { textColor: a > 0 ? C.BLUE : C.GREY, fontStyle: a > 0 ? "bold" : "normal" } };
       else if (c.covered === 0) status = { content: isOwed(m, y, k) ? "Not paid" : "-", styles: { textColor: isOwed(m, y, k) ? C.RED : C.GREY, fontStyle: "bold" } };
       else if (c.covered >= fee) status = { content: c.cout > 0 && a > 0 ? `Paid\n+${fmt(c.cout)} to ${k < 11 ? MONTHS[k + 1] : "next yr"}` : "Paid", tick: a > 0 ? C.GREEN : C.BLUE, styles: { textColor: a > 0 ? C.GREEN : C.BLUE, fontStyle: "bold", cellPadding: { top: 1.6, bottom: 1.6, left: 7.5, right: 2 } } };
       else status = { content: `Rs. ${fmt(fee - c.covered)} left`, styles: { textColor: C.AMBER, fontStyle: "bold" } };
@@ -2394,13 +2445,15 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       doc.text(value, W - M - 2, ty, { align: "right" });
       ty += 6.5;
     };
+    if (d.bf) row(d.bf > 0 ? `Paid ahead before ${y}` : `Still to pay from before ${y}`, `Rs. ${fmt(Math.abs(d.bf))}`, d.bf > 0 ? C.BLUE : C.RED, false);
     row(`Total paid in ${y}`, `Rs. ${fmt(d.paid)}`, C.INK, false);
     if (om.length) {
       if (d.due > 0) row(`Still to pay (up to ${MONTHS_FULL[last]} ${y})`, `Rs. ${fmt(d.due)}`, C.RED, true);
       else if (d.due < 0) row(`Paid ahead`, `Rs. ${fmt(-d.due)}`, C.BLUE, true);
       else row(`All paid up to ${MONTHS_FULL[last]} ${y}`, "Thank you", C.GREEN, true);
-    } else if (d.paid > 0) row(`Paid ahead`, `Rs. ${fmt(d.paid)}`, C.BLUE, true);
-    else if (offs.length) row("Inactive", "No fee counted", C.GREY, true);
+    } else if (d.due < 0) row(`Paid ahead`, `Rs. ${fmt(-d.due)}`, C.BLUE, true);
+    else if (d.due > 0) row(`Still to pay`, `Rs. ${fmt(d.due)}`, C.RED, true);
+    else if (offs.length) row("No fee counted", "Rs. 0", C.GREY, false);
     const by = [...new Set([...months].flatMap((k) => partsOf(m.id, k).map((p) => p.c).filter(Boolean)))];
     if (by.length) { doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...C.GREY); doc.text(`Collected by: ${by.join(", ")}`, M + 2, ty); ty += 5; }
     // signature block, bottom right above the footer
@@ -2454,13 +2507,13 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     doc.setFont("helvetica", "bold"); doc.setFontSize(17); doc.setTextColor(...C.INK); doc.text(`Rs. ${fmt(p.a)}.00`, W - M - 4, yy + 5.5, { align: "right" });
     yy += 17;
     let monthTxt, monthCol;
-    if (rc.off) { monthTxt = "Inactive, no fee"; monthCol = C.GREY; }
+    if (rc.off) { monthTxt = "No fee this month"; monthCol = C.GREY; }
     else if (a >= fee) { monthTxt = "Paid in full"; monthCol = C.GREEN; }
     else { monthTxt = `Rs. ${fmt(a)} of ${fmt(fee)} paid · Rs. ${fmt(fee - a)} left`; monthCol = C.AMBER; }
     line(`${MONTHS_FULL[i]}`, monthTxt, { size: 8.5, color: monthCol });
     if (rc.cout > 0) line("Extra carried to", `${i < 11 ? MONTHS_FULL[i + 1] : "next year"} · Rs. ${fmt(rc.cout)}`, { size: 8.5, color: C.BLUE });
     const d = dueOf(m, y), om = owedMonths(m, y);
-    if (om.length) line(d.due > 0 ? `Still to pay (to ${MONTHS[om[om.length - 1]]})` : "Balance", d.due > 0 ? `Rs. ${fmt(d.due)}` : d.due < 0 ? `Rs. ${fmt(-d.due)} ahead` : "All paid up", { size: 8.5, color: d.due > 0 ? C.RED : C.GREEN });
+    if (om.length || d.due !== 0) line(d.due > 0 ? (om.length ? `Still to pay (to ${MONTHS[om[om.length - 1]]})` : "Still to pay") : "Balance", d.due > 0 ? `Rs. ${fmt(d.due)}` : d.due < 0 ? `Rs. ${fmt(-d.due)} ahead` : "All paid up", { size: 8.5, color: d.due > 0 ? C.RED : C.GREEN });
     if (p.c && !sigImg.url) line("Collected by", p.c, { size: 9 });
     // signature
     yy = Math.max(yy + 15, H - 22);
@@ -2747,7 +2800,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.9.0";
+  const APP_VERSION = "1.9.1";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty";
   const SEED = {};

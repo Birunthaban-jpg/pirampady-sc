@@ -1,5 +1,5 @@
 // Offline support for Pirampady SC Subscriptions. Bump VERSION on every release.
-const VERSION = "1.9.0";
+const VERSION = "1.9.1";
 const CACHE = "psc-" + VERSION;
 const FILES = [
   "./",
