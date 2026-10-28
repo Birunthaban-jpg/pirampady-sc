@@ -10,9 +10,10 @@ Members pay Rs. 650 a month. Some pay part of it, some pay ahead. The club also 
 - **Electricity bill and signature** recorded for each month, with the date paid and an optional note.
 - **Monthly account slip** (A5 PDF) for the whole club: the electricity bill, the month's collections (totals only, no names) and the calculation, from the balance brought forward to the balance in hand.
 - **A4 landscape PDF** of the filled register (club logo, ticks, totals), shared straight to WhatsApp from a phone.
+- **Club expenses:** ground maintenance, sports equipment (balls, nets), events and other costs. Saving an expense makes an **expense bill** (A6 PDF) with a bill number and the club balance before and after, and every total includes it.
 - **PDF receipts** (A6) for each payment, with a receipt number, who collected the money and the member's balance.
 - **PDF slips** (A5) for each member, sent one by one through WhatsApp, so every member sees only their own payments and dues; all slips can also be saved as one PDF for printing. A plain-text version is available too.
-- **Styled signature** (e.g. *Y.Birunthaban*) printed on every receipt and slip, in a choice of five script styles.
+- **Styled signatures:** the collector's (e.g. *Y.Birunthaban*) on every receipt, slip and bill, and an "Accounts checked by" signature (e.g. *Kajenthirakumar*) on the monthly account, expense bills and the register, each in a choice of five script styles.
 - **Private members:** a member can ask not to be named; the shared PDF shows their money as "Private contributions" so the totals still add up.
 - **Backup and restore** with a single JSON file, plus a CSV export for Excel.
 - **Phone and Mac share one register**, synced through a private GitHub repository, and every change is kept as a version you can restore.

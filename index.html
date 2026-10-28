@@ -178,6 +178,19 @@ button:disabled { cursor: default; }
 .elec-row p { margin: 0; font-size: 14px; }
 .elec-row p b { font-variant-numeric: tabular-nums; }
 .elec-btns { display: inline-flex; gap: 8px; flex-wrap: wrap; }
+.exp-block { display: grid; gap: 8px; }
+.exp-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.exp-item { width: 100%; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 1px 10px; text-align: left; padding: 8px 12px; border: 1px solid var(--line); border-radius: 10px; background: var(--surface-2); }
+.exp-item:hover:not(:disabled) { border-color: var(--line-strong); }
+.exp-cat { grid-column: 1 / -1; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--brand); }
+.exp-desc { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.exp-amt { font-variant-numeric: tabular-nums; }
+.exp-item small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
+.sugs { display: flex; gap: 6px; flex-wrap: wrap; }
+.sugs button { border: 1px dashed var(--line-strong); background: transparent; border-radius: 999px; height: 30px; padding: 0 12px; font-size: 13px; color: var(--muted); font-weight: 600; }
+.state.calc { display: grid; gap: 3px; font-variant-numeric: tabular-nums; }
+.state.calc div { display: flex; justify-content: space-between; gap: 10px; }
+.state.calc .after { font-weight: 700; border-top: 1px solid var(--line); padding-top: 4px; }
 
 .filter { display: flex; gap: 6px; flex-wrap: wrap; }
 .filter button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; height: 34px; padding: 0 14px; font-weight: 600; font-size: 14px; color: var(--muted); }
@@ -470,6 +483,39 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
   </form>
 </dialog>
 
+<dialog class="dlg" id="expDlg" aria-labelledby="expTitle">
+  <form id="expForm" novalidate>
+    <div class="dlg-head">
+      <div><p class="eyebrow" id="expWhen">October 2026</p><h3 id="expTitle">Add expense</h3></div>
+      <button type="button" class="close" data-close aria-label="Close">×</button>
+    </div>
+    <div class="field">
+      <span class="lbl2">Type</span>
+      <div class="filter" id="expCats" role="group" aria-label="Expense type"></div>
+    </div>
+    <div class="field">
+      <label for="expDesc">What was it for?</label>
+      <input id="expDesc" autocomplete="off" placeholder="e.g. Football, grass cutting">
+      <div class="sugs" id="expSugs"></div>
+    </div>
+    <div class="inrow">
+      <div class="field" style="flex:1;min-width:0"><label for="expAmt">Amount (Rs.)</label><input id="expAmt" inputmode="numeric" autocomplete="off" placeholder="e.g. 2500"></div>
+      <div class="field" style="flex:1;min-width:0"><label for="expDate">Paid on</label><input id="expDate" type="date"></div>
+    </div>
+    <div class="field">
+      <label for="expTo">Paid to (optional)</label>
+      <input id="expTo" autocomplete="off" placeholder="e.g. shop name or person">
+    </div>
+    <div class="state calc" id="expCalc"></div>
+    <p class="err" id="expErr" hidden></p>
+    <button type="submit" class="btn primary big" id="expBill">Save and share bill (PDF)</button>
+    <div class="foot-row">
+      <button type="button" class="btn danger" id="expDel" hidden>Delete this expense</button>
+      <button type="button" class="btn" id="expSave">Save only</button>
+    </div>
+  </form>
+</dialog>
+
 <dialog class="dlg" id="memDlg" aria-labelledby="memTitle">
   <div class="inner">
     <div class="dlg-head">
@@ -508,7 +554,13 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       <label for="sigText">Signature on receipts and slips</label>
       <input id="sigText" autocomplete="off" placeholder="Leave empty for no signature">
       <div class="sigstyles" id="sigStyles" role="group" aria-label="Signature style"></div>
-      <p class="hint">Printed in dark-blue ink above the signature line. Shared with your other devices.</p>
+      <p class="hint">The collector's signature, printed on receipts, slips, bills and the monthly account. Shared with your other devices.</p>
+    </div>
+    <div class="field">
+      <label for="sig2Text">Accounts checked by</label>
+      <input id="sig2Text" autocomplete="off" placeholder="Leave empty for no second signature">
+      <div class="sigstyles" id="sig2Styles" role="group" aria-label="Second signature style"></div>
+      <p class="hint">The person who checks the accounts. Printed next to yours on the monthly account, expense bills and the register PDF.</p>
     </div>
     <p class="err" id="setErr" hidden></p>
     <div class="foot-row"><span></span><button type="submit" class="btn primary">Save</button></div>
@@ -691,12 +743,13 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
   }
 
   /* ---------- reads ---------- */
-  const DEFAULT_SIG = "Y.Birunthaban";
+  const DEFAULT_SIG = "Y.Birunthaban", DEFAULT_SIG2 = "Kajenthirakumar";
   function settings() {
     const o = overlay.get("settings/club");
     const s = o || S.settingsServer || {};
     const sig = s.sig && typeof s.sig === "object" ? { text: typeof s.sig.text === "string" ? s.sig.text : DEFAULT_SIG, style: s.sig.style >= 1 && s.sig.style <= 5 ? s.sig.style : 1 } : { text: DEFAULT_SIG, style: 1 };
-    return { fees: s.fees || {}, start: s.start && Number.isInteger(s.start.y) ? s.start : { y: CY, m: 0 }, sig };
+    const sig2 = s.sig2 && typeof s.sig2 === "object" ? { text: typeof s.sig2.text === "string" ? s.sig2.text : DEFAULT_SIG2, style: s.sig2.style >= 1 && s.sig2.style <= 5 ? s.sig2.style : 2 } : { text: DEFAULT_SIG2, style: 2 };
+    return { fees: s.fees || {}, start: s.start && Number.isInteger(s.start.y) ? s.start : { y: CY, m: 0 }, sig, sig2 };
   }
   function feeFor(y) {
     const fees = settings().fees;
@@ -745,6 +798,21 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     if (overlay.has(p)) { const b = overlay.get(p); return b ? b.m || {} : {}; }
     return S.elecServer || {};
   }
+  /* ---------- expenses: ground maintenance, equipment, events, other ---------- */
+  const EXP_CATS = [
+    ["ground", "Ground maintenance", ["Ground cleaning", "Grass cutting", "Line marking", "Repairs"]],
+    ["equipment", "Sports equipment", ["Football", "Volleyball", "Volleyball net", "Football net", "Cricket ball", "Badminton shuttles"]],
+    ["event", "Events & tournaments", ["Tournament entry fee", "Prizes", "Refreshments"]],
+    ["other", "Other", []],
+  ];
+  const catName = (c) => (EXP_CATS.find((x) => x[0] === c) || EXP_CATS[3])[1];
+  function expensesAll() {
+    const map = new Map((S.expServer || []).map((e) => [e.id, e]));
+    for (const [p, b] of overlay) if (p.startsWith("expenses/")) { const id = p.slice(9); if (b && b.year === S.year) map.set(id, { ...b, id }); else map.delete(id); }
+    return [...map.values()].filter((e) => e && e.amount > 0 && Number.isInteger(e.month));
+  }
+  const expensesIn = (i) => expensesAll().filter((e) => e.month === i).sort((a, b) => String(a.t || "").localeCompare(String(b.t || "")) || String(a.no).localeCompare(String(b.no)));
+  const expTotal = (i) => expensesIn(i).reduce((s2, e) => s2 + e.amount, 0);
   const elec = (i) => { const e = elecMap()[i]; return { amount: e && e.amount > 0 ? e.amount : 0, signed: !!(e && e.signed), t: (e && e.t) || null, note: (e && e.note) || "" }; };
 
   function startOf(m) { return m.start && Number.isInteger(m.start.y) ? m.start : settings().start; }
@@ -836,14 +904,17 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     let collected = 0, dueSum = 0, behind = 0, elecSum = 0, signed = 0, elecMonths = 0;
     for (const m of ms) { const d = dueOf(m, S.year); collected += d.paid; if (d.due > 0) { dueSum += d.due; behind++; } }
     for (let i = 0; i < 12; i++) { const e = elec(i); elecSum += e.amount; if (e.amount > 0) elecMonths++; if (e.signed) signed++; }
-    const bal = collected - elecSum;
+    let expSum = 0;
+    for (let i = 0; i < 12; i++) expSum += expTotal(i);
+    const spent = elecSum + expSum;
+    const bal = collected - spent;
     const thisMonth = S.year === CY ? `Rs. ${fmt(monthTotal(CM))} in ${MONTHS_FULL[CM]}` : `in ${S.year}`;
     const span = countedLabel(S.year);
     const dueSub = S.year > CY || !span ? "Nothing due yet" : behind ? `${behind} member${behind > 1 ? "s" : ""} behind · ${span} counted` : `Everyone is paid up · ${span}`;
     el.innerHTML = `
       <div class="stat"><span class="lbl">Collected · ${S.year}</span><strong>${rs(collected)}</strong><span class="sub">${thisMonth}</span></div>
-      <div class="stat"><span class="lbl">Electricity paid</span><strong>${rs(elecSum)}</strong><span class="sub">${elecMonths} month${elecMonths === 1 ? "" : "s"} · ${signed} signed</span></div>
-      <div class="stat is-bal"><span class="lbl">Balance in hand</span><strong${bal < 0 ? ' style="color:var(--due)"' : ""}>${bal < 0 ? "−" : ""}${rs(Math.abs(bal))}</strong><span class="sub">Collected minus electricity</span></div>
+      <div class="stat"><span class="lbl">Spent · ${S.year}</span><strong>${rs(spent)}</strong><span class="sub">Electricity ${rs(elecSum)} · Other ${rs(expSum)}</span></div>
+      <div class="stat is-bal"><span class="lbl">Balance in hand</span><strong${bal < 0 ? ' style="color:var(--due)"' : ""}>${bal < 0 ? "−" : ""}${rs(Math.abs(bal))}</strong><span class="sub">Collected minus spending</span></div>
       <div class="stat is-due"><span class="lbl">Still due</span><strong>${rs(dueSum)}</strong><span class="sub">${dueSub}</span></div>`;
   }
 
@@ -897,7 +968,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
           <div class="figs">
             <div class="fig"><span>Collected</span><b>${rs(collected)}</b></div>
             <div class="fig"><span>Expected</span><b>${rs(expected)}</b></div>
-            <div class="fig"><span>Electricity</span><b>${rs(e.amount)}</b></div>
+            <div class="fig"><span>Spent</span><b>${rs(e.amount + expTotal(i))}</b></div>
           </div>
           <div class="elec-row">
             <p>Electricity bill: <b>${e.amount ? rs(e.amount) : "not paid yet"}</b> · ${e.signed ? '<span style="color:var(--ok);font-weight:700">✓ Signed by Selvarajah</span>' : "Selvarajah has not signed"}</p>
@@ -905,6 +976,13 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
               <button type="button" class="btn" data-act="acct" data-m="${i}">Account slip</button>
               <button type="button" class="btn" data-act="elec" data-m="${i}"${S.canWrite ? "" : " disabled"}>${e.amount || e.signed ? "Edit" : "Record bill"}</button>
             </span>
+          </div>
+          <div class="exp-block">
+            <div class="elec-row exp-head">
+              <p>Other expenses: <b>${expTotal(i) ? rs(expTotal(i)) : "none yet"}</b></p>
+              <button type="button" class="btn" data-act="exp-add" data-m="${i}"${S.canWrite ? "" : " disabled"}>+ Add expense</button>
+            </div>
+            ${expensesIn(i).length ? `<ul class="exp-list">${expensesIn(i).map((x) => `<li><button type="button" class="exp-item" data-act="exp-edit" data-id="${esc(x.id)}"${S.canWrite ? "" : " disabled"}><span class="exp-cat">${esc(catName(x.cat))}</span><span class="exp-desc">${esc(x.desc || catName(x.cat))}</span><b class="exp-amt">${rs(x.amount)}</b><small>${x.t ? esc(dayLabel(x.t)) : ""}${x.no ? ` · ${esc(x.no)}` : ""}${x.to ? ` · ${esc(x.to)}` : ""}</small></button></li>`).join("")}</ul>` : ""}
           </div>
         </section>
         <div class="slipbar">
@@ -938,11 +1016,14 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     const colRow = MONTHS.map((_, k) => { const t = monthTotal(k); yc += t; return `<td class="mc">${t ? fmt(t) : "–"}</td>`; }).join("");
     const elRow = MONTHS.map((_, k) => { const e = elec(k); ye += e.amount; return `<td class="mc"><button type="button" class="cellbtn${e.amount ? "" : " off"}" data-act="elec" data-m="${k}" aria-label="Electricity ${MONTHS_FULL[k]}"${S.canWrite ? "" : " disabled"}>${e.amount ? fmt(e.amount) : S.canWrite ? "+" : "–"}</button></td>`; }).join("");
     const sgRow = MONTHS.map((_, k) => { const e = elec(k); return `<td class="mc"><button type="button" class="cellbtn${e.signed ? " ok" : " off"}" data-act="elec" data-m="${k}" aria-label="Selvarajah signature ${MONTHS_FULL[k]}: ${e.signed ? "signed" : "not signed"}"${S.canWrite ? "" : " disabled"}>${e.signed ? "✓" : "–"}</button></td>`; }).join("");
-    const blRow = MONTHS.map((_, k) => { const b = monthTotal(k) - elec(k).amount; return `<td class="mc${b < 0 ? " neg" : ""}">${b ? (b < 0 ? "−" : "") + fmt(Math.abs(b)) : "–"}</td>`; }).join("");
-    const yb = yc - ye;
+    let yx = 0;
+    const exRow = MONTHS.map((_, k) => { const x = expTotal(k); yx += x; return `<td class="mc">${x ? fmt(x) : "–"}</td>`; }).join("");
+    const blRow = MONTHS.map((_, k) => { const b = monthTotal(k) - elec(k).amount - expTotal(k); return `<td class="mc${b < 0 ? " neg" : ""}">${b ? (b < 0 ? "−" : "") + fmt(Math.abs(b)) : "–"}</td>`; }).join("");
+    const yb = yc - ye - yx;
     const foot = `
       <tr><th class="c-name" colspan="2" scope="row">Total collected</th>${colRow}<td class="tot">${fmt(yc)}</td><td class="dcol due">${dueTotal ? fmt(dueTotal) : "–"}</td></tr>
       <tr><th class="c-name" colspan="2" scope="row">Paid for electricity</th>${elRow}<td class="tot">${fmt(ye)}</td><td></td></tr>
+      <tr><th class="c-name" colspan="2" scope="row">Other expenses</th>${exRow}<td class="tot">${yx ? fmt(yx) : "–"}</td><td></td></tr>
       <tr><th class="c-name" colspan="2" scope="row">Selvarajah signed</th>${sgRow}<td></td><td></td></tr>
       <tr><th class="c-name" colspan="2" scope="row">Balance</th>${blRow}<td class="tot${yb < 0 ? " neg" : ""}">${yb < 0 ? "−" : ""}${fmt(Math.abs(yb))}</td><td></td></tr>`;
     return `
@@ -1303,6 +1384,93 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     toast(`Cleared the electricity record for ${MONTHS[i]}.`, () => setElec(i, prev.amount, prev.signed, prev.t, prev.note));
   });
 
+  /* ---------- expense entry ---------- */
+  let expCtx = null, expCat = "equipment";
+  function expBalanceNow(i, excludeId) {
+    // club balance at the end of month i, counting everything recorded so far (except the expense being edited)
+    let b = balanceBefore(S.year, i) + monthTotal(i) - elec(i).amount;
+    for (const x of expensesIn(i)) if (x.id !== excludeId) b -= x.amount;
+    return b;
+  }
+  const rsSigned = (n) => `${n < 0 ? "−" : ""}Rs. ${fmt(Math.abs(n))}`;
+  function drawExpCats() {
+    $("expCats").innerHTML = EXP_CATS.map(([c, n]) => `<button type="button" data-cat="${c}" aria-pressed="${expCat === c}">${n}</button>`).join("");
+    const sug = (EXP_CATS.find((x) => x[0] === expCat) || EXP_CATS[3])[2];
+    $("expSugs").innerHTML = sug.map((t) => `<button type="button" data-sug="${esc(t)}">${esc(t)}</button>`).join("");
+  }
+  function drawExpCalc() {
+    if (!expCtx) return;
+    const v = parseAmt($("expAmt").value) || 0;
+    const before = expBalanceNow(expCtx.i, expCtx.id);
+    $("expCalc").innerHTML = `<div><span>Balance in hand (end of ${MONTHS_FULL[expCtx.i]})</span><span>${rsSigned(before)}</span></div><div><span>This expense</span><span>− Rs. ${fmt(v)}</span></div><div class="after"><span>Balance after</span><span style="color:${before - v < 0 ? "var(--due)" : "var(--ok)"}">${rsSigned(before - v)}</span></div>`;
+  }
+  function openExpense(id, month) {
+    if (!S.canWrite) return;
+    const x = id ? expensesAll().find((e) => e.id === id) : null;
+    if (id && !x) return;
+    const i = x ? x.month : month;
+    expCtx = { id: x ? x.id : null, i, year: S.year, no: x ? x.no : null };
+    expCat = x ? x.cat || "other" : "equipment";
+    $("expWhen").textContent = `${MONTHS_FULL[i]} ${S.year}`;
+    $("expTitle").textContent = x ? "Edit expense" : "Add expense";
+    $("expDesc").value = x ? x.desc || "" : "";
+    $("expAmt").value = x ? String(x.amount) : "";
+    $("expDate").value = x && x.t ? x.t : (S.year === CY && i === CM ? todayStr() : `${S.year}-${String(i + 1).padStart(2, "0")}-01`);
+    $("expTo").value = x ? x.to || "" : "";
+    $("expDel").hidden = !x;
+    $("expErr").hidden = true;
+    drawExpCats(); drawExpCalc();
+    $("expDlg").showModal();
+  }
+  $("expCats").addEventListener("click", (ev) => { const b = ev.target.closest("[data-cat]"); if (!b) return; expCat = b.dataset.cat; drawExpCats(); });
+  $("expSugs").addEventListener("click", (ev) => { const b = ev.target.closest("[data-sug]"); if (!b) return; $("expDesc").value = b.dataset.sug; $("expAmt").focus(); });
+  $("expAmt").addEventListener("input", drawExpCalc);
+  function saveExpense() {
+    if (!expCtx || expCtx.year !== S.year) return null;
+    const v = parseAmt($("expAmt").value), desc = $("expDesc").value.trim().replace(/\s+/g, " ").slice(0, 60);
+    if (!desc) { $("expErr").textContent = "Write what the money was for, for example “Football”."; $("expErr").hidden = false; $("expDesc").focus(); return null; }
+    if (!(v > 0)) { $("expErr").textContent = "Enter the amount in rupees, for example 2500."; $("expErr").hidden = false; $("expAmt").focus(); return null; }
+    if (v > 1000000) { $("expErr").textContent = "That amount looks too large. Check the number."; $("expErr").hidden = false; return null; }
+    let t = /^\d{4}-\d{2}-\d{2}$/.test($("expDate").value) ? $("expDate").value : todayStr();
+    let month = expCtx.i;
+    const [ty, tm] = t.split("-").map(Number);
+    if (ty === S.year) month = tm - 1;     // the date decides the month
+    const id = expCtx.id || ("x" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5));
+    const no = expCtx.no || newReceipt(S.year, month).replace("PSC-", "EXP-");
+    const rec = { year: S.year, month, cat: expCat, desc, amount: v, t, no };
+    const to = $("expTo").value.trim().slice(0, 60);
+    if (to) rec.to = to;
+    const by = getCollector().trim();
+    if (by) rec.by = by;
+    writeDoc("expenses/" + id, rec);
+    render();
+    return { ...rec, id };
+  }
+  $("expForm").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const x = saveExpense();
+    if (!x) return;
+    $("expDlg").close();
+    if (!pdfReady()) { toast(`Saved: ${x.desc}, Rs. ${fmt(x.amount)}.`); return; }
+    sharePdf(buildExpenseVoucher(x), `Pirampady_SC_bill_${x.no}.pdf`);
+  });
+  $("expSave").addEventListener("click", () => {
+    const x = saveExpense();
+    if (!x) return;
+    $("expDlg").close();
+    toast(`Saved: ${x.desc}, Rs. ${fmt(x.amount)}. Balance in hand is now ${rsSigned(expBalanceNow(x.month))}.`);
+  });
+  $("expDel").addEventListener("click", () => {
+    if (!expCtx || !expCtx.id) return;
+    const x = expensesAll().find((e) => e.id === expCtx.id);
+    if (!x) return;
+    const { id, ...body } = x;
+    writeDoc("expenses/" + id, null);
+    $("expDlg").close();
+    render();
+    toast(`Deleted the expense “${x.desc}”.`, () => { writeDoc("expenses/" + id, body); render(); });
+  });
+
   /* ---------- members ---------- */
   let confirmId = null;
   function startOptions(sel) {
@@ -1411,24 +1579,29 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     $("setErr").hidden = true;
     $("sigText").value = st.sig.text;
     sigStyleSel = st.sig.style;
+    $("sig2Text").value = st.sig2.text;
+    sig2StyleSel = st.sig2.style;
     drawSigChoices();
     $("setDlg").showModal();
   }
-  let sigStyleSel = 1;
+  let sigStyleSel = 1, sig2StyleSel = 2;
   const SIG_NAMES = ["Pen", "Flowing", "Elegant", "Brush", "Neat"];
   function drawSigChoices() {
-    const t = $("sigText").value.trim() || "Your signature";
-    $("sigStyles").innerHTML = SIG_NAMES.map((n, k) => `<button type="button" class="sigopt" data-sig="${k + 1}" aria-pressed="${sigStyleSel === k + 1}" aria-label="${n} style"><span style="font-family:'PSC Sig ${k + 1}', cursive">${esc(t)}</span><small>${n}</small></button>`).join("");
+    const opts = (t, sel) => SIG_NAMES.map((n, k) => `<button type="button" class="sigopt" data-sig="${k + 1}" aria-pressed="${sel === k + 1}" aria-label="${n} style"><span style="font-family:'PSC Sig ${k + 1}', cursive">${esc(t)}</span><small>${n}</small></button>`).join("");
+    $("sigStyles").innerHTML = opts($("sigText").value.trim() || "Your signature", sigStyleSel);
+    $("sig2Styles").innerHTML = opts($("sig2Text").value.trim() || "Checker's signature", sig2StyleSel);
   }
   $("sigText").addEventListener("input", drawSigChoices);
+  $("sig2Text").addEventListener("input", drawSigChoices);
   $("sigStyles").addEventListener("click", (ev) => { const b = ev.target.closest("[data-sig]"); if (!b) return; sigStyleSel = +b.dataset.sig; drawSigChoices(); });
+  $("sig2Styles").addEventListener("click", (ev) => { const b = ev.target.closest("[data-sig]"); if (!b) return; sig2StyleSel = +b.dataset.sig; drawSigChoices(); });
 
   /* ---------- signature image for PDFs (drawn from the chosen script font) ---------- */
-  let sigImg = { key: "", url: null, ratio: 0 };
-  async function renderSignature() {
-    const sg = settings().sig, text = (sg.text || "").trim(), key = `${sg.style}|${text}`;
-    if (key === sigImg.key) return;
-    if (!text) { sigImg = { key, url: null, ratio: 0 }; return; }
+  let sigImg = { key: "", url: null, ratio: 0 }, sigImg2 = { key: "", url: null, ratio: 0 };
+  async function makeSigImage(sg, prev) {
+    const text = (sg.text || "").trim(), key = `${sg.style}|${text}`;
+    if (key === prev.key) return prev;
+    if (!text) return { key, url: null, ratio: 0, text: "" };
     const fam = `"PSC Sig ${sg.style}"`;
     try { if (document.fonts && document.fonts.load) await document.fonts.load(`120px ${fam}`, text); } catch (e) {}
     try {
@@ -1441,27 +1614,42 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       const px = ctx.getImageData(0, 0, w, h).data;
       let x0 = w, y0 = h, x1 = 0, y1 = 0;
       for (let yy = 0; yy < h; yy++) for (let xx = 0; xx < w; xx++) if (px[(yy * w + xx) * 4 + 3] > 8) { if (xx < x0) x0 = xx; if (xx > x1) x1 = xx; if (yy < y0) y0 = yy; if (yy > y1) y1 = yy; }
-      if (x1 <= x0) { sigImg = { key, url: null, ratio: 0 }; return; }
+      if (x1 <= x0) return { key, url: null, ratio: 0, text };
       const t = document.createElement("canvas"); t.width = x1 - x0 + 8; t.height = y1 - y0 + 8;
       t.getContext("2d").drawImage(c, x0 - 4, y0 - 4, t.width, t.height, 0, 0, t.width, t.height);
-      sigImg = { key, url: t.toDataURL("image/png"), ratio: t.height / t.width };
-    } catch (e) { sigImg = { key, url: null, ratio: 0 }; }
+      return { key, url: t.toDataURL("image/png"), ratio: t.height / t.width, text };
+    } catch (e) { return { key, url: null, ratio: 0, text }; }
   }
-  // draws the signature centred above a line from x to x+w at baseline y; returns true if drawn
-  function drawSignature(doc, x, y, w, maxH) {
-    if (!sigImg.url) return false;
-    let iw = w * 0.92, ih = iw * sigImg.ratio;
-    if (ih > maxH) { ih = maxH; iw = ih / sigImg.ratio; }
-    doc.addImage(sigImg.url, "PNG", x + (w - iw) / 2, y - ih + 1.2, iw, ih);
+  async function renderSignature() {
+    const st = settings();
+    sigImg = await makeSigImage(st.sig, sigImg);
+    sigImg2 = await makeSigImage(st.sig2, sigImg2);
+  }
+  // draws a signature centred above a line from x to x+w at baseline y; returns true if drawn
+  function drawSignature(doc, x, y, w, maxH, which) {
+    const sg = which === 2 ? sigImg2 : sigImg;
+    if (!sg.url) return false;
+    let iw = w * 0.92, ih = iw * sg.ratio;
+    if (ih > maxH) { ih = maxH; iw = ih / sg.ratio; }
+    doc.addImage(sg.url, "PNG", x + (w - iw) / 2, y - ih + 1.2, iw, ih);
     return true;
   }
+  // a signature with its line and caption
+  function sigBlock(doc, x, y, w, maxH, which, caption) {
+    const C = PDF_C;
+    drawSignature(doc, x, y, w, maxH, which);
+    doc.setDrawColor(...C.GREY); doc.setLineWidth(0.25); doc.setLineDashPattern([0.8, 0.8], 0); doc.line(x, y, x + w, y); doc.setLineDashPattern([], 0);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7.2); doc.setTextColor(...C.GREY);
+    doc.text(caption, x + w / 2, y + 3.6, { align: "center" });
+  }
+  const checker = () => (settings().sig2.text || "").trim();
   $("setForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
     const fee = parseAmt($("feeIn").value);
     if (!(fee > 0)) { $("setErr").textContent = "Enter the monthly fee in rupees, for example 650."; $("setErr").hidden = false; return; }
     const st = settings();
     const fees = { ...st.fees, [String(S.year)]: fee };
-    writeDoc("settings/club", { fees, start: { y: +$("startY").value, m: +$("startM").value }, sig: { text: $("sigText").value.trim().replace(/\s+/g, " "), style: sigStyleSel } });
+    writeDoc("settings/club", { fees, start: { y: +$("startY").value, m: +$("startM").value }, sig: { text: $("sigText").value.trim().replace(/\s+/g, " "), style: sigStyleSel }, sig2: { text: $("sig2Text").value.trim().replace(/\s+/g, " "), style: sig2StyleSel } });
     renderSignature();
     $("setDlg").close();
     render();
@@ -1524,8 +1712,9 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
 
     // rows
     const nm = ms.length;
-    const avail = H - 37 - 13;
-    const rowH = Math.max(4.6, Math.min(7.5, avail / (nm + 4 + (priv.length ? 1 : 0) + 1.6)));
+    const signing = !!(sigImg.url || sigImg2.url);
+    const avail = H - 37 - (signing ? 24 : 13);
+    const rowH = Math.max(4.6, Math.min(7.5, avail / (nm + 5 + (priv.length ? 1 : 0) + 1.6)));
     const body = [];
     let dueTotal = 0;
     ms.forEach((m, idx) => {
@@ -1557,22 +1746,27 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       body.push(pr);
     }
     let yc = 0, ye = 0;
-    const r1 = [label("Total collected (Rs.)")], r2 = [label("Paid for electricity (Rs.)")], r3 = [label("Selvarajah's signature")], r4 = [label("Balance (Rs.)")];
+    const r1 = [label("Total collected (Rs.)")], r2 = [label("Paid for electricity (Rs.)")], r2x = [label("Other expenses (Rs.)")], r3 = [label("Selvarajah's signature")], r4 = [label("Balance (Rs.)")];
+    let yx = 0;
     for (let k = 0; k < 12; k++) {
       const t = monthTotal(k), e = elec(k);
       yc += t; ye += e.amount;
       r1.push({ content: t ? fmt(t) : "-", styles: sumStyle });
       r2.push({ content: e.amount ? fmt(e.amount) : "-", styles: sumStyle });
       r3.push(e.signed ? { content: "", tick: GREEN, styles: sumStyle } : { content: "", styles: sumStyle });
-      const b = t - e.amount;
+      const x = expTotal(k);
+      yx += x;
+      r2x.push({ content: x ? fmt(x) : "-", styles: sumStyle });
+      const b = t - e.amount - x;
       r4.push({ content: b ? (b < 0 ? "-" : "") + fmt(Math.abs(b)) : "-", styles: b < 0 ? { ...sumStyle, textColor: RED } : sumStyle });
     }
     r1.push({ content: fmt(yc), styles: sumStyle }, { content: dueTotal ? fmt(dueTotal) : "-", styles: { ...sumStyle, textColor: RED } });
     r2.push({ content: fmt(ye), styles: sumStyle }, { content: "", styles: sumStyle });
     r3.push({ content: "", styles: sumStyle }, { content: "", styles: sumStyle });
-    const yb = yc - ye;
+    r2x.push({ content: yx ? fmt(yx) : "-", styles: sumStyle }, { content: "", styles: sumStyle });
+    const yb = yc - ye - yx;
     r4.push({ content: (yb < 0 ? "-" : "") + fmt(Math.abs(yb)), styles: yb < 0 ? { ...sumStyle, textColor: RED } : sumStyle }, { content: "", styles: sumStyle });
-    body.push(r1, r2, r3, r4);
+    body.push(r1, r2, r2x, r3, r4);
 
     const colStyles = { 0: { cellWidth: 9, textColor: GREY, fontSize: 7.5 }, 1: { cellWidth: 44, halign: "left", fontStyle: "bold" }, 14: { cellWidth: 25 }, 15: { cellWidth: 25 } };
     for (let k = 2; k < 14; k++) colStyles[k] = { cellWidth: 14.5 };
@@ -1617,7 +1811,11 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     seg(fmt(fee * 2), BLUE, true); seg(" = paid more (advance)", GREY); lx += 7;
     seg("Due", RED, true); seg(y === CY ? ` = still to pay up to ${MONTHS_FULL[CM]} ${y}` : " = still to pay for the year", GREY);
     doc.setFont("helvetica", "normal"); doc.setTextColor(...GREY);
-    doc.text("Pirampady Sports Club", W - 10, ly, { align: "right" });
+    if (signing && ly + 14 <= H - 2) {
+      const sgy = ly + 10.5;
+      sigBlock(doc, W - 10 - 46, sgy, 46, 9.5, 1, "Collector");
+      if (checker()) sigBlock(doc, W - 10 - 46 - 54, sgy, 46, 9.5, 2, "Accounts checked by");
+    } else doc.text("Pirampady Sports Club", W - 10, ly, { align: "right" });
     if (priv.length && ly + 4.5 < H - 3) doc.text("Private contributions = payments by members who asked not to be named. They are included in the totals.", 10, ly + 4.5);
     return doc.output("blob");
   }
@@ -1803,10 +2001,11 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
         const before = (mk) => d.year < y || (d.year === y && +mk < i);
         if (k.startsWith("payments/")) for (const mk in d.m || {}) { if (before(mk) && d.m[mk] > 0) bal += d.m[mk]; }
         if (k.startsWith("electricity/")) for (const mk in d.m || {}) { const e = d.m[mk]; if (before(mk) && e && e.amount > 0) bal -= e.amount; }
+        if (k.startsWith("expenses/") && Number.isInteger(d.month) && before(d.month) && d.amount > 0) bal -= d.amount;
       }
       return bal;
     }
-    for (let k = 0; k < i; k++) bal += monthTotal(k) - elec(k).amount;
+    for (let k = 0; k < i; k++) bal += monthTotal(k) - elec(k).amount - expTotal(k);
     return bal;
   }
   function monthStats(i) {
@@ -1829,7 +2028,8 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     const C = PDF_C, { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
     const W = 148, H = 210, M = 12, y = S.year, e = elec(i), st = monthStats(i);
-    const opening = balanceBefore(y, i), closing = opening + st.collected - e.amount;
+    const exps = expensesIn(i), expSum = exps.reduce((a, x) => a + x.amount, 0);
+    const opening = balanceBefore(y, i), closing = opening + st.collected - e.amount - expSum;
     const mName = `${MONTHS_FULL[i]} ${y}`;
     slipWatermark(doc, W, 80, 96);
     slipHeader(doc, W, M, `Monthly account  \u00B7  ${mName}`);
@@ -1854,7 +2054,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     doc.autoTable({
       startY: 71, margin: { left: M, right: M }, theme: "grid",
       head: [[`Collections \u00B7 ${mName}`, { content: "", styles: { halign: "right" } }]], body,
-      styles: { font: "helvetica", fontSize: 9, textColor: C.INK, lineColor: C.LINE, lineWidth: 0.15, cellPadding: { top: 2, bottom: 2, left: 3, right: 3 }, fillColor: false },
+      styles: { font: "helvetica", fontSize: 9, textColor: C.INK, lineColor: C.LINE, lineWidth: 0.15, cellPadding: { top: 1.6, bottom: 1.6, left: 3, right: 3 }, fillColor: false },
       headStyles: { fillColor: C.BROWN, textColor: [255, 255, 255], fontStyle: "bold" },
       columnStyles: { 1: { halign: "right", cellWidth: 40 } },
     });
@@ -1867,10 +2067,13 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       ["", `Balance brought forward (end of ${prevName})`, `Rs. ${opening < 0 ? "-" : ""}${fmt(Math.abs(opening))}`],
       ["+", `Collected in ${MONTHS_FULL[i]}`, `Rs. ${fmt(st.collected)}`],
       ["\u2013", `Electricity bill (${MONTHS_FULL[i]})`, `Rs. ${fmt(e.amount)}`],
+      ...(exps.length > 6
+        ? EXP_CATS.map(([c, n]) => { const t = exps.filter((x) => (x.cat || "other") === c).reduce((a, x) => a + x.amount, 0); return t ? ["\u2013", `${n} (${exps.filter((x) => (x.cat || "other") === c).length} items)`, `Rs. ${fmt(t)}`] : null; }).filter(Boolean)
+        : exps.map((x) => ["\u2013", `${catName(x.cat)}: ${x.desc || "-"}${x.t ? ` (${dayLabel(x.t)})` : ""}`, `Rs. ${fmt(x.amount)}`])),
     ];
     doc.autoTable({
       startY: ty, margin: { left: M, right: M }, theme: "plain", body: calc,
-      styles: { font: "helvetica", fontSize: 9.5, textColor: C.INK, cellPadding: { top: 1.8, bottom: 1.8, left: 2, right: 3 } },
+      styles: { font: "helvetica", fontSize: 9.3, textColor: C.INK, cellPadding: { top: 1.4, bottom: 1.4, left: 2, right: 3 } },
       columnStyles: { 0: { cellWidth: 7, halign: "center", fontStyle: "bold", textColor: C.BROWN }, 2: { halign: "right", cellWidth: 40 } },
     });
     ty = doc.lastAutoTable.finalY + 1;
@@ -1882,20 +2085,74 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     doc.text(`Balance in hand (end of ${MONTHS_FULL[i]})`, M + 9, ty + 7.3);
     doc.text(`Rs. ${closing < 0 ? "-" : ""}${fmt(Math.abs(closing))}`, W - M - 3, ty + 7.3, { align: "right" });
     ty += 11;
-    // signature
-    const sy = Math.max(ty + 20, H - 30);
-    if (sy <= H - 23) {
-      drawSignature(doc, W - M - 50, sy, 50, 13);
-      doc.setDrawColor(...C.GREY); doc.setLineWidth(0.25); doc.setLineDashPattern([0.8, 0.8], 0); doc.line(W - M - 50, sy, W - M, sy); doc.setLineDashPattern([], 0);
-      doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...C.GREY);
-      doc.text("Prepared by the club collector", W - M - 25, sy + 3.6, { align: "center" });
-    }
+    // signatures: always printed; the footer gets smaller, or the signatures move to a new page, if space is short
+    let footTop = H - 19, compact = false;
+    let room = footTop - 4.5 - (ty + 3);
+    if (room < 10) { compact = true; footTop = H - 10; room = footTop - 4.5 - (ty + 3); }
+    if (room < 7) { doc.addPage("a5", "portrait"); slipHeader(doc, W, M, `Monthly account  \u00B7  ${mName} (signatures)`); ty = 45; compact = false; footTop = H - 19; room = 14; }
+    const sh = Math.min(13, room), sy = Math.min(footTop - 4.5, ty + 3 + sh);
+    sigBlock(doc, W - M - 52, sy, 52, sh, 1, "Prepared by the club collector");
+    if (checker()) sigBlock(doc, M, sy, 52, sh, 2, `Accounts checked by ${checker()}`);
     // footer
-    doc.setDrawColor(...C.LINE); doc.setLineWidth(0.3); doc.line(M, H - 19, W - M, H - 19);
-    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...C.BROWN);
-    doc.text("Thank you to every member for supporting the club.", W / 2, H - 13, { align: "center" });
-    doc.setFont("helvetica", "normal"); doc.setFontSize(7.2); doc.setTextColor(...C.GREY);
-    doc.text("Totals only. Individual members' payments are not shown on this slip.", W / 2, H - 8.5, { align: "center" });
+    doc.setDrawColor(...C.LINE); doc.setLineWidth(0.3); doc.line(M, footTop, W - M, footTop);
+    if (compact) {
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7); doc.setTextColor(...C.GREY);
+      doc.text("Thank you for supporting the club. Totals only; individual payments are not shown.", W / 2, H - 6, { align: "center" });
+    } else {
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...C.BROWN);
+      doc.text("Thank you to every member for supporting the club.", W / 2, H - 13, { align: "center" });
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7.2); doc.setTextColor(...C.GREY);
+      doc.text("Totals only. Individual members' payments are not shown on this slip.", W / 2, H - 8.5, { align: "center" });
+    }
+    return doc.output("blob");
+  }
+  // A6 bill for one club expense, with the balance before and after.
+  function buildExpenseVoucher(x) {
+    const C = PDF_C, { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a6" });
+    const W = 105, H = 148, M = 9;
+    const after = expBalanceNow(x.month), before = after + x.amount;
+    slipWatermark(doc, W, 52, 70);
+    const LOGO = pdfLogo();
+    if (LOGO) doc.addImage(LOGO, "JPEG", (W - 20) / 2, 5, 20, 20 * 372 / 420);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(...C.BROWN);
+    doc.text("PIRAMPADY SPORTS CLUB", W / 2, LOGO ? 28.5 : 13, { align: "center" });
+    let yy = LOGO ? 32 : 17;
+    doc.setFillColor(...C.BROWN); doc.rect(M, yy, W - 2 * M, 7.5, "F");
+    doc.setFontSize(9); doc.setTextColor(255, 255, 255); doc.text("EXPENSE BILL", W / 2, yy + 5.1, { align: "center", charSpace: 0.6 });
+    yy += 12.5;
+    const line = (label, value, opts) => {
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...C.GREY); doc.text(label, M + 1, yy);
+      doc.setFont("helvetica", "bold"); doc.setFontSize((opts && opts.size) || 9.5); doc.setTextColor(...((opts && opts.color) || C.INK));
+      doc.text(doc.splitTextToSize(String(value), W - 2 * M - 30)[0], W - M - 1, yy, { align: "right" });
+      yy += 5.8;
+    };
+    line("Bill no.", x.no || "-");
+    line("Date", x.t ? longDate(x.t) : issuedToday());
+    line("Type", catName(x.cat));
+    line("For", x.desc);
+    if (x.to) line("Paid to", x.to);
+    yy += 1.5;
+    doc.setFillColor(...C.CREAM); doc.roundedRect(M, yy - 4.5, W - 2 * M, 13, 2, 2, "F");
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...C.GREY); doc.text("AMOUNT PAID", M + 4, yy + 0.5);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.setTextColor(...C.INK); doc.text(`Rs. ${fmt(x.amount)}.00`, W - M - 4, yy + 5, { align: "right" });
+    yy += 14;
+    // calculation
+    doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...C.BROWN); doc.text("CLUB BALANCE", M + 1, yy); yy += 4.6;
+    const calcRow = (sign, label, value, bold, color) => {
+      doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setFontSize(8.5); doc.setTextColor(...(color || C.INK));
+      doc.text(sign, M + 1.5, yy); doc.text(label, M + 6, yy); doc.text(value, W - M - 1, yy, { align: "right" }); yy += 5;
+    };
+    const money = (n) => `Rs. ${n < 0 ? "-" : ""}${fmt(Math.abs(n))}`;
+    calcRow("", `Balance in hand before`, money(before));
+    calcRow("\u2013", `This bill`, money(x.amount));
+    doc.setDrawColor(...C.BROWN); doc.setLineWidth(0.4); doc.line(M, yy - 3.4, W - M, yy - 3.4); yy += 0.8;
+    calcRow("=", `Balance in hand after`, money(after), true, after < 0 ? C.RED : C.GREEN);
+    // signature
+    yy = Math.max(yy + 13, H - 17);
+    sigBlock(doc, W - M - 41, yy, 41, 11, 1, x.by ? `Paid by ${x.by}` : "Paid by the collector");
+    if (checker()) sigBlock(doc, M, yy, 41, 11, 2, "Accounts checked by");
+    else { doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(...C.BROWN); doc.text("Club expense", M + 1, yy + 3.8); }
     return doc.output("blob");
   }
   function shareAccountSlip(i) {
@@ -1947,6 +2204,8 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     else if (act === "elec") openElec(+b.dataset.m);
     else if (act === "slips") openSlips();
     else if (act === "acct") shareAccountSlip(+b.dataset.m);
+    else if (act === "exp-add") openExpense(null, +b.dataset.m);
+    else if (act === "exp-edit") openExpense(b.dataset.id);
     else if (act === "members") { if (!S.db) { toast("Members can't load in this view."); return; } openMembers(); }
     else if (act === "settings") { if (!S.canWrite || !S.db) { toast("You can view this register, but you can't change its settings."); return; } openSettings(); }
     else if (act === "pdf") downloadPdf();
@@ -1958,7 +2217,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
   $("memDlg").addEventListener("close", () => { confirmId = null; });
 
   /* ---------- data ---------- */
-  let unsubPay = null, unsubElec = null;
+  let unsubPay = null, unsubElec = null, unsubExp = null;
   function onSubErr(e) {
     if (e && (e.code === "revoked" || e.code === "not_granted")) { S.canWrite = false; render(); return; }
     if (e && e.code === "unavailable") setTimeout(() => { if (S.db) { startMembers(); subYear(); } }, 3000);
@@ -1967,7 +2226,8 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     if (!S.db) return;
     if (unsubPay) unsubPay();
     if (unsubElec) unsubElec();
-    S.payServer = {}; S.elecServer = {}; S.payLoaded = false;
+    if (unsubExp) unsubExp();
+    S.payServer = {}; S.elecServer = {}; S.expServer = []; S.payLoaded = false;
     const y = S.year;
     unsubPay = S.db.collection("payments").where("year", "==", y).onSnapshot((snap) => {
       if (y !== S.year) return;
@@ -1978,6 +2238,11 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     unsubElec = S.db.doc("electricity/" + y).onSnapshot((d) => {
       if (y !== S.year) return;
       S.elecServer = d.exists ? (d.data().m || {}) : {}; render();
+    }, onSubErr);
+    unsubExp = S.db.collection("expenses").where("year", "==", y).onSnapshot((snap) => {
+      if (y !== S.year) return;
+      S.expServer = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+      render();
     }, onSubErr);
   }
   let unsubMem = null, unsubSet = null;
@@ -1996,7 +2261,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.5.0";
+  const APP_VERSION = "1.6.0";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty";
   const SEED = {};
@@ -2427,7 +2692,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       let data = null;
       try { data = JSON.parse(fr.result); } catch (e) {}
       const st = data && data.app === "pirampady-sc" && data.store && typeof data.store === "object" ? data.store : null;
-      const valid = st && Object.keys(st).every((k) => /^(members|payments|electricity|settings)\/[A-Za-z0-9_.:@+~-]+$/.test(k) && st[k] && typeof st[k] === "object");
+      const valid = st && Object.keys(st).every((k) => /^(members|payments|electricity|settings|expenses)\/[A-Za-z0-9_.:@+~-]+$/.test(k) && st[k] && typeof st[k] === "object");
       if (!valid) { showErr("bakErr", "That file isn't a Pirampady SC backup. Choose the .json file made with “Save backup file”."); return; }
       const c = countRecords(st);
       pendingRestore = st;
@@ -2465,6 +2730,10 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     for (const k of Object.keys(st).filter((k) => k.startsWith("electricity/")).sort()) {
       const e = st[k];
       for (let i = 0; i < 12; i++) { const x = e.m && e.m[i]; if (x && (x.amount > 0 || x.signed)) rows.push(["Electricity", e.year, MONTHS_FULL[i], "", x.amount || 0, "", x.signed ? "Signed by Selvarajah" : "Not signed"]); }
+    }
+    for (const k of Object.keys(st).filter((k) => k.startsWith("expenses/")).sort((a, b) => (st[a].year - st[b].year) || (st[a].month - st[b].month))) {
+      const x = st[k];
+      if (x && x.amount > 0) rows.push(["Expense", x.year, MONTHS_FULL[x.month] || "", "", x.amount, x.t || "", [x.desc, x.to ? `paid to ${x.to}` : "", x.no].filter(Boolean).join(" · ")]);
     }
     const csv = "﻿" + rows.map((r) => r.map(q).join(",")).join("\r\n");
     const d = new Date();
