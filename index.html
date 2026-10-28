@@ -989,14 +989,15 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     let expSum = 0;
     for (let i = 0; i < 12; i++) expSum += expTotal(i);
     const spent = elecSum + expSum;
-    const bal = collected - spent;
+    // money in hand: everything collected minus everything spent, up to the end of this year (earlier years included)
+    const bal = balanceBefore(S.year, 12), earlier = balanceBefore(S.year, 0);
     const thisMonth = S.year === CY ? `Rs. ${fmt(monthTotal(CM))} in ${MONTHS_FULL[CM]}` : `in ${S.year}`;
     const span = countedLabel(S.year);
     const dueSub = S.year > CY || !span ? "Nothing due yet" : behind ? `${behind} member${behind > 1 ? "s" : ""} behind · ${span} counted` : `Everyone is paid up · ${span}`;
     el.innerHTML = `
       <div class="stat"><span class="lbl">Collected · ${S.year}</span><strong>${rs(collected)}</strong><span class="sub">${thisMonth}</span></div>
       <div class="stat"><span class="lbl">Spent · ${S.year}</span><strong>${rs(spent)}</strong><span class="sub">Electricity ${rs(elecSum)} · Other ${rs(expSum)}</span></div>
-      <div class="stat is-bal"><span class="lbl">Balance in hand</span><strong${bal < 0 ? ' style="color:var(--due)"' : ""}>${bal < 0 ? "−" : ""}${rs(Math.abs(bal))}</strong><span class="sub">Collected minus spending</span></div>
+      <div class="stat is-bal"><span class="lbl">Balance in hand</span><strong${bal < 0 ? ' style="color:var(--due)"' : ""}>${bal < 0 ? "−" : ""}${rs(Math.abs(bal))}</strong><span class="sub">${earlier ? `Incl. ${rsSigned(earlier)} from before ${S.year}` : "Collected minus spending"}</span></div>
       <div class="stat is-due"><span class="lbl">Still due</span><strong>${rs(dueSum)}</strong><span class="sub">${dueSub}</span></div>`;
   }
 
@@ -1048,7 +1049,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     }
     const owedCount = ms.filter((m) => isOwed(m, S.year, i) || cov(m, i).covered > 0).length;
     const e = elec(i);
-    const label = { all: `All ${ms.length}`, todo: `Still to pay ${toPay}`, paid: `Paid ${ms.filter((m) => amt(m.id, i) > 0).length}` };
+    const label = { all: `All ${ms.length}`, todo: `Still to pay ${toPay}`, paid: `Paid ${ms.filter((m) => cov(m, i).covered > 0).length}` };
     const list = rows.length ? `<ul class="mlist">${rows.join("")}</ul>` : `<p class="empty-filter">${S.filter === "todo" ? "Everyone has paid for this month." : "No payments recorded for this month yet."}</p>`;
     return `
       <div style="display:grid;gap:12px">
@@ -1115,7 +1116,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       <tr><th class="c-name" colspan="2" scope="row">Paid for electricity</th>${elRow}<td class="tot">${fmt(ye)}</td><td></td></tr>
       <tr><th class="c-name" colspan="2" scope="row">Other expenses</th>${exRow}<td class="tot">${yx ? fmt(yx) : "–"}</td><td></td></tr>
       <tr><th class="c-name" colspan="2" scope="row">Selvarajah signed</th>${sgRow}<td></td><td></td></tr>
-      <tr><th class="c-name" colspan="2" scope="row">Balance</th>${blRow}<td class="tot${yb < 0 ? " neg" : ""}">${yb < 0 ? "−" : ""}${fmt(Math.abs(yb))}</td><td></td></tr>`;
+      <tr><th class="c-name" colspan="2" scope="row">Net (collected − spent)</th>${blRow}<td class="tot${yb < 0 ? " neg" : ""}">${yb < 0 ? "−" : ""}${fmt(Math.abs(yb))}</td><td></td></tr>`;
     return `
       <section class="card">
         <div class="sheet-wrap"><table class="sheet"><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table></div>
@@ -2075,7 +2076,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       body.push(pr);
     }
     let yc = 0, ye = 0;
-    const r1 = [label("Total collected (Rs.)")], r2 = [label("Paid for electricity (Rs.)")], r2x = [label("Other expenses (Rs.)")], r3 = [label("Selvarajah's signature")], r4 = [label("Balance (Rs.)")];
+    const r1 = [label("Total collected (Rs.)")], r2 = [label("Paid for electricity (Rs.)")], r2x = [label("Other expenses (Rs.)")], r3 = [label("Selvarajah's signature")], r4 = [label("Net: collected - spent (Rs.)")];
     let yx = 0;
     for (let k = 0; k < 12; k++) {
       const t = monthTotal(k), e = elec(k);
@@ -2595,7 +2596,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.8.1";
+  const APP_VERSION = "1.8.2";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty";
   const SEED = {};
