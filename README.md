@@ -11,6 +11,7 @@ Members pay Rs. 650 a month. Some pay part of it, some pay ahead. The club also 
 - **Monthly account slip** (A5 PDF) for the whole club: the electricity bill, the month's collections (totals only, no names) and the calculation, from the balance brought forward to the balance in hand.
 - **A4 landscape PDF** of the filled register (club logo, ticks, totals), shared straight to WhatsApp from a phone.
 - **Club expenses:** ground maintenance, sports equipment (balls, nets), events and other costs. Saving an expense makes an **expense bill** (A6 PDF) with a bill number and the club balance before and after, and every total includes it.
+- **Birthday fund:** cake money is kept completely separate from the subscription account. Each birthday records who gave how much (members and guests), what was spent (cake, candles...), and makes a birthday bill (A5 PDF); leftovers carry over to the next birthday.
 - **PDF receipts** (A6) for each payment, with a receipt number, who collected the money and the member's balance.
 - **PDF slips** (A5) for each member, sent one by one through WhatsApp, so every member sees only their own payments and dues; all slips can also be saved as one PDF for printing. A plain-text version is available too.
 - **Styled signatures:** the collector's (e.g. *Y.Birunthaban*) on every receipt, slip and bill, and an "Accounts checked by" signature (e.g. *Kajenthirakumar*) on the monthly account, expense bills and the register, each in a choice of five script styles.
