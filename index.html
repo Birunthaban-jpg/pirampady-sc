@@ -265,6 +265,8 @@ dialog.dlg::backdrop { background: var(--scrim); }
 .sliplist .who span.ok { color: var(--ok); font-weight: 600; }
 .sliplist .send { height: 38px; padding: 0 14px; border-radius: 10px; border: 0; background: var(--ok); color: var(--surface); font-weight: 700; white-space: nowrap; }
 .sliplist .send.share { background: var(--brand); color: var(--brand-ink); }
+.sliplist .sendbtns { display: inline-flex; gap: 6px; }
+.sliplist .send.alt { background: transparent; color: var(--ink); border: 1px solid var(--line-strong); padding: 0 10px; }
 .sliplist .sent { grid-column: 1 / -1; font-size: 12px; color: var(--ok); font-weight: 600; }
 .sliplist pre { grid-column: 1 / -1; margin: 4px 0 0; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); font: 13px/1.45 var(--f-body); white-space: pre-wrap; }
 .memlist .sub2 { flex-wrap: wrap; }
@@ -490,10 +492,11 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       <div><p class="eyebrow" id="slipWhen">2026</p><h3 id="slipTitle">Send slips</h3></div>
       <button type="button" class="close" data-close aria-label="Close">×</button>
     </div>
-    <p class="hint">Each member gets only their own payments and what they still owe, so nobody sees anyone else's. Tap <b>WhatsApp</b> or <b>Send</b>, send the message, then come back for the next one. Tap a name to preview the slip.</p>
+    <p class="hint">Each member gets a slip with only their own payments and what they still owe, so nobody sees anyone else's. Tap <b>PDF slip</b>, choose WhatsApp and the member, send it, then come back for the next one. <b>Text</b> sends the same details as a message instead. Tap a name to preview.</p>
     <div class="filter" id="slipFilter" role="group" aria-label="Show"></div>
     <ul class="sliplist" id="slipList"></ul>
-    <p class="hint">Save members' WhatsApp numbers under <b>Members</b> to open each chat directly.</p>
+    <button type="button" class="btn" id="slipAll">All slips in this list as one PDF (to print)</button>
+    <p class="hint">For <b>Text</b>, a saved WhatsApp number (under Members) opens the member's chat directly.</p>
   </div>
 </dialog>
 
@@ -1020,8 +1023,8 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     const p = parts[idx];
     if (!p) return;
     if (!p.r) { parts[idx] = { ...p, r: newReceipt(S.year, i) }; setParts(mid, i, parts); }   // older payments get a number when first sent
-    const how = sendText(m, receiptText(m, i, parts[idx]));
-    if (how === "wa") markSent(mid);
+    if (!pdfReady()) { sendText(m, receiptText(m, i, parts[idx])); return; }
+    sharePdf(buildReceiptPdf(m, i, parts[idx]), `Pirampady_SC_receipt_${parts[idx].r}.pdf`);
   }
   /* ---------- send slips one by one ---------- */
   let slipFilter = "due", slipOpen = null;
@@ -1046,17 +1049,31 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       const when = sent[`${y}:${m.id}`];
       return `<li>
         <button type="button" class="who" data-sp="${esc(m.id)}" aria-expanded="${slipOpen === m.id}"><b>${esc(m.name)}${m.private ? '<span class="lock" title="Name kept private">🔒</span>' : ""}</b>${status}${ph ? "" : "<span>No WhatsApp number saved</span>"}</button>
-        <button type="button" class="send${ph ? "" : " share"}" data-ss="${esc(m.id)}" aria-label="Send ${esc(m.name)}'s slip">${ph ? "WhatsApp" : "Send"}</button>
+        <span class="sendbtns"><button type="button" class="send" data-spdf="${esc(m.id)}" aria-label="Send ${esc(m.name)}'s slip as a PDF">PDF slip</button><button type="button" class="send alt" data-ss="${esc(m.id)}" aria-label="Send ${esc(m.name)}'s slip as a text message">Text</button></span>
         ${when ? `<span class="sent">✓ Sent ${esc(fmtSent(when))}</span>` : ""}
         ${slipOpen === m.id ? `<pre>${esc(statementText(m))}</pre>` : ""}
       </li>`;
     }).join("") || `<li class="hint" style="border:0">${slipFilter === "due" ? "Nobody owes anything right now." : "No members in this list."}</li>`;
   }
   function openSlips() { slipOpen = null; renderSlips(); $("slipDlg").showModal(); }
+  $("slipAll").addEventListener("click", () => {
+    if (!pdfReady()) { toast("The PDF maker didn't load. Close and reopen the app."); return; }
+    const y = S.year, info = yearMembers().filter((m) => !m.removed).map((m) => ({ m, d: dueOf(m, y) }));
+    const list = (slipFilter === "due" ? info.filter((x) => x.d.due > 0) : slipFilter === "paid" ? info.filter((x) => x.d.due <= 0) : info).map((x) => x.m);
+    if (!list.length) { toast("There are no slips in this list."); return; }
+    const name = `Pirampady_SC_slips_${y}_${slipFilter === "due" ? "to_pay" : slipFilter === "paid" ? "paid_up" : "all"}.pdf`;
+    deliverFile(buildSlipPdf(list), name, "application/pdf").then((how) => { if (how === "downloaded") toast(`Saved ${list.length} slips in one PDF.`); });
+  });
   $("slipFilter").addEventListener("click", (ev) => { const b = ev.target.closest("[data-sf]"); if (!b) return; slipFilter = b.dataset.sf; slipOpen = null; renderSlips(); });
   $("slipList").addEventListener("click", (ev) => {
     const p = ev.target.closest("[data-sp]");
     if (p) { slipOpen = slipOpen === p.dataset.sp ? null : p.dataset.sp; renderSlips(); return; }
+    const pdfBtn = ev.target.closest("[data-spdf]");
+    if (pdfBtn) {
+      const pm = allMembers().find((x) => x.id === pdfBtn.dataset.spdf);
+      if (pm) { sendSlipPdf(pm); renderSlips(); }
+      return;
+    }
     const s = ev.target.closest("[data-ss]");
     if (!s) return;
     const m = allMembers().find((x) => x.id === s.dataset.ss);
@@ -1152,7 +1169,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     if (!payOk()) return;
     const m = allMembers().find((x) => x.id === payCtx.mid);
     if (!m) return;
-    if (sendText(m, statementText(m)) === "wa") markSent(m.id);
+    sendSlipPdf(m);
   });
   $("payForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
@@ -1360,10 +1377,10 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
   fetch("icons/logo.jpg").then((r) => r.blob()).then((b) => new Promise((res) => { const fr = new FileReader(); fr.onload = () => res(fr.result); fr.readAsDataURL(b); })).then((d) => { LOGO_DATA = d; }).catch(() => {});
 
   // Phones get the share sheet (WhatsApp, Save to Files); computers get a normal download.
-  async function deliverFile(blob, filename, type) {
+  async function deliverFile(blob, filename, type, preferShare) {
     const file = new File([blob], filename, { type });
     const touch = window.matchMedia("(pointer: coarse)").matches;
-    if (touch && navigator.canShare && navigator.canShare({ files: [file] })) {
+    if ((touch || preferShare) && navigator.canShare && navigator.canShare({ files: [file] })) {
       try { await navigator.share({ files: [file], title: filename }); return "shared"; }
       catch (e) { if (e && e.name === "AbortError") return "cancelled"; }
     }
@@ -1507,6 +1524,179 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     if (priv.length && ly + 4.5 < H - 3) doc.text("Private contributions = payments by members who asked not to be named. They are included in the totals.", 10, ly + 4.5);
     return doc.output("blob");
   }
+  /* ---------- PDF slips (one member) and PDF receipts (one payment) ---------- */
+  const PDF_C = { BROWN: [107, 58, 0], CREAM: [255, 247, 218], GREEN: [29, 122, 61], AMBER: [152, 86, 0], BLUE: [29, 93, 166], RED: [176, 40, 31], GREY: [110, 103, 95], INK: [30, 26, 22], LINE: [200, 180, 150] };
+  function pdfLogo() { try { return typeof LOGO_DATA !== "undefined" && LOGO_DATA ? LOGO_DATA : null; } catch (e) { return null; } }
+  const safeName = (s) => String(s || "member").replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  const pdfReady = () => !!(window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API.autoTable);
+  function issuedToday() { return NOW.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }); }
+  function slipHeader(doc, W, M, title) {
+    const C = PDF_C, LOGO = pdfLogo();
+    if (LOGO) doc.addImage(LOGO, "JPEG", M, 9, 24, 24 * 372 / 420);
+    const tx = LOGO ? M + 28 : M;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(15.5); doc.setTextColor(...C.BROWN);
+    doc.text("PIRAMPADY SPORTS CLUB", tx, 17);
+    doc.setFontSize(10.5); doc.setTextColor(...C.INK); doc.text(title, tx, 23.2);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...C.GREY);
+    doc.text(`Issued ${issuedToday()}`, tx, 28.4);
+    doc.setDrawColor(...C.BROWN); doc.setLineWidth(0.8); doc.line(M, 33.5, W - M, 33.5);
+    doc.setLineWidth(0.25); doc.line(M, 34.6, W - M, 34.6);
+  }
+  function slipWatermark(doc, W, y, w) {
+    const LOGO = pdfLogo();
+    if (!LOGO) return;
+    doc.saveGraphicsState(); doc.setGState(new doc.GState({ opacity: 0.07 }));
+    doc.addImage(LOGO, "JPEG", (W - w) / 2, y, w, w * 372 / 420);
+    doc.restoreGraphicsState();
+  }
+  function stamp(doc, x, y, w, h, ok, big, small) {
+    const C = PDF_C, col = ok ? C.GREEN : C.RED;
+    doc.setDrawColor(...col); doc.setLineWidth(0.9); doc.roundedRect(x, y, w, h, 2.2, 2.2, "S");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...col);
+    doc.text(small, x + w / 2, y + 5.2, { align: "center" });
+    doc.setFontSize(big.length > 9 ? 12 : 14);
+    if (ok) { drawTick(doc, x + w / 2 - doc.getTextWidth(big) / 2 - 2.6, y + h - 5.1, 3.6, col); doc.text(big, x + w / 2 + 2, y + h - 3.6, { align: "center" }); }
+    else doc.text(big, x + w / 2, y + h - 3.6, { align: "center" });
+  }
+  // One A5 page per member: their own payments, dates, receipt numbers and what they still owe.
+  function drawSlip(doc, m) {
+    const C = PDF_C, W = 148, H = 210, M = 12;
+    const y = S.year, fee = feeFor(y), d = dueOf(m, y), r = owedRange(m, y);
+    slipWatermark(doc, W, 78, 96);
+    slipHeader(doc, W, M, `Subscription slip  ·  ${y}`);
+    // member box with status stamp
+    doc.setFillColor(...C.CREAM); doc.roundedRect(M, 39, W - 2 * M, 25, 2.5, 2.5, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...C.GREY); doc.text("MEMBER", M + 5, 46);
+    doc.setFontSize(16); doc.setTextColor(...C.INK);
+    const nameLines = doc.splitTextToSize(m.name, W - 2 * M - 50);
+    doc.text(nameLines[0], M + 5, 53.5);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...C.GREY);
+    doc.text(`Monthly fee Rs. ${fmt(fee)}${r ? `  ·  counted ${MONTHS[r[0]]}–${MONTHS[r[1]]} ${y}` : ""}`, M + 5, 59.5);
+    const upto = r ? `${MONTHS[r[1]].toUpperCase()} ${y}` : String(y);
+    if (d.due > 0) stamp(doc, W - M - 41, 42, 37, 19, false, `Rs. ${fmt(d.due)}`, `TO PAY · UP TO ${upto}`);
+    else if (r || d.paid > 0) stamp(doc, W - M - 41, 42, 37, 19, true, "PAID UP", d.due < 0 ? `+ Rs. ${fmt(-d.due)} AHEAD` : `UP TO ${upto}`);
+    // months table
+    const months = new Set();
+    if (r) for (let k = r[0]; k <= r[1]; k++) months.add(k);
+    for (let k = 0; k < 12; k++) if (amt(m.id, k) > 0) months.add(k);
+    // one line per payment; the month and its status span the lines of that month
+    const body = [];
+    for (const k of [...months].sort((a, b) => a - b)) {
+      const a = amt(m.id, k), parts = partsOf(m.id, k), n = Math.max(1, parts.length);
+      let status;
+      if (a === 0) status = { content: isOwed(m, y, k) ? "Not paid" : "-", styles: { textColor: isOwed(m, y, k) ? C.RED : C.GREY, fontStyle: "bold" } };
+      else if (a === fee) status = { content: "Paid", tick: C.GREEN, styles: { textColor: C.GREEN, fontStyle: "bold", cellPadding: { top: 1.6, bottom: 1.6, left: 7.5, right: 2 } } };
+      else if (a < fee) status = { content: `Rs. ${fmt(fee - a)} left`, styles: { textColor: C.AMBER, fontStyle: "bold" } };
+      else status = { content: `+ Rs. ${fmt(a - fee)} extra`, styles: { textColor: C.BLUE, fontStyle: "bold" } };
+      status.rowSpan = n;
+      const month = { content: MONTHS_FULL[k], rowSpan: n, styles: { fontStyle: "bold" } };
+      if (!parts.length) { body.push([month, "-", "-", "", status]); continue; }
+      parts.forEach((p, j) => {
+        const cells = [p.t ? longDate(p.t) : "Earlier", `Rs. ${fmt(p.a)}`, { content: p.r || "-", styles: { textColor: p.r ? C.INK : C.GREY } }];
+        body.push(j === 0 ? [month, ...cells, status] : cells);
+      });
+    }
+    if (!body.length) body.push([{ content: "Nothing due yet.", colSpan: 5, styles: { halign: "center", textColor: C.GREY } }]);
+    doc.autoTable({
+      startY: 69, margin: { left: M, right: M, bottom: 24 }, theme: "grid",
+      head: [["Month", "Paid on", "Amount", "Receipt no.", "Status"]], body,
+      styles: { font: "helvetica", fontSize: 8.3, textColor: C.INK, lineColor: C.LINE, lineWidth: 0.15, valign: "middle", cellPadding: { top: 1.6, bottom: 1.6, left: 2, right: 2 }, fillColor: false },
+      headStyles: { fillColor: C.BROWN, textColor: [255, 255, 255], fontStyle: "bold", fontSize: 8.3 },
+      columnStyles: { 0: { cellWidth: 23 }, 1: { cellWidth: 24 }, 2: { cellWidth: 19, halign: "right" }, 3: { cellWidth: 28, fontSize: 7.6 }, 4: { cellWidth: "auto" } },
+      didParseCell: (data) => { if (data.section === "head" && data.column.index === 2) data.cell.styles.halign = "right"; },
+      didDrawCell: (data) => {
+        if (data.section !== "body") return;
+        const c = data.cell;
+        if (c.raw && c.raw.tick) drawTick(doc, c.x + 3.6, c.y + c.height / 2, 3, c.raw.tick);
+      },
+    });
+    // totals
+    let ty = doc.lastAutoTable.finalY + 7;
+    const row = (label, value, color, bold) => {
+      doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setFontSize(10); doc.setTextColor(...C.INK);
+      doc.text(label, M + 2, ty);
+      doc.setFont("helvetica", "bold"); doc.setTextColor(...color);
+      doc.text(value, W - M - 2, ty, { align: "right" });
+      ty += 6.5;
+    };
+    row(`Total paid in ${y}`, `Rs. ${fmt(d.paid)}`, C.INK, false);
+    if (r) {
+      if (d.due > 0) row(`Still to pay (up to ${MONTHS_FULL[r[1]]} ${y})`, `Rs. ${fmt(d.due)}`, C.RED, true);
+      else if (d.due < 0) row(`Paid ahead`, `Rs. ${fmt(-d.due)}`, C.BLUE, true);
+      else row(`All paid up to ${MONTHS_FULL[r[1]]} ${y}`, "Thank you", C.GREEN, true);
+    }
+    const by = [...new Set([...months].flatMap((k) => partsOf(m.id, k).map((p) => p.c).filter(Boolean)))];
+    if (by.length) { doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...C.GREY); doc.text(`Collected by: ${by.join(", ")}`, M + 2, ty); }
+    // footer
+    doc.setDrawColor(...C.LINE); doc.setLineWidth(0.3); doc.line(M, H - 19, W - M, H - 19);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...C.BROWN);
+    doc.text("Thank you for supporting Pirampady Sports Club.", W / 2, H - 13, { align: "center" });
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7.2); doc.setTextColor(...C.GREY);
+    doc.text("This slip shows only your own payments. Receipt numbers can be checked with the club.", W / 2, H - 8.5, { align: "center" });
+  }
+  function buildSlipPdf(list) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
+    list.forEach((m, n) => { if (n) doc.addPage("a5", "portrait"); drawSlip(doc, m); });
+    return doc.output("blob");
+  }
+  // One A6 receipt for a single payment.
+  function buildReceiptPdf(m, i, p) {
+    const C = PDF_C, { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a6" });
+    const W = 105, H = 148, M = 9, y = S.year, fee = feeFor(y), a = amt(m.id, i);
+    slipWatermark(doc, W, 52, 70);
+    const LOGO = pdfLogo();
+    if (LOGO) doc.addImage(LOGO, "JPEG", (W - 22) / 2, 6, 22, 22 * 372 / 420);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(12.5); doc.setTextColor(...C.BROWN);
+    doc.text("PIRAMPADY SPORTS CLUB", W / 2, LOGO ? 31 : 14, { align: "center" });
+    let yy = LOGO ? 35 : 18;
+    doc.setFillColor(...C.BROWN); doc.rect(M, yy, W - 2 * M, 7.5, "F");
+    doc.setFontSize(9); doc.setTextColor(255, 255, 255); doc.text("PAYMENT RECEIPT", W / 2, yy + 5.1, { align: "center", charSpace: 0.6 });
+    yy += 13;
+    const line = (label, value, opts) => {
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...C.GREY); doc.text(label, M + 1, yy);
+      doc.setFont("helvetica", "bold"); doc.setFontSize((opts && opts.size) || 10); doc.setTextColor(...((opts && opts.color) || C.INK));
+      doc.text(value, W - M - 1, yy, { align: "right" });
+      yy += (opts && opts.gap) || 6.3;
+    };
+    line("Receipt no.", p.r || "-");
+    line("Date", p.t ? longDate(p.t) : issuedToday());
+    line("Received from", m.name);
+    line("For", `${MONTHS_FULL[i]} ${y} subscription`, { size: 9 });
+    yy += 2;
+    doc.setFillColor(...C.CREAM); doc.roundedRect(M, yy - 5, W - 2 * M, 15, 2, 2, "F");
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...C.GREY); doc.text("AMOUNT RECEIVED", M + 4, yy + 0.5);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(17); doc.setTextColor(...C.INK); doc.text(`Rs. ${fmt(p.a)}.00`, W - M - 4, yy + 5.5, { align: "right" });
+    yy += 17;
+    let monthTxt, monthCol;
+    if (a === fee) { monthTxt = "Paid in full"; monthCol = C.GREEN; }
+    else if (a < fee) { monthTxt = `Rs. ${fmt(a)} of ${fmt(fee)} paid · Rs. ${fmt(fee - a)} left`; monthCol = C.AMBER; }
+    else { monthTxt = `Rs. ${fmt(a)} paid (Rs. ${fmt(a - fee)} extra)`; monthCol = C.BLUE; }
+    line(`${MONTHS_FULL[i]}`, monthTxt, { size: 8.5, color: monthCol });
+    const d = dueOf(m, y), r = owedRange(m, y);
+    if (r) line(d.due > 0 ? `Still to pay (to ${MONTHS[r[1]]})` : "Balance", d.due > 0 ? `Rs. ${fmt(d.due)}` : d.due < 0 ? `Rs. ${fmt(-d.due)} ahead` : "All paid up", { size: 8.5, color: d.due > 0 ? C.RED : C.GREEN });
+    if (p.c) line("Collected by", p.c, { size: 9 });
+    // signature
+    yy = Math.max(yy + 4, H - 27);
+    doc.setDrawColor(...C.GREY); doc.setLineWidth(0.25); doc.setLineDashPattern([0.8, 0.8], 0); doc.line(W - M - 40, yy, W - M, yy); doc.setLineDashPattern([], 0);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...C.GREY); doc.text("Collector's signature", W - M - 20, yy + 3.8, { align: "center" });
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...C.BROWN);
+    doc.text("Thank you!", W / 2, H - 9, { align: "center" });
+    return doc.output("blob");
+  }
+  function sharePdf(blob, name) {
+    if (typeof deliverFile !== "function") { toast("PDFs can't be shared from here."); return; }
+    deliverFile(blob, name, "application/pdf", true).then((how) => {
+      if (how === "downloaded") toast("PDF saved to your Downloads. Attach it in the member's WhatsApp chat.");
+    }).catch(() => toast("The PDF couldn't be shared. Try again."));
+  }
+  function sendSlipPdf(m) {
+    if (!pdfReady()) { toast("The PDF maker didn't load. Close and reopen the app."); return; }
+    sharePdf(buildSlipPdf([m]), `Pirampady_SC_slip_${safeName(m.name)}_${S.year}.pdf`);
+    markSent(m.id);
+  }
+
   async function downloadPdf() {
     if (!S.membersLoaded || !S.payLoaded) { toast("Wait for the register to finish loading."); return; }
     if (!window.jspdf || !window.jspdf.jsPDF || !window.jspdf.jsPDF.API.autoTable) { toast("The PDF maker didn't load. Check your connection and reload the page."); return; }
@@ -1588,7 +1778,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.2.1";
+  const APP_VERSION = "1.3.0";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty";
   const SEED = {};
