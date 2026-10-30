@@ -948,6 +948,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       const d = raw[k];
       if (!d || d._deleted || typeof d.year !== "number" || !d.member) continue;
       (idx[d.member] = idx[d.member] || {})[d.year] = d.m || {};
+      ((idx._h = idx._h || {})[d.member] = idx._h[d.member] || {})[d.year] = d.h || {};
     }
     payIdx = idx;
     return idx;
@@ -1035,7 +1036,38 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
   // money used for month i (what it was paid for, plus extra carried in from earlier months)
   function monthTotal(i) { let t = 0; for (const m of yearMembers()) t += cov(m, i).covered; return t; }
   // money paid above the fee up to the end of month i, kept for later months (not counted yet)
-  function heldAfter(i) { let t = 0; for (const m of allMembers()) { const c = cov(m, i); t += c.cout; } return t; }
+  // the separate payments recorded for a member and month, each with the date it was received (if known)
+  function partsAt(mid, y, k) {
+    if (y === S.year) return partsOf(mid, k);
+    const hh = payIndex()._h, h = hh && hh[mid] && hh[mid][y] && hh[mid][y][k], tot = cashOf(mid, y, k);
+    if (Array.isArray(h) && h.length) return h.filter((x) => x && x.a > 0).map((x) => ({ a: x.a, t: x.t || null }));
+    return tot ? [{ a: tot, t: null }] : [];
+  }
+  // Money paid in advance that was in hand at the end of month i of year y: everything received by then
+  // (by its date, or the month it was recorded for when it has no date) that isn't used for month i or earlier.
+  function heldAt(y, i) {
+    const end = y * 12 + i;
+    let t = 0;
+    for (const m of allMembers()) {
+      const f = firstYear(m), r = payIndex()[m.id] || {};
+      let last = y;
+      for (const yy in r) if (+yy > last) last = +yy;
+      if (S.year > last) last = S.year;
+      let received = 0, used = 0;
+      for (let yy = f; yy <= last; yy++) {
+        const cv = yy <= y ? coverage(m, yy) : null;
+        for (let k = 0; k < 12; k++) {
+          for (const p of partsAt(m.id, yy, k)) {
+            const when = p.t && /^\d{4}-\d{2}/.test(p.t) ? (+p.t.slice(0, 4)) * 12 + (+p.t.slice(5, 7) - 1) : yy * 12 + k;
+            if (when <= end) received += p.a;
+          }
+          if (cv && yy * 12 + k <= end) used += cv[k].covered;
+        }
+      }
+      if (received > used) t += received - used;
+    }
+    return t;
+  }
 
   /* ---------- rendering ---------- */
   function render() {
@@ -1094,14 +1126,15 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     const spent = elecSum + expSum;
     // money in hand: everything collected minus everything spent, up to the end of this year (earlier years included)
     // cash actually held up to the end of this year (earlier years included); part of it may be paid ahead for later
-    const bal = cashBalanceBefore(S.year, 12), earlier = cashBalanceBefore(S.year, 0), ahead = bal - balanceBefore(S.year, 12);
+    const bal = cashBalanceBefore(S.year, 12), earlier = cashBalanceBefore(S.year, 0);
+    const ahead = S.year === CY ? heldAt(CY, CM) : bal - balanceBefore(S.year, 12);
     const thisMonth = S.year === CY ? `Rs. ${fmt(monthTotal(CM))} in ${MONTHS_FULL[CM]}` : `in ${S.year}`;
     const span = countedLabel(S.year);
     const dueSub = S.year > CY || !span ? "Nothing due yet" : behind ? `${behind} member${behind > 1 ? "s" : ""} behind · ${span}${fromBefore ? " + earlier" : ""} counted` : `Everyone is paid up · ${span}`;
     el.innerHTML = `
       <div class="stat"><span class="lbl">Collected · ${S.year}</span><strong>${rs(collected)}</strong><span class="sub">${thisMonth}</span></div>
       <div class="stat"><span class="lbl">Spent · ${S.year}</span><strong>${rs(spent)}</strong><span class="sub">Electricity ${rs(elecSum)} · Other ${rs(expSum)}</span></div>
-      <div class="stat is-bal"><span class="lbl">Balance in hand</span><strong${bal < 0 ? ' style="color:var(--due)"' : ""}>${bal < 0 ? "−" : ""}${rs(Math.abs(bal))}</strong><span class="sub">${[earlier ? `Incl. ${rsSigned(earlier)} from before ${S.year}` : "", ahead > 0 ? `Incl. ${rs(ahead)} paid ahead for next year` : ""].filter(Boolean).join(" · ") || "Collected minus spending"}</span></div>
+      <div class="stat is-bal"><span class="lbl">Balance in hand</span><strong${bal < 0 ? ' style="color:var(--due)"' : ""}>${bal < 0 ? "−" : ""}${rs(Math.abs(bal))}</strong><span class="sub">${[earlier ? `Incl. ${rsSigned(earlier)} from before ${S.year}` : "", ahead > 0 ? `Incl. ${rs(ahead)} paid in advance` : ""].filter(Boolean).join(" · ") || "Collected minus spending"}</span></div>
       <div class="stat is-due"><span class="lbl">Still due</span><strong>${rs(dueSum)}</strong><span class="sub">${dueSub}</span></div>`;
   }
 
@@ -2519,8 +2552,16 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
         if (c.raw && c.raw.tick) drawTick(doc, c.x + 3.6, c.y + c.height / 2, 3, c.raw.tick);
       },
     });
-    // totals
+    // totals: if a long list of payments leaves no room for them and the signature, they go on a second page
     let ty = doc.lastAutoTable.finalY + 7;
+    const by = [...new Set([...months].flatMap((k) => partsOf(m.id, k).map((p) => p.c).filter(Boolean)))];
+    const rowsN = (d.bf ? 1 : 0) + 1 + (om.length || d.due !== 0 || offs.length ? 1 : 0);
+    if (ty + rowsN * 6.5 + (by.length ? 5 : 0) > H - 38) {
+      doc.addPage("a5", "portrait"); slipWatermark(doc, W, 78, 96);
+      slipHeader(doc, W, M, `Subscription slip  \u00B7  ${y}  (continued)`);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(13); doc.setTextColor(...C.INK); doc.text(m.name, M + 2, 48);
+      ty = 58;
+    }
     const row = (label, value, color, bold) => {
       doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setFontSize(10); doc.setTextColor(...C.INK);
       doc.text(label, M + 2, ty);
@@ -2537,7 +2578,6 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     } else if (d.due < 0) row(`Paid ahead`, `Rs. ${fmt(-d.due)}`, C.BLUE, true);
     else if (d.due > 0) row(`Still to pay`, `Rs. ${fmt(d.due)}`, C.RED, true);
     else if (offs.length) row("No fee counted", "Rs. 0", C.GREY, false);
-    const by = [...new Set([...months].flatMap((k) => partsOf(m.id, k).map((p) => p.c).filter(Boolean)))];
     if (by.length) { doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...C.GREY); doc.text(`Collected by: ${by.join(", ")}`, M + 2, ty); ty += 5; }
     // signature block, bottom right above the footer
     const sy = Math.max(ty + 15, H - 27);
@@ -2574,11 +2614,16 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     doc.setFillColor(...C.BROWN); doc.rect(M, yy, W - 2 * M, 7.5, "F");
     doc.setFontSize(9); doc.setTextColor(255, 255, 255); doc.text("PAYMENT RECEIPT", W / 2, yy + 5.1, { align: "center", charSpace: 0.6 });
     yy += 13;
+    // label on the left, value on the right; a long value gets smaller, then wraps onto a second line
     const line = (label, value, opts) => {
       doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...C.GREY); doc.text(label, M + 1, yy);
-      doc.setFont("helvetica", "bold"); doc.setFontSize((opts && opts.size) || 10); doc.setTextColor(...((opts && opts.color) || C.INK));
-      doc.text(value, W - M - 1, yy, { align: "right" });
-      yy += (opts && opts.gap) || 6.3;
+      const room = W - 2 * M - 4 - doc.getTextWidth(label);
+      let size = (opts && opts.size) || 10;
+      doc.setFont("helvetica", "bold"); doc.setFontSize(size); doc.setTextColor(...((opts && opts.color) || C.INK));
+      while (doc.getTextWidth(String(value)) > room && size > 7.5) { size -= 0.5; doc.setFontSize(size); }
+      const parts = doc.getTextWidth(String(value)) > room ? doc.splitTextToSize(String(value), room).slice(0, 2) : [String(value)];
+      parts.forEach((t, n) => doc.text(t, W - M - 1, yy + n * 3.8, { align: "right" }));
+      yy += ((opts && opts.gap) || 6.3) + (parts.length - 1) * 3.8;
     };
     line("Receipt no.", p.r || "-");
     line("Date", p.t ? longDate(p.t) : issuedToday());
@@ -2714,7 +2759,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       ["+", `Collected for ${MONTHS_FULL[i]}`, `Rs. ${fmt(st.collected)}`],
       ["\u2013", `Electricity bill (${MONTHS_FULL[i]})`, `Rs. ${fmt(e.amount)}`],
       ...(exps.length > 6
-        ? EXP_CATS.map(([c, n]) => { const t = exps.filter((x) => (x.cat || "other") === c).reduce((a, x) => a + x.amount, 0); return t ? ["\u2013", `${n} (${exps.filter((x) => (x.cat || "other") === c).length} items)`, `Rs. ${fmt(t)}`] : null; }).filter(Boolean)
+        ? EXP_CATS.map(([c, n]) => { const t = exps.filter((x) => (x.cat || "other") === c).reduce((a, x) => a + x.amount, 0); const cnt = exps.filter((x) => (x.cat || "other") === c).length; return t ? ["\u2013", `${n} (${cnt} ${cnt === 1 ? "bill" : "bills"})`, `Rs. ${fmt(t)}`] : null; }).filter(Boolean)
         : exps.map((x) => ["\u2013", `${catName(x.cat)}: ${x.desc || "-"}${x.t ? ` (${dayLabel(x.t)})` : ""}`, `Rs. ${fmt(x.amount)}`])),
     ];
     doc.autoTable({
@@ -2731,13 +2776,14 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     doc.text(`Balance in hand (end of ${MONTHS_FULL[i]})`, M + 9, ty + 7.3);
     doc.text(`Rs. ${closing < 0 ? "-" : ""}${fmt(Math.abs(closing))}`, W - M - 3, ty + 7.3, { align: "right" });
     ty += 11;
-    // extra paid ahead is held too, but it belongs to later months, so it is shown here and not in the balance
-    const held = heldAfter(i);
+    // money paid in advance is in hand too, but belongs to later months: shown under the balance, so the cash adds up
+    const held = heldAt(y, i);
     if (held > 0) {
-      ty += 4.5;
-      doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...C.BLUE);
-      doc.text(`Also held: Rs. ${fmt(held)} paid in advance. It is counted in the month it is for.`, M + 2, ty);
-      ty += 1;
+      doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...C.BLUE);
+      doc.text("+", M + 3.5, ty + 5.5); doc.text("Paid in advance for later months", M + 9, ty + 5.5); doc.text(`Rs. ${fmt(held)}`, W - M - 3, ty + 5.5, { align: "right" });
+      doc.setFont("helvetica", "bold"); doc.setTextColor(...C.INK);
+      doc.text("=", M + 3.5, ty + 11); doc.text(`Cash in hand (end of ${MONTHS_FULL[i]})`, M + 9, ty + 11); doc.text(`Rs. ${closing + held < 0 ? "-" : ""}${fmt(Math.abs(closing + held))}`, W - M - 3, ty + 11, { align: "right" });
+      ty += 13;
     }
     // signatures: always printed; the footer gets smaller, or the signatures move to a new page, if space is short
     let footTop = H - 19, compact = false;
@@ -2761,13 +2807,25 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     return doc.output("blob");
   }
   // A6 bill for one club expense, with the balance before and after.
+  // One expense bill: what was bought, the total, and the club balance worked out step by step.
+  // Always one page: A6 width, and the page grows taller when a bill has many items.
   function buildExpenseVoucher(x) {
     const C = PDF_C, { jsPDF } = window.jspdf;
-    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a6" });
-    const W = 105, H = 148, M = 9;
-    const after = expBalanceNow(x.month), before = after + x.amount;
-    slipWatermark(doc, W, 52, 70);
+    const items = expItemsOf(x), y = S.year, i = x.month, mon = MONTHS_FULL[i];
+    // the club balance for the bill's month, the same way the monthly account works it out
+    const opening = balanceBefore(y, i), collected = monthTotal(i), bill = elec(i).amount;
+    const others = expensesIn(i).filter((e) => e.id !== x.id), otherSum = others.reduce((t, e) => t + e.amount, 0);
+    const before = opening + collected - bill - otherSum, after = before - x.amount;
     const LOGO = pdfLogo();
+    const W = 105, M = 9, rowH = 5, calcH = 5;
+    const nLines = 3 + (items.length === 1 ? 1 : 0) + (x.to ? 1 : 0);
+    const itemsH = items.length > 1 ? 0.5 + 4.4 + items.length * rowH + 1 : 0;
+    const held = heldAt(y, i);
+    const calcRows = 6 + (otherSum ? 1 : 0) + (held > 0 ? 2 : 0);
+    const contentEnd = (LOGO ? 44.5 : 29.5) + nLines * 5.8 + itemsH + 1.5 + 14 + 4.6 + calcRows * calcH + 1.6;
+    const H = Math.max(148, Math.ceil(contentEnd + 20));
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [W, H] });
+    slipWatermark(doc, W, 52, 70);
     if (LOGO) doc.addImage(LOGO, "JPEG", (W - 20) / 2, 5, 20, 20 * 372 / 420);
     doc.setFont("helvetica", "bold"); doc.setFontSize(12); doc.setTextColor(...C.BROWN);
     doc.text("PIRAMPADY SPORTS CLUB", W / 2, LOGO ? 28.5 : 13, { align: "center" });
@@ -2775,58 +2833,56 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     doc.setFillColor(...C.BROWN); doc.rect(M, yy, W - 2 * M, 7.5, "F");
     doc.setFontSize(9); doc.setTextColor(255, 255, 255); doc.text("EXPENSE BILL", W / 2, yy + 5.1, { align: "center", charSpace: 0.6 });
     yy += 12.5;
-    const line = (label, value, opts) => {
+    const line = (label, value) => {
       doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...C.GREY); doc.text(label, M + 1, yy);
-      doc.setFont("helvetica", "bold"); doc.setFontSize((opts && opts.size) || 9.5); doc.setTextColor(...((opts && opts.color) || C.INK));
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9.5); doc.setTextColor(...C.INK);
       doc.text(doc.splitTextToSize(String(value), W - 2 * M - 30)[0], W - M - 1, yy, { align: "right" });
       yy += 5.8;
     };
     line("Bill no.", x.no || "-");
     line("Date", x.t ? longDate(x.t) : issuedToday());
     line("Type", catName(x.cat));
-    const items = expItemsOf(x);
     if (items.length === 1) line("For", items[0].d);
     if (x.to) line("Paid to", x.to);
     if (items.length > 1) {
-      // one line per item, then the total in the box below
       yy += 0.5;
       doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...C.BROWN); doc.text("ITEMS", M + 1, yy); yy += 4.4;
-      const rowH = items.length > 4 ? 4.3 : 5;
       items.forEach((it, n) => {
-        doc.setFont("helvetica", "normal"); doc.setFontSize(items.length > 4 ? 8 : 8.8); doc.setTextColor(...C.INK);
-        doc.text(`${n + 1}. ${doc.splitTextToSize(it.d, W - 2 * M - 30)[0]}`, M + 1.5, yy);
+        doc.setFont("helvetica", "normal"); doc.setFontSize(8.8); doc.setTextColor(...C.INK);
+        doc.text(`${n + 1}. ${doc.splitTextToSize(it.d, W - 2 * M - 32)[0]}`, M + 1.5, yy);
         doc.setFont("helvetica", "bold"); doc.text(`Rs. ${fmt(it.a)}`, W - M - 1, yy, { align: "right" });
         doc.setDrawColor(...C.LINE); doc.setLineWidth(0.15); doc.line(M + 1, yy + 1.4, W - M - 1, yy + 1.4);
         yy += rowH;
       });
       yy += 1;
     }
-    // the total, the club balance and the signatures need about 60 mm; start a new page if the items used it up
-    if (yy + 58 > H) {
-      doc.addPage("a6", "portrait"); slipWatermark(doc, W, 52, 70);
-      doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...C.BROWN);
-      doc.text(`PIRAMPADY SPORTS CLUB  \u00B7  Expense bill ${x.no || ""}`, W / 2, 11, { align: "center" });
-      doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...C.GREY);
-      doc.text(`continued: ${items.length} items, ${catName(x.cat)}`, W / 2, 15.5, { align: "center" });
-      yy = 24;
-    }
     yy += 1.5;
     doc.setFillColor(...C.CREAM); doc.roundedRect(M, yy - 4.5, W - 2 * M, 13, 2, 2, "F");
     doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...C.GREY); doc.text(items.length > 1 ? `TOTAL PAID (${items.length} ITEMS)` : "AMOUNT PAID", M + 4, yy + 0.5);
     doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.setTextColor(...C.INK); doc.text(`Rs. ${fmt(x.amount)}.00`, W - M - 4, yy + 5, { align: "right" });
     yy += 14;
-    // calculation
-    doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...C.BROWN); doc.text("CLUB BALANCE", M + 1, yy); yy += 4.6;
-    const calcRow = (sign, label, value, bold, color) => {
-      doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setFontSize(8.5); doc.setTextColor(...(color || C.INK));
-      doc.text(sign, M + 1.5, yy); doc.text(label, M + 6, yy); doc.text(value, W - M - 1, yy, { align: "right" }); yy += 5;
-    };
+    // calculation of the money in hand
+    doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...C.BROWN); doc.text(`CLUB BALANCE  ·  ${mon.toUpperCase()} ${y}`, M + 1, yy); yy += 4.6;
     const money = (n) => `Rs. ${n < 0 ? "-" : ""}${fmt(Math.abs(n))}`;
-    calcRow("", `Balance in hand before`, money(before));
-    calcRow("\u2013", `This bill`, money(x.amount));
-    doc.setDrawColor(...C.BROWN); doc.setLineWidth(0.4); doc.line(M, yy - 3.4, W - M, yy - 3.4); yy += 0.8;
-    calcRow("=", `Balance in hand after`, money(after), true, after < 0 ? C.RED : C.GREEN);
-    // signature
+    const calcRow = (sign, label, value, bold, color) => {
+      doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setFontSize(8.2); doc.setTextColor(...(color || C.INK));
+      doc.text(sign, M + 1.5, yy); doc.text(label, M + 6, yy); doc.text(value, W - M - 1, yy, { align: "right" }); yy += calcH;
+    };
+    const rule = () => { doc.setDrawColor(...C.BROWN); doc.setLineWidth(0.3); doc.line(M, yy - 3.4, W - M, yy - 3.4); yy += 0.8; };
+    calcRow("", `Brought forward (end of ${i > 0 ? MONTHS[i - 1] : `Dec ${y - 1}`})`, money(opening));
+    calcRow("+", `Collected for ${mon}`, money(collected));
+    calcRow("–", `Electricity bill (${mon})`, money(bill));
+    if (otherSum) calcRow("–", `Other bills in ${mon} (${others.length})`, money(otherSum));
+    rule();
+    calcRow("=", "Balance in hand before this bill", money(before), true);
+    calcRow("–", "This bill", money(x.amount));
+    rule();
+    calcRow("=", "Balance in hand after", money(after), true, after < 0 ? C.RED : C.GREEN);
+    if (held > 0) {
+      calcRow("+", "Paid in advance for later months", money(held), false, C.BLUE);
+      calcRow("=", `Cash in hand (end of ${mon})`, money(after + held), true);
+    }
+    // signatures
     yy = Math.max(yy + 13, H - 17);
     sigBlock(doc, W - M - 41, yy, 41, 11, 1, x.by ? `Paid by ${x.by}` : "Paid by the collector");
     if (checker()) sigBlock(doc, M, yy, 41, 11, 2, "Accounts checked by");
@@ -2943,7 +2999,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.9.3";
+  const APP_VERSION = "1.9.4";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty";
   const SEED = {};
