@@ -188,7 +188,15 @@ button:disabled { cursor: default; }
 .exp-item small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
 .sugs { display: flex; gap: 6px; flex-wrap: wrap; }
 .dlg form > *, .dlg .inner > *, .field, .inrow > * { min-width: 0; }
-input[type="date"] { min-width: 0; width: 100%; max-width: 100%; }
+input[type="date"] { min-width: 0; width: 100%; max-width: 100%; display: block; -webkit-appearance: none; appearance: none; }
+input[type="date"]::-webkit-date-and-time-value { text-align: left; }
+.exp-items { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.exp-items li { display: grid; grid-template-columns: minmax(0, 1fr) 104px 40px; gap: 6px; align-items: center; }
+.exp-items input { min-width: 0; width: 100%; }
+.exp-items .xi-del { width: 40px; height: 46px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); color: var(--due); font-size: 20px; line-height: 1; }
+.exp-items .xi-del[disabled] { visibility: hidden; }
+.exp-items .xi-total { display: flex; justify-content: space-between; padding: 4px 48px 0 4px; font-weight: 700; }
+.lbl2 small { font-weight: 500; }
 .field > input, .field > select { width: 100%; min-width: 0; }
 .bd-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
 .bd-card { width: 100%; display: grid; gap: 6px; text-align: left; padding: 12px 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); }
@@ -534,14 +542,12 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
       <div class="filter" id="expCats" role="group" aria-label="Expense type"></div>
     </div>
     <div class="field">
-      <label for="expDesc">What was it for?</label>
-      <input id="expDesc" autocomplete="off" placeholder="e.g. Football, grass cutting">
+      <span class="lbl2">What was bought or paid for? <small>One line per item</small></span>
+      <ul class="exp-items" id="expItems"></ul>
+      <button type="button" class="btn sm" id="expAddItem">+ Add another item</button>
       <div class="sugs" id="expSugs"></div>
     </div>
-    <div class="inrow">
-      <div class="field" style="flex:1;min-width:0"><label for="expAmt">Amount (Rs.)</label><input id="expAmt" inputmode="numeric" autocomplete="off" placeholder="e.g. 2500"></div>
-      <div class="field" style="flex:1;min-width:0"><label for="expDate">Paid on</label><input id="expDate" type="date"></div>
-    </div>
+    <div class="field"><label for="expDate">Paid on</label><input id="expDate" type="date"></div>
     <div class="field">
       <label for="expTo">Paid to (optional)</label>
       <input id="expTo" autocomplete="off" placeholder="e.g. shop name or person">
@@ -881,7 +887,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
   }
   /* ---------- expenses: ground maintenance, equipment, events, other ---------- */
   const EXP_CATS = [
-    ["ground", "Ground maintenance", ["Ground cleaning", "Grass cutting", "Line marking", "Repairs"]],
+    ["ground", "Ground maintenance", ["Grass cutting", "Petrol", "Broom stick", "Ground cleaning", "Line marking", "Repairs"]],
     ["equipment", "Sports equipment", ["Football", "Volleyball", "Volleyball net", "Football net", "Cricket ball", "Badminton shuttles"]],
     ["event", "Events & tournaments", ["Tournament entry fee", "Prizes", "Refreshments"]],
     ["other", "Other", []],
@@ -1628,11 +1634,26 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     const sug = (EXP_CATS.find((x) => x[0] === expCat) || EXP_CATS[3])[2];
     $("expSugs").innerHTML = sug.map((t) => `<button type="button" data-sug="${esc(t)}">${esc(t)}</button>`).join("");
   }
+  // the lines of the bill being written: [{ d: what it was for, a: amount as typed }]
+  let expRows = [{ d: "", a: "" }];
+  // the items of a saved expense (older expenses have one item: desc + amount)
+  const expItemsOf = (x) => (Array.isArray(x.items) && x.items.length ? x.items.filter((it) => it && it.a > 0) : [{ d: x.desc || catName(x.cat), a: x.amount }]);
+  const expTotalNow = () => expRows.reduce((t, r) => t + (parseAmt(r.a) || 0), 0);
+  function drawExpItems(focus) {
+    const one = expRows.length === 1;
+    $("expItems").innerHTML = expRows.map((r, k) => `<li>
+        <input class="xi-d" data-k="${k}" autocomplete="off" maxlength="60" value="${esc(r.d)}" placeholder="${k === 0 ? "e.g. Grass cutting" : "e.g. Petrol"}" aria-label="Item ${k + 1}: what for">
+        <input class="xi-a" data-k="${k}" inputmode="numeric" autocomplete="off" value="${esc(r.a)}" placeholder="Rs." aria-label="Item ${k + 1}: amount in rupees">
+        <button type="button" class="xi-del" data-xdel="${k}" aria-label="Remove item ${k + 1}"${one ? " disabled" : ""}>×</button>
+      </li>`).join("") + (one ? "" : `<li class="xi-total"><span>Total (${expRows.length} items)</span><span id="expItemsTotal">${rs(expTotalNow())}</span></li>`);
+    if (focus) { const el = $("expItems").querySelector(`.${focus.cls}[data-k="${focus.k}"]`); if (el) el.focus(); }
+  }
   function drawExpCalc() {
     if (!expCtx) return;
-    const v = parseAmt($("expAmt").value) || 0;
+    const v = expTotalNow();
     const before = expBalanceNow(expCtx.i, expCtx.id);
-    $("expCalc").innerHTML = `<div><span>Balance in hand (end of ${MONTHS_FULL[expCtx.i]})</span><span>${rsSigned(before)}</span></div><div><span>This expense</span><span>− Rs. ${fmt(v)}</span></div><div class="after"><span>Balance after</span><span style="color:${before - v < 0 ? "var(--due)" : "var(--ok)"}">${rsSigned(before - v)}</span></div>`;
+    const tot = $("expItemsTotal"); if (tot) tot.textContent = rs(v);
+    $("expCalc").innerHTML = `<div><span>Balance in hand (end of ${MONTHS_FULL[expCtx.i]})</span><span>${rsSigned(before)}</span></div><div><span>This bill${expRows.length > 1 ? ` (${expRows.length} items)` : ""}</span><span>− Rs. ${fmt(v)}</span></div><div class="after"><span>Balance after</span><span style="color:${before - v < 0 ? "var(--due)" : "var(--ok)"}">${rsSigned(before - v)}</span></div>`;
   }
   function openExpense(id, month) {
     if (!S.canWrite) return;
@@ -1643,24 +1664,50 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     expCat = x ? x.cat || "other" : "equipment";
     $("expWhen").textContent = `${MONTHS_FULL[i]} ${S.year}`;
     $("expTitle").textContent = x ? "Edit expense" : "Add expense";
-    $("expDesc").value = x ? x.desc || "" : "";
-    $("expAmt").value = x ? String(x.amount) : "";
+    expRows = x ? expItemsOf(x).map((it) => ({ d: it.d || "", a: String(it.a) })) : [{ d: "", a: "" }];
     $("expDate").value = x && x.t ? x.t : (S.year === CY && i === CM ? todayStr() : `${S.year}-${String(i + 1).padStart(2, "0")}-01`);
     $("expTo").value = x ? x.to || "" : "";
     $("expDel").hidden = !x;
     $("expErr").hidden = true;
-    drawExpCats(); drawExpCalc();
+    drawExpCats(); drawExpItems(); drawExpCalc();
     $("expDlg").showModal();
   }
   $("expCats").addEventListener("click", (ev) => { const b = ev.target.closest("[data-cat]"); if (!b) return; expCat = b.dataset.cat; drawExpCats(); });
-  $("expSugs").addEventListener("click", (ev) => { const b = ev.target.closest("[data-sug]"); if (!b) return; $("expDesc").value = b.dataset.sug; $("expAmt").focus(); });
-  $("expAmt").addEventListener("input", drawExpCalc);
+  // a quick pick fills the first empty line, or adds a new line
+  $("expSugs").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-sug]"); if (!b) return;
+    let k = expRows.findIndex((r) => !r.d.trim());
+    if (k < 0) { expRows.push({ d: "", a: "" }); k = expRows.length - 1; }
+    expRows[k].d = b.dataset.sug;
+    drawExpItems({ cls: "xi-a", k }); drawExpCalc();
+  });
+  $("expAddItem").addEventListener("click", () => { expRows.push({ d: "", a: "" }); drawExpItems({ cls: "xi-d", k: expRows.length - 1 }); drawExpCalc(); });
+  $("expItems").addEventListener("input", (ev) => {
+    const t = ev.target, k = +t.dataset.k;
+    if (!expRows[k]) return;
+    if (t.classList.contains("xi-d")) expRows[k].d = t.value;
+    if (t.classList.contains("xi-a")) { expRows[k].a = t.value; drawExpCalc(); }
+  });
+  $("expItems").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-xdel]"); if (!b || expRows.length < 2) return;
+    expRows.splice(+b.dataset.xdel, 1);
+    drawExpItems(); drawExpCalc();
+  });
+  $("expItems").addEventListener("keydown", (ev) => { if (ev.key === "Enter") { ev.preventDefault(); ev.target.blur(); } });
   function saveExpense() {
     if (!expCtx || expCtx.year !== S.year) return null;
-    const v = parseAmt($("expAmt").value), desc = $("expDesc").value.trim().replace(/\s+/g, " ").slice(0, 60);
-    if (!desc) { $("expErr").textContent = "Write what the money was for, for example “Football”."; $("expErr").hidden = false; $("expDesc").focus(); return null; }
-    if (!(v > 0)) { $("expErr").textContent = "Enter the amount in rupees, for example 2500."; $("expErr").hidden = false; $("expAmt").focus(); return null; }
-    if (v > 1000000) { $("expErr").textContent = "That amount looks too large. Check the number."; $("expErr").hidden = false; return null; }
+    const err = (msg, k, cls) => { $("expErr").textContent = msg; $("expErr").hidden = false; if (k != null) { const el = $("expItems").querySelector(`.${cls}[data-k="${k}"]`); if (el) el.focus(); } return null; };
+    const items = [];
+    for (let k = 0; k < expRows.length; k++) {
+      const d = expRows[k].d.trim().replace(/\s+/g, " ").slice(0, 60), raw = String(expRows[k].a).trim(), a = parseAmt(raw);
+      if (!d && !raw) continue;                       // an empty line is ignored
+      if (!d) return err(`Write what item ${k + 1} was for, for example “Petrol”.`, k, "xi-d");
+      if (!(a > 0)) return err(`Enter the amount for “${d}” in rupees, for example 500.`, k, "xi-a");
+      if (a > 1000000) return err(`The amount for “${d}” looks too large. Check the number.`, k, "xi-a");
+      items.push({ d, a });
+    }
+    if (!items.length) return err("Write what the money was for and how much, for example “Grass cutting” Rs. 4000.", 0, "xi-d");
+    const v = items.reduce((t, it) => t + it.a, 0), desc = items.map((it) => it.d).join(", ").slice(0, 200);
     let t = /^\d{4}-\d{2}-\d{2}$/.test($("expDate").value) ? $("expDate").value : todayStr();
     let month = expCtx.i;
     const [ty, tm] = t.split("-").map(Number);
@@ -1668,6 +1715,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     const id = expCtx.id || ("x" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5));
     const no = expCtx.no || newReceipt(S.year, month).replace("PSC-", "EXP-");
     const rec = { year: S.year, month, cat: expCat, desc, amount: v, t, no };
+    if (items.length > 1) rec.items = items;
     const to = $("expTo").value.trim().slice(0, 60);
     if (to) rec.to = to;
     const by = getCollector().trim();
@@ -2736,11 +2784,35 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     line("Bill no.", x.no || "-");
     line("Date", x.t ? longDate(x.t) : issuedToday());
     line("Type", catName(x.cat));
-    line("For", x.desc);
+    const items = expItemsOf(x);
+    if (items.length === 1) line("For", items[0].d);
     if (x.to) line("Paid to", x.to);
+    if (items.length > 1) {
+      // one line per item, then the total in the box below
+      yy += 0.5;
+      doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...C.BROWN); doc.text("ITEMS", M + 1, yy); yy += 4.4;
+      const rowH = items.length > 4 ? 4.3 : 5;
+      items.forEach((it, n) => {
+        doc.setFont("helvetica", "normal"); doc.setFontSize(items.length > 4 ? 8 : 8.8); doc.setTextColor(...C.INK);
+        doc.text(`${n + 1}. ${doc.splitTextToSize(it.d, W - 2 * M - 30)[0]}`, M + 1.5, yy);
+        doc.setFont("helvetica", "bold"); doc.text(`Rs. ${fmt(it.a)}`, W - M - 1, yy, { align: "right" });
+        doc.setDrawColor(...C.LINE); doc.setLineWidth(0.15); doc.line(M + 1, yy + 1.4, W - M - 1, yy + 1.4);
+        yy += rowH;
+      });
+      yy += 1;
+    }
+    // the total, the club balance and the signatures need about 60 mm; start a new page if the items used it up
+    if (yy + 58 > H) {
+      doc.addPage("a6", "portrait"); slipWatermark(doc, W, 52, 70);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...C.BROWN);
+      doc.text(`PIRAMPADY SPORTS CLUB  \u00B7  Expense bill ${x.no || ""}`, W / 2, 11, { align: "center" });
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...C.GREY);
+      doc.text(`continued: ${items.length} items, ${catName(x.cat)}`, W / 2, 15.5, { align: "center" });
+      yy = 24;
+    }
     yy += 1.5;
     doc.setFillColor(...C.CREAM); doc.roundedRect(M, yy - 4.5, W - 2 * M, 13, 2, 2, "F");
-    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...C.GREY); doc.text("AMOUNT PAID", M + 4, yy + 0.5);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...C.GREY); doc.text(items.length > 1 ? `TOTAL PAID (${items.length} ITEMS)` : "AMOUNT PAID", M + 4, yy + 0.5);
     doc.setFont("helvetica", "bold"); doc.setFontSize(16); doc.setTextColor(...C.INK); doc.text(`Rs. ${fmt(x.amount)}.00`, W - M - 4, yy + 5, { align: "right" });
     yy += 14;
     // calculation
@@ -2871,7 +2943,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.9.2";
+  const APP_VERSION = "1.9.3";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty";
   const SEED = {};
@@ -3343,7 +3415,8 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     }
     for (const k of Object.keys(st).filter((k) => k.startsWith("expenses/")).sort((a, b) => (st[a].year - st[b].year) || (st[a].month - st[b].month))) {
       const x = st[k];
-      if (x && x.amount > 0) rows.push(["Expense", x.year, MONTHS_FULL[x.month] || "", "", x.amount, x.t || "", [x.desc, x.to ? `paid to ${x.to}` : "", x.no].filter(Boolean).join(" · ")]);
+      const what = Array.isArray(x && x.items) && x.items.length > 1 ? x.items.map((it) => `${it.d} ${it.a}`).join(", ") : x && x.desc;
+      if (x && x.amount > 0) rows.push(["Expense", x.year, MONTHS_FULL[x.month] || "", "", x.amount, x.t || "", [what, x.to ? `paid to ${x.to}` : "", x.no].filter(Boolean).join(" · ")]);
     }
     for (const k of Object.keys(st).filter((k) => k.startsWith("birthdays/"))) {
       const b = st[k];
