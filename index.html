@@ -6,6 +6,7 @@
 <title>Pirampady SC Subscriptions</title>
 <meta name="description" content="Monthly subscription register for Pirampady Sports Club. Works offline and saves on this device.">
 <meta name="theme-color" content="#6B3A00">
+<script>try{var s=localStorage.getItem("psc.style");if(/^(floodlight|scoreboard|pearl)$/.test(s||""))document.documentElement.setAttribute("data-style",s)}catch(e){}</script>
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="Pirampady SC">
@@ -416,6 +417,167 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
 @media (prefers-reduced-motion: no-preference) {
   .mchip, .seg button, .cellbtn, .quick { transition: background-color .15s, color .15s, box-shadow .15s; }
 }
+
+/* ===================== App styles (Settings → App style; this device only) =====================
+   All three use the logo's colours: club brown #6B3A00, star gold #F8D000, and the white and grey of the ball.
+   Classic is everything above and follows the phone's light or dark mode. */
+
+/* ---------- Floodlight: a night stadium. Cocoa-black, a gold floodlight glow from the top, smoked-glass cards ---------- */
+html:root[data-style="floodlight"] {
+  color-scheme: dark;
+  --bg: #100903; --surface: #1C1209; --surface-2: #261A0F; --ink: #F8F0E3; --muted: #BCA992;
+  --line: #36261A; --line-strong: #5A432C;
+  --brand: #F8D000; --brand-ink: #1B1000; --brand-soft: #3A2C07; --gold: #F8D000;
+  --ok: #5ED58B; --ok-bg: #11301D; --warn: #FFB547; --warn-bg: #3A2608;
+  --adv: #80BBFF; --adv-bg: #12253E; --due: #FF8B80; --due-bg: #3E1914;
+  --scrim: rgba(4, 2, 0, .7); --toast-act: #6B3A00;
+  --shadow: 0 12px 32px rgba(0, 0, 0, .5);
+  --glass: rgba(28, 18, 9, .62); --edge: rgba(248, 208, 0, .2);
+}
+/* two floodlights over the pitch, and faint mown stripes */
+[data-style="floodlight"] body {
+  background:
+    radial-gradient(48% 34% at 6% -4%, rgba(255, 228, 120, .30), transparent 72%),
+    radial-gradient(48% 34% at 94% -4%, rgba(255, 228, 120, .30), transparent 72%),
+    radial-gradient(110% 60% at 50% -18%, rgba(248, 208, 0, .16), transparent 66%),
+    repeating-linear-gradient(180deg, rgba(255, 240, 200, .018) 0 64px, transparent 64px 128px),
+    var(--bg);
+}
+/* smoked glass with a glowing gold edge */
+[data-style="floodlight"] :is(.stat, .card, .bd-card) {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(180deg, rgba(255, 220, 110, .08), rgba(255, 220, 110, 0) 50%) padding-box,
+    linear-gradient(var(--glass), var(--glass)) padding-box,
+    linear-gradient(150deg, rgba(255, 228, 120, .6), rgba(248, 208, 0, .07) 36%, rgba(248, 208, 0, .04) 64%, rgba(255, 186, 60, .34)) border-box;
+  box-shadow: 0 18px 40px -24px rgba(0, 0, 0, .85), 0 0 30px -18px rgba(248, 208, 0, .35);
+  -webkit-backdrop-filter: blur(14px) saturate(140%); backdrop-filter: blur(14px) saturate(140%);
+}
+[data-style="floodlight"] .sheet .c-name { background: #1E140B; }
+[data-style="floodlight"] .brand h1 { background: linear-gradient(92deg, #FFE98A, #F8D000 45%, #E89F1E); -webkit-background-clip: text; background-clip: text; color: transparent; letter-spacing: .04em; }
+[data-style="floodlight"] .brand img { border-radius: 14px; box-shadow: 0 0 0 2px #F8D000, 0 0 26px rgba(248, 208, 0, .35); }
+[data-style="floodlight"] .btn.primary { background: linear-gradient(135deg, #FFE45A 0%, #F8D000 45%, #E6A100 100%); color: #1B1000; box-shadow: 0 8px 24px -8px rgba(248, 208, 0, .55), inset 0 1px 0 rgba(255, 255, 255, .45); }
+[data-style="floodlight"] :is(.btn:not(.primary), .yearstep, .filter button) { background: rgba(255, 240, 200, .04); border-color: var(--edge); }
+[data-style="floodlight"] .stat .lbl { color: #DCC6A2; }
+[data-style="floodlight"] .stat strong { color: #FFF6E0; text-shadow: 0 0 18px rgba(255, 236, 190, .16); }
+[data-style="floodlight"] .stat.is-bal strong { color: #F8D000; text-shadow: 0 0 22px rgba(248, 208, 0, .35); }
+[data-style="floodlight"] .stat.is-due strong { color: var(--due); text-shadow: 0 0 22px rgba(255, 139, 128, .25); }
+[data-style="floodlight"] .seg { background: rgba(255, 240, 200, .04); box-shadow: inset 0 0 0 1px var(--edge); }
+[data-style="floodlight"] .seg button[aria-selected="true"] { background: rgba(248, 208, 0, .14); color: #F8D000; box-shadow: inset 0 0 0 1px rgba(248, 208, 0, .4); }
+[data-style="floodlight"] .mchip { background: var(--glass); border-color: var(--edge); }
+[data-style="floodlight"] .mchip.is-now { border-color: #F8D000; box-shadow: 0 0 16px rgba(248, 208, 0, .25); }
+[data-style="floodlight"] .mchip[aria-pressed="true"] { background: linear-gradient(160deg, #FFE45A, #F8D000 55%, #E6A100); color: #1B1000; border-color: transparent; box-shadow: 0 8px 22px -8px rgba(248, 208, 0, .6); }
+[data-style="floodlight"] .mchip .bar i { background: linear-gradient(90deg, #5ED58B, #B9F29C); }
+[data-style="floodlight"] .mchip[aria-pressed="true"] .bar i { background: #1B1000; }
+[data-style="floodlight"] .fig { background: rgba(255, 240, 200, .045); box-shadow: inset 0 0 0 1px rgba(248, 208, 0, .08); }
+[data-style="floodlight"] .sheet thead th, [data-style="floodlight"] .sheet thead .c-name { background: #2A1A0C; color: #F8D000; box-shadow: inset 0 -1px 0 rgba(248, 208, 0, .4); }
+[data-style="floodlight"] dialog.dlg { background: #1A1008; box-shadow: 0 0 0 1px var(--edge), 0 -10px 60px rgba(0, 0, 0, .6); }
+[data-style="floodlight"] dialog.dlg::backdrop { background: rgba(6, 3, 0, .72); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); }
+
+/* ---------- Scoreboard: match-day kit. Deep club brown, gold scoreboard bars, kit-cut corners ---------- */
+html:root[data-style="scoreboard"] {
+  color-scheme: dark;
+  --bg: #1F0F01; --surface: #2C1704; --surface-2: #371E07; --ink: #FFF8EE; --muted: #D2B999;
+  --line: #4D2D0E; --line-strong: #74471A;
+  --brand: #F8D000; --brand-ink: #241200; --brand-soft: #4A3204; --gold: #F8D000;
+  --ok: #6BE09A; --ok-bg: #173A22; --warn: #FFC15C; --warn-bg: #4A2F08;
+  --adv: #8CC4FF; --adv-bg: #162C48; --due: #FF958A; --due-bg: #4A1D16;
+  --scrim: rgba(10, 4, 0, .72); --toast-act: #6B3A00;
+  --shadow: 0 10px 26px rgba(0, 0, 0, .45);
+  --cut: 18px 4px 18px 4px; --cut-sm: 12px 3px 12px 3px;
+}
+[data-style="scoreboard"] body {
+  background:
+    repeating-linear-gradient(135deg, rgba(255, 255, 255, .028) 0 2px, transparent 2px 16px),
+    linear-gradient(180deg, #2C1604 0, var(--bg) 360px) var(--bg);
+}
+[data-style="scoreboard"] .top { padding-bottom: 14px; background: repeating-linear-gradient(135deg, #F8D000 0 7px, transparent 7px 13px) bottom / 100% 4px no-repeat; }
+[data-style="scoreboard"] .brand h1 { color: #F8D000; letter-spacing: .04em; }
+[data-style="scoreboard"] .brand img { border-radius: 16px 4px 16px 4px; }
+[data-style="scoreboard"] :is(.stat, .card, .bd-card) { border-radius: var(--cut); background: linear-gradient(180deg, #341B05, #2A1604); border-color: var(--line); }
+[data-style="scoreboard"] .stat { border-left: 4px solid #F8D000; }
+[data-style="scoreboard"] .stat .lbl { color: #F8D000; letter-spacing: .1em; }
+[data-style="scoreboard"] .stat strong { color: #FFFFFF; letter-spacing: .01em; }
+[data-style="scoreboard"] .stat.is-bal strong { color: #F8D000; }
+[data-style="scoreboard"] .stat.is-due strong { color: var(--due); }
+[data-style="scoreboard"] :is(.btn, .yearstep, .mchip, .fig, .exp-item, .sliplist li, .filter button, .quick) { border-radius: var(--cut-sm); }
+[data-style="scoreboard"] .btn.primary { background: repeating-linear-gradient(135deg, #F8D000 0 14px, #EAC100 14px 28px); color: #241200; text-transform: uppercase; letter-spacing: .05em; font-weight: 700; }
+[data-style="scoreboard"] .seg { border-radius: var(--cut-sm); background: #2C1704; box-shadow: inset 0 0 0 1px var(--line); }
+[data-style="scoreboard"] .seg button { border-radius: 9px 2px 9px 2px; }
+[data-style="scoreboard"] .seg button[aria-selected="true"] { background: #F8D000; color: #241200; }
+[data-style="scoreboard"] .mchip[aria-pressed="true"] { background: #F8D000; color: #241200; border-color: #F8D000; }
+[data-style="scoreboard"] .mchip[aria-pressed="true"] .bar i { background: #241200; }
+[data-style="scoreboard"] .mchip.is-now { border-color: #F8D000; border-width: 2px; }
+[data-style="scoreboard"] .msum-head h2 { text-transform: uppercase; letter-spacing: .03em; }
+[data-style="scoreboard"] .fig b { color: #FFFFFF; }
+[data-style="scoreboard"] .sheet thead th, [data-style="scoreboard"] .sheet thead .c-name { background: #F8D000; color: #241200; font-weight: 700; }
+[data-style="scoreboard"] .sheet thead th.is-now::after { background: #6B3A00; }
+[data-style="scoreboard"] dialog.dlg { border-radius: 22px 6px 22px 6px; box-shadow: 0 0 0 1px var(--line-strong), var(--shadow); }
+@media (max-width: 600px) { [data-style="scoreboard"] dialog.dlg { border-radius: 22px 6px 0 0; } }
+
+/* ---------- Pearl: light and airy. Pearl grey from the ball, frosted white glass, brown and gold gradients ---------- */
+html:root[data-style="pearl"] {
+  color-scheme: light;
+  --bg: #ECEEF2; --surface: #FFFFFF; --surface-2: #F5F6F9; --ink: #23150A; --muted: #67605A;
+  --line: #E0E1E7; --line-strong: #C8C5C6;
+  --brand: #6B3A00; --brand-ink: #FFFFFF; --brand-soft: #F2E7D3; --gold: #D9A600;
+  --ok: #157A3A; --ok-bg: #DCF2E3; --warn: #8C5000; --warn-bg: #FAEACB;
+  --adv: #1A5DAD; --adv-bg: #DEE9F8; --due: #B0251C; --due-bg: #FBE3E0;
+  --scrim: rgba(35, 21, 10, .35); --toast-act: #F8D000;
+  --shadow: 0 1px 2px rgba(60, 40, 20, .06), 0 14px 34px -14px rgba(60, 40, 20, .24);
+}
+/* a soft mesh: star gold, club brown and the grey of the ball */
+[data-style="pearl"] body {
+  background:
+    radial-gradient(70% 42% at 100% 0%, rgba(248, 208, 0, .26), transparent 70%),
+    radial-gradient(55% 38% at 0% 22%, rgba(168, 168, 192, .32), transparent 70%),
+    radial-gradient(60% 40% at 0% 100%, rgba(107, 58, 0, .12), transparent 70%),
+    var(--bg);
+}
+/* frosted glass with a gold-tinted pearl edge */
+[data-style="pearl"] :is(.stat, .card, .bd-card) {
+  border: 1px solid transparent;
+  background:
+    linear-gradient(rgba(255, 255, 255, .82), rgba(255, 255, 255, .82)) padding-box,
+    linear-gradient(150deg, #FFFFFF, rgba(248, 208, 0, .5) 42%, rgba(255, 255, 255, .95) 68%, rgba(107, 58, 0, .22)) border-box;
+  box-shadow: var(--shadow);
+  -webkit-backdrop-filter: blur(16px) saturate(160%); backdrop-filter: blur(16px) saturate(160%);
+}
+[data-style="pearl"] .brand h1 { background: linear-gradient(95deg, #6B3A00, #9A5300 55%, #B98600); -webkit-background-clip: text; background-clip: text; color: transparent; }
+[data-style="pearl"] .brand img { border-radius: 14px; box-shadow: 0 8px 22px -10px rgba(107, 58, 0, .5); }
+[data-style="pearl"] .btn.primary { background: linear-gradient(135deg, #8A4B05, #6B3A00 50%, #4A2700); box-shadow: 0 10px 24px -10px rgba(107, 58, 0, .6), inset 0 1px 0 rgba(255, 220, 140, .35); }
+[data-style="pearl"] :is(.btn:not(.primary), .yearstep) { background: rgba(255, 255, 255, .75); border-color: rgba(200, 197, 198, .8); }
+[data-style="pearl"] .stat.is-bal strong { background: linear-gradient(95deg, #6B3A00, #A87400); -webkit-background-clip: text; background-clip: text; color: transparent; }
+[data-style="pearl"] .seg { background: rgba(255, 255, 255, .55); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .9); }
+[data-style="pearl"] .mchip { background: rgba(255, 255, 255, .75); border-color: rgba(255, 255, 255, .95); box-shadow: 0 6px 16px -10px rgba(60, 40, 20, .35); }
+[data-style="pearl"] .mchip.is-now { box-shadow: 0 0 0 2px #F8D000, 0 6px 16px -10px rgba(60, 40, 20, .35); }
+[data-style="pearl"] .mchip[aria-pressed="true"] { background: linear-gradient(160deg, #7A4300, #5A3000); border-color: transparent; }
+[data-style="pearl"] .mchip[aria-pressed="true"] .bar i { background: #F8D000; }
+[data-style="pearl"] .fig { background: rgba(236, 238, 242, .7); }
+[data-style="pearl"] .sheet thead th, [data-style="pearl"] .sheet thead .c-name { background: linear-gradient(180deg, #7A4300, #5E3200); }
+
+/* the style picker in Settings: each choice shows a small swatch of its own colours */
+.stylepick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.styleopt { display: grid; gap: 4px; padding: 6px 6px 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); text-align: left; min-width: 0; }
+.styleopt b { font-size: 14px; padding: 0 4px; }
+.styleopt small { font-size: 12px; color: var(--muted); padding: 0 4px; line-height: 1.25; }
+.styleopt[aria-pressed="true"] { border-color: var(--brand); box-shadow: 0 0 0 2px var(--brand-soft); }
+.sw { position: relative; display: block; height: 58px; border-radius: 8px; overflow: hidden; }
+.sw i { position: absolute; display: block; }
+.sw i:nth-child(1) { left: 8px; right: 34%; top: 10px; height: 18px; border-radius: 5px; }
+.sw i:nth-child(2) { left: 8px; width: 42%; bottom: 9px; height: 11px; border-radius: 4px; }
+.sw-classic { background: linear-gradient(135deg, #F6F3EF 50%, #14100C 50%); }
+.sw-classic i:nth-child(1) { background: #FFFFFF; box-shadow: 0 0 0 1px #E6DED4; }
+.sw-classic i:nth-child(2) { background: #6B3A00; }
+.sw-floodlight { background: radial-gradient(60% 70% at 10% -10%, rgba(255, 228, 120, .5), transparent 70%), radial-gradient(60% 70% at 90% -10%, rgba(255, 228, 120, .5), transparent 70%), #100903; }
+.sw-floodlight i:nth-child(1) { background: rgba(40, 26, 12, .85); box-shadow: inset 0 0 0 1px rgba(248, 208, 0, .3); }
+.sw-floodlight i:nth-child(2) { background: linear-gradient(135deg, #FFE45A, #F8D000 50%, #E6A100); box-shadow: 0 0 10px rgba(248, 208, 0, .6); }
+.sw-scoreboard { background: repeating-linear-gradient(135deg, rgba(255, 255, 255, .05) 0 2px, transparent 2px 9px), #1F0F01; }
+.sw-scoreboard i:nth-child(1) { background: #341B05; box-shadow: inset 3px 0 0 #F8D000; border-radius: 9px 2px 9px 2px; }
+.sw-scoreboard i:nth-child(2) { background: repeating-linear-gradient(135deg, #F8D000 0 6px, #EAC100 6px 12px); border-radius: 7px 2px 7px 2px; }
+.sw-pearl { background: radial-gradient(80% 90% at 100% 0%, rgba(248, 208, 0, .4), transparent 70%), #ECEEF2; }
+.sw-pearl i:nth-child(1) { background: rgba(255, 255, 255, .9); box-shadow: 0 4px 10px -4px rgba(60, 40, 20, .35); }
+.sw-pearl i:nth-child(2) { background: linear-gradient(135deg, #8A4B05, #4A2700); }
 </style>
 </head>
 <body>
@@ -629,6 +791,11 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     <div class="dlg-head">
       <div><p class="eyebrow">Register</p><h3 id="setTitle">Settings</h3></div>
       <button type="button" class="close" data-close aria-label="Close">×</button>
+    </div>
+    <div class="field">
+      <span class="lbl2">App style</span>
+      <div class="stylepick" id="stylePick"></div>
+      <p class="hint">Changes how the app looks on this device only. PDFs keep the club colours.</p>
     </div>
     <div class="field">
       <span class="lbl2">Monthly fee (Rs.)</span>
@@ -2226,6 +2393,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     const sch = feeSchedule();
     feeRows = sch.length ? sch.map((e) => ({ y: e.y, m: e.m, fee: String(e.fee) })) : [{ y: st.start.y, m: st.start.m, fee: String(DEFAULT_FEE) }];
     drawFeeRows();
+    drawStylePick();
     $("startM").innerHTML = MONTHS_FULL.map((n, k) => `<option value="${k}"${k === st.start.m ? " selected" : ""}>${n}</option>`).join("");
     let ys = "";
     for (let y = CY - 3; y <= CY + 1; y++) ys += `<option value="${y}"${y === st.start.y ? " selected" : ""}>${y}</option>`;
@@ -2238,6 +2406,32 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
     drawSigChoices();
     $("setDlg").showModal();
   }
+  /* ---------- app style (this device only) ---------- */
+  const STYLES = [
+    ["classic", "Classic", "Follows your phone's light or dark mode"],
+    ["floodlight", "Floodlight", "Night stadium glow in club gold"],
+    ["scoreboard", "Scoreboard", "Match-day kit, bold gold bars"],
+    ["pearl", "Pearl", "Light frosted glass, brown and gold"],
+  ];
+  function currentStyle() { try { const v = localStorage.getItem("psc.style"); return STYLES.some((x) => x[0] === v) ? v : "classic"; } catch (e) { return "classic"; } }
+  function applyStyle(name) {
+    const root = document.documentElement;
+    if (name && name !== "classic") root.setAttribute("data-style", name); else root.removeAttribute("data-style");
+    // the browser bar takes the style's background (Classic keeps the club brown)
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if (meta) meta.setAttribute("content", name && name !== "classic" ? getComputedStyle(document.body).backgroundColor : "#6B3A00");
+  }
+  function drawStylePick() {
+    const cur = currentStyle();
+    $("stylePick").innerHTML = STYLES.map(([id, name, note]) => `<button type="button" class="styleopt" data-style-pick="${id}" aria-pressed="${id === cur}"><span class="sw sw-${id}" aria-hidden="true"><i></i><i></i></span><b>${name}</b><small>${note}</small></button>`).join("");
+  }
+  $("stylePick").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-style-pick]"); if (!b) return;
+    const id = b.dataset.stylePick;
+    try { localStorage.setItem("psc.style", id); } catch (e) {}
+    applyStyle(id); drawStylePick();
+  });
+  applyStyle(currentStyle());
   // the fee list being edited: the first line is the fee from the start, each further line a change from a month
   let feeRows = [];
   function drawFeeRows() {
@@ -3071,7 +3265,7 @@ details summary { cursor: pointer; font-weight: 600; color: var(--muted); }
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.9.5";
+  const APP_VERSION = "1.10.0";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty";
   const SEED = {};

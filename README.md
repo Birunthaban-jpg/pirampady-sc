@@ -21,6 +21,7 @@ Members pay a monthly fee (Rs. 650 at the start; it can change from any month). 
 - **Across years:** money paid ahead carries into the next year, and anything still owed from an earlier year is brought forward into "Still due". A "Before <year>" column shows it on the sheet and the register when anyone has it.
 - **Backup and restore** with a single JSON file, plus a CSV export for Excel.
 - **Phone and Mac share one register**, synced through a private GitHub repository, and every change is kept as a version you can restore.
+- **App styles:** Classic (follows the phone's light or dark mode), Floodlight (a night stadium in club gold), Scoreboard (match-day kit) and Pearl (light frosted glass), all from the logo's brown, gold, white and grey. Chosen in Settings for each device; PDFs keep the club colours.
 - **Works fully offline.** Changes are saved on the device first and synced once it's back online.
 
 ## How it works
