@@ -1077,8 +1077,9 @@ html:root[data-style="pearl"] {
   // the fee to name for a year: this month's in the current year, December's for a past year, January's ahead
   function feeFor(y) { return feeAt(y, y === CY ? CM : y < CY ? 11 : 0); }
   // the fees used in a year, e.g. "Rs. 650" or "Rs. 650 (Oct) · Rs. 500 (from Nov)"
-  function feeText(y) {
-    const st = settings().start, first = st.y === y ? st.m : 0, segs = [];
+  // from: a member's first counted month, so a slip only names the fees that apply to them
+  function feeText(y, from) {
+    const st = settings().start, first = Math.max(st.y === y ? st.m : 0, from || 0), segs = [];
     for (let k = first; k < 12; k++) { const f = feeAt(y, k); if (segs.length && segs[segs.length - 1].fee === f) segs[segs.length - 1].to = k; else segs.push({ fee: f, from: k, to: k }); }
     if (segs.length <= 1) return `Rs. ${fmt(segs.length ? segs[0].fee : feeAt(y, 0))}`;
     return segs.map((g) => `Rs. ${fmt(g.fee)} (${g.to === 11 && g.from > first ? `from ${MONTHS[g.from]}` : g.from === g.to ? MONTHS[g.from] : `${MONTHS[g.from]}–${MONTHS[g.to]}`})`).join(" · ");
@@ -1618,7 +1619,7 @@ html:root[data-style="pearl"] {
     if (r) for (let k = r[0]; k <= r[1]; k++) months.add(k);
     const cvs = coverage(m, y);
     for (let k = 0; k < 12; k++) if (amt(m.id, k) > 0 || cvs[k].covered > 0) months.add(k);
-    const L = ["*Pirampady Sports Club*", `Subscription slip · ${y}`, "", `*${m.name}*`, `Monthly fee: ${feeText(y)}`, ""];
+    const L = ["*Pirampady Sports Club*", `Subscription slip · ${y}`, "", `*${m.name}*`, `Monthly fee: ${feeText(y, r ? r[0] : 0)}`, ""];
     for (const k of [...months].sort((a, b) => a - b)) {
       const a = amt(m.id, k), parts = partsOf(m.id, k), c = cvs[k], fee = feeAt(y, k);
       let line = `${MONTHS[k]}: `;
@@ -3106,10 +3107,19 @@ html:root[data-style="pearl"] {
     const nameLines = doc.splitTextToSize(m.name, W - 2 * M - 50);
     doc.text(nameLines[0], M + 5, 53.5);
     doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...C.GREY);
-    const sub = [`Monthly fee ${feeText(y)}`];
-    if (r && !offs.length) sub.push(`counted ${MONTHS[r[0]]}–${MONTHS[r[1]]} ${y}`);
+    const sub = [`Monthly fee ${feeText(y, r ? r[0] : 0)}`];
+    if (r && !offs.length) sub.push(`counted ${r[0] === r[1] ? MONTHS[r[0]] : `${MONTHS[r[0]]}–${MONTHS[r[1]]}`} ${y}`);
     else if (r) sub.push(`no fee for ${spanTxt(offs)}`);
-    doc.text(sub.join("  ·  "), M + 5, 59.5);
+    // keep clear of the stamp on the right: wrap onto a second line when the fee changed during the year
+    const subW = W - M - 41 - 4 - (M + 5);
+    const subOne = sub.join("  ·  ");
+    if (doc.getTextWidth(subOne) <= subW) doc.text(subOne, M + 5, 59.5);
+    else {
+      // fee on the first line, the counted months on the second; shrink only if a line is still too wide
+      let fs = 8.5; doc.setFontSize(fs);
+      while (fs > 6.5 && sub.some((t) => doc.getTextWidth(t) > subW)) { fs -= 0.25; doc.setFontSize(fs); }
+      sub.slice(0, 2).forEach((t, n) => doc.text(t, M + 5, 58 + n * 3.7));
+    }
     const upto = last >= 0 ? `${MONTHS[last].toUpperCase()} ${y}` : String(y);
     if (d.due > 0) stamp(doc, W - M - 41, 42, 37, 19, false, `Rs. ${fmt(d.due)}`, `TO PAY · UP TO ${upto}`);
     else if (om.length || d.paid > 0 || d.bf) stamp(doc, W - M - 41, 42, 37, 19, true, "PAID UP", d.due < 0 ? `+ Rs. ${fmt(-d.due)} AHEAD` : `UP TO ${upto}`);
@@ -3613,7 +3623,7 @@ html:root[data-style="pearl"] {
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.12.0";
+  const APP_VERSION = "1.12.1";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty";
   const SEED = {};
