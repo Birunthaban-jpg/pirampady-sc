@@ -186,6 +186,7 @@ button:disabled { cursor: default; }
 .exp-cat { grid-column: 1 / -1; font-size: 11px; font-weight: 700; letter-spacing: .05em; text-transform: uppercase; color: var(--brand); }
 .exp-desc { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .exp-amt { font-variant-numeric: tabular-nums; }
+.exp-item.inc .exp-cat, .exp-item.inc .exp-amt { color: var(--ok); }
 .exp-item small { grid-column: 1 / -1; color: var(--muted); font-size: 12px; }
 .sugs { display: flex; gap: 6px; flex-wrap: wrap; }
 .dlg form > *, .dlg .inner > *, .field, .inrow > * { min-width: 0; }
@@ -745,7 +746,7 @@ html:root[data-style="pearl"] {
       <div class="field" style="flex:1;min-width:0"><label for="evPer">Same for everyone? (optional)</label><input id="evPer" inputmode="numeric" autocomplete="off" placeholder="Leave empty"></div>
     </div>
     <div class="state calc" id="evSum"></div>
-    <label class="check" for="evCover"><input type="checkbox" id="evCover"> If the money isn't enough, take the rest from the club balance</label>
+    <label class="check" for="evCover"><input type="checkbox" id="evCover"> Settle with the club balance: take from it if money is short, add to it if money is left over</label>
     <span class="lbl2" id="evContribHead">Contributions</span>
     <p class="hint" style="margin-top:-8px" id="evHint">Type how much each person gave.</p>
     <ul class="bd-people" id="evList"></ul>
@@ -1136,6 +1137,15 @@ html:root[data-style="pearl"] {
   }
   const expensesIn = (i) => expensesAll().filter((e) => e.month === i).sort((a, b) => String(a.t || "").localeCompare(String(b.t || "")) || String(a.no).localeCompare(String(b.no)));
   const expTotal = (i) => expensesIn(i).reduce((s2, e) => s2 + e.amount, 0);
+  // other club income, apart from subscriptions: money left over from an event, added to the club balance.
+  // income/<id> = { year, month, src: "event", desc, amount, t, no, ev }
+  function incomeAll() {
+    const map = new Map((S.incServer || []).map((e) => [e.id, e]));
+    for (const [p, b] of overlay) if (p.startsWith("income/")) { const id = p.slice(7); if (b && b.year === S.year) map.set(id, { ...b, id }); else map.delete(id); }
+    return [...map.values()].filter((e) => e && e.amount > 0 && Number.isInteger(e.month));
+  }
+  const incomeIn = (i) => incomeAll().filter((e) => e.month === i).sort((a, b) => String(a.t || "").localeCompare(String(b.t || "")) || String(a.no).localeCompare(String(b.no)));
+  const incTotal = (i) => incomeIn(i).reduce((s2, e) => s2 + e.amount, 0);
   const elec = (i) => { const e = elecMap()[i]; return { amount: e && e.amount > 0 ? e.amount : 0, signed: !!(e && e.signed), t: (e && e.t) || null, note: (e && e.note) || "" }; };
 
   function startOf(m) { return m.start && Number.isInteger(m.start.y) ? m.start : settings().start; }
@@ -1364,7 +1374,9 @@ html:root[data-style="pearl"] {
     // cash actually held up to the end of this year (earlier years included); part of it may be paid ahead for later
     const bal = cashBalanceBefore(S.year, 12), earlier = cashBalanceBefore(S.year, 0);
     const ahead = S.year === CY ? heldAt(CY, CM) : bal - balanceBefore(S.year, 12);
-    const thisMonth = S.year === CY ? `Rs. ${fmt(monthTotal(CM))} in ${MONTHS_FULL[CM]}` : `in ${S.year}`;
+    let incYear = 0;
+    for (let i = 0; i < 12; i++) incYear += incTotal(i);
+    const thisMonth = (S.year === CY ? `Rs. ${fmt(monthTotal(CM))} in ${MONTHS_FULL[CM]}` : `in ${S.year}`) + (incYear ? ` · + ${rs(incYear)} other income` : "");
     const span = countedLabel(S.year);
     const dueSub = S.year > CY || !span ? "Nothing due yet" : behind ? `${behind} member${behind > 1 ? "s" : ""} behind · ${span}${fromBefore ? " + earlier" : ""} counted` : `Everyone is paid up · ${span}`;
     el.innerHTML = `
@@ -1463,6 +1475,10 @@ html:root[data-style="pearl"] {
             </div>
             ${expensesIn(i).length ? `<ul class="exp-list">${expensesIn(i).map((x) => `<li><button type="button" class="exp-item" data-act="exp-edit" data-id="${esc(x.id)}"${S.canWrite ? "" : " disabled"}><span class="exp-cat">${esc(catName(x.cat))}</span><span class="exp-desc">${esc(x.desc || catName(x.cat))}</span><b class="exp-amt">${rs(x.amount)}</b><small>${x.t ? esc(dayLabel(x.t)) : ""}${x.no ? ` · ${esc(x.no)}` : ""}${x.to ? ` · ${esc(x.to)}` : ""}</small></button></li>`).join("")}</ul>` : ""}
           </div>
+          ${incomeIn(i).length ? `<div class="exp-block">
+            <div class="elec-row exp-head"><p>Other income: <b>${rs(incTotal(i))}</b></p></div>
+            <ul class="exp-list">${incomeIn(i).map((x) => `<li><button type="button" class="exp-item inc" data-act="ev-open" data-id="${esc(x.ev || "")}"><span class="exp-cat">Added to the club</span><span class="exp-desc">${esc(x.desc)}</span><b class="exp-amt">+ ${rs(x.amount)}</b><small>${x.t ? esc(dayLabel(x.t)) : ""}${x.no ? ` · ${esc(x.no)}` : ""}</small></button></li>`).join("")}</ul>
+          </div>` : ""}
         </section>
         <div class="slipbar">
           <div class="filter" role="group" aria-label="Show">
@@ -1503,14 +1519,17 @@ html:root[data-style="pearl"] {
     const sgRow = MONTHS.map((_, k) => { const e = elec(k); return `<td class="mc"><button type="button" class="cellbtn${e.signed ? " ok" : " off"}" data-act="elec" data-m="${k}" aria-label="Selvarajah signature ${MONTHS_FULL[k]}: ${e.signed ? "signed" : "not signed"}"${S.canWrite ? "" : " disabled"}>${e.signed ? "✓" : "–"}</button></td>`; }).join("");
     let yx = 0;
     const exRow = MONTHS.map((_, k) => { const x = expTotal(k); yx += x; return `<td class="mc">${x ? fmt(x) : "–"}</td>`; }).join("");
-    const blRow = MONTHS.map((_, k) => { const b = monthTotal(k) - elec(k).amount - expTotal(k); return `<td class="mc${b < 0 ? " neg" : ""}">${b ? (b < 0 ? "−" : "") + fmt(Math.abs(b)) : "–"}</td>`; }).join("");
-    const yb = yc - ye - yx;
+    let yi = 0;
+    const inRow = MONTHS.map((_, k) => { const x = incTotal(k); yi += x; return `<td class="mc">${x ? fmt(x) : "–"}</td>`; }).join("");
+    const blRow = MONTHS.map((_, k) => { const b = monthTotal(k) + incTotal(k) - elec(k).amount - expTotal(k); return `<td class="mc${b < 0 ? " neg" : ""}">${b ? (b < 0 ? "−" : "") + fmt(Math.abs(b)) : "–"}</td>`; }).join("");
+    const yb = yc + yi - ye - yx;
     const foot = `
       <tr><th class="c-name" colspan="${cs}" scope="row">Total collected</th>${colRow}<td class="tot">${fmt(yc)}</td><td class="dcol due">${dueTotal ? fmt(dueTotal) : "–"}</td></tr>
+      ${yi ? `<tr><th class="c-name" colspan="${cs}" scope="row">Other income</th>${inRow}<td class="tot">${fmt(yi)}</td><td></td></tr>` : ""}
       <tr><th class="c-name" colspan="${cs}" scope="row">Paid for electricity</th>${elRow}<td class="tot">${fmt(ye)}</td><td></td></tr>
       <tr><th class="c-name" colspan="${cs}" scope="row">Other expenses</th>${exRow}<td class="tot">${yx ? fmt(yx) : "–"}</td><td></td></tr>
       <tr><th class="c-name" colspan="${cs}" scope="row">Selvarajah signed</th>${sgRow}<td></td><td></td></tr>
-      <tr><th class="c-name" colspan="${cs}" scope="row">Net (collected − spent)</th>${blRow}<td class="tot${yb < 0 ? " neg" : ""}">${yb < 0 ? "−" : ""}${fmt(Math.abs(yb))}</td><td></td></tr>`;
+      <tr><th class="c-name" colspan="${cs}" scope="row">${yi ? "Net (money in − spent)" : "Net (collected − spent)"}</th>${blRow}<td class="tot${yb < 0 ? " neg" : ""}">${yb < 0 ? "−" : ""}${fmt(Math.abs(yb))}</td><td></td></tr>`;
     return `
       <section class="card">
         <div class="sheet-wrap"><table class="sheet"><thead>${head}</thead><tbody>${body}</tbody><tfoot>${foot}</tfoot></table></div>
@@ -1893,7 +1912,7 @@ html:root[data-style="pearl"] {
   let expCtx = null, expCat = "equipment";
   function expBalanceNow(i, excludeId) {
     // club balance at the end of month i, counting everything recorded so far (except the expense being edited)
-    let b = balanceBefore(S.year, i) + monthTotal(i) - elec(i).amount;
+    let b = balanceBefore(S.year, i) + monthTotal(i) + incTotal(i) - elec(i).amount;
     for (const x of expensesIn(i)) if (x.id !== excludeId) b -= x.amount;
     return b;
   }
@@ -2027,6 +2046,7 @@ html:root[data-style="pearl"] {
      comes in. One record per event:
      events/<id> = { name, date, per, no, cover, c: {memberId: {a, t}}, g: [{n, a, t}], x: [{d, a, t}] }
      its club top-up = expenses/ev<id> = { year, month, cat: "event", desc, amount, t, no, ev: <id> }
+     money left over = income/ev<id> = { year, month, src: "event", desc, amount, t, no, ev: <id> } (added to the club)
      (the top-up's bill number matches the event's: EVT-2611-ABCD → EXP-2611-ABCD)
      ====================================================================== */
   const EV_COSTS = ["Trophies", "Medals", "Prizes", "Ground booking", "Referee", "Balls", "Refreshments", "Transport", "Banner"];
@@ -2041,10 +2061,11 @@ html:root[data-style="pearl"] {
     for (const k in ev.c || {}) { const v = ev.c[k]; if (v && v.a > 0) { collected += v.a; n++; } }
     for (const g of ev.g || []) if (g && g.a > 0) { collected += g.a; n++; }
     for (const x of ev.x || []) if (x && x.a > 0) spent += x.a;
-    const short = Math.max(0, spent - collected), fromClub = ev.cover === false ? 0 : short;
-    return { collected, n, spent, short, fromClub, left: collected + fromClub - spent };
+    const settle = ev.cover !== false;
+    const short = Math.max(0, spent - collected), fromClub = settle ? short : 0, toClub = settle ? Math.max(0, collected - spent) : 0;
+    return { collected, n, spent, short, fromClub, toClub, left: collected + fromClub - spent - toClub };
   }
-  const evTopPath = (id) => "expenses/ev" + id;
+  const evTopPath = (id) => "expenses/ev" + id, evIncPath = (id) => "income/ev" + id;
   // a saved record as it stands now (changes still being saved included)
   function readDoc(path) {
     if (overlay.has(path)) return overlay.get(path) || null;
@@ -2061,6 +2082,13 @@ html:root[data-style="pearl"] {
       const rec = { year: y, month: m, cat: "event", desc: `${ev.name || "Event"}: shortfall from club balance`, amount: t.fromClub, t: ev.date, no: (cur && cur.no) || (/^EVT-/.test(ev.no || "") ? "EXP-" + ev.no.slice(4) : newReceipt(y, m).replace("PSC-", "EXP-")), ev: ev.id };
       if (!cur || cur.amount !== rec.amount || cur.year !== y || cur.month !== m || cur.desc !== rec.desc || cur.t !== rec.t) writeDoc(path, rec);
     } else if (cur) writeDoc(path, null);
+    // money left over goes into the club balance as other income
+    const ipath = evIncPath(ev.id), icur = readDoc(ipath);
+    if (!gone && t.toClub > 0 && dated) {
+      const y = +ev.date.slice(0, 4), m = +ev.date.slice(5, 7) - 1;
+      const rec = { year: y, month: m, src: "event", desc: `${ev.name || "Event"}: money left over`, amount: t.toClub, t: ev.date, no: (icur && icur.no) || (/^EVT-/.test(ev.no || "") ? "INC-" + ev.no.slice(4) : newReceipt(y, m).replace("PSC-", "INC-")), ev: ev.id };
+      if (!icur || icur.amount !== rec.amount || icur.year !== y || icur.month !== m || icur.desc !== rec.desc || icur.t !== rec.t) writeDoc(ipath, rec);
+    } else if (icur) writeDoc(ipath, null);
   }
   // Make every event's club top-up match the event (after a sync or a restore), and remove top-ups whose event is gone.
   // The top-up's place and bill number come from the event, so two devices doing this always agree.
@@ -2071,18 +2099,18 @@ html:root[data-style="pearl"] {
     const raw = S.db.raw();
     for (const k in raw) {
       const d = raw[k];
-      if (k.startsWith("expenses/ev") && d && !d._deleted && d.ev && !ids.has(d.ev) && !overlay.has(k)) writeDoc(k, null);
+      if ((k.startsWith("expenses/ev") || k.startsWith("income/ev")) && d && !d._deleted && d.ev && !ids.has(d.ev) && !overlay.has(k)) writeDoc(k, null);
     }
   }
   function eventsHTML() {
     const list = eventsAll();
-    let collected = 0, spent = 0, fromClub = 0;
-    for (const ev of list) { const t = evTotals(ev); collected += t.collected; spent += t.spent; fromClub += t.fromClub; }
+    let collected = 0, spent = 0, net = 0;
+    for (const ev of list) { const t = evTotals(ev); collected += t.collected; spent += t.spent; net += t.toClub - t.fromClub; }
     const cards = list.map((ev) => {
       const t = evTotals(ev);
       return `<li><button type="button" class="bd-card" data-act="ev-open" data-id="${esc(ev.id)}">
         <span class="bd-top"><b>🏆 ${esc(ev.name || "Event")}</b><span>${ev.date ? esc(longDate(ev.date)) : ""}</span></span>
-        <span class="bd-figs"><span>Collected <b>${rs(t.collected)}</b>${t.n ? ` · ${t.n} ${t.n === 1 ? "person" : "people"}` : ""}</span><span>Spent <b>${rs(t.spent)}</b></span>${t.fromClub ? `<span>From club <b>${rs(t.fromClub)}</b></span>` : ""}${t.short && !t.fromClub ? `<span class="neg">Short <b>${rs(t.short)}</b></span>` : `<span>Left <b>${rs(Math.max(0, t.left))}</b></span>`}</span>
+        <span class="bd-figs"><span>Collected <b>${rs(t.collected)}</b>${t.n ? ` · ${t.n} ${t.n === 1 ? "person" : "people"}` : ""}</span><span>Spent <b>${rs(t.spent)}</b></span>${t.fromClub ? `<span>From club <b>${rs(t.fromClub)}</b></span>` : ""}${t.toClub ? `<span>To club <b>${rs(t.toClub)}</b></span>` : ""}${t.short && !t.fromClub ? `<span class="neg">Short <b>${rs(t.short)}</b></span>` : !t.fromClub && !t.toClub ? `<span>Left <b>${rs(Math.max(0, t.left))}</b></span>` : ""}</span>
       </button></li>`;
     }).join("");
     return `
@@ -2092,9 +2120,9 @@ html:root[data-style="pearl"] {
           <div class="figs">
             <div class="fig"><span>Collected</span><b>${rs(collected)}</b></div>
             <div class="fig"><span>Spent</span><b>${rs(spent)}</b></div>
-            <div class="fig"><span>From club</span><b>${rs(fromClub)}</b></div>
+            <div class="fig"><span>Club balance</span><b style="color:${net < 0 ? "var(--due)" : net > 0 ? "var(--ok)" : "inherit"}">${net < 0 ? "−" : net > 0 ? "+" : ""}${rs(Math.abs(net))}</b></div>
           </div>
-          <div class="elec-row"><p>If an event's money isn't enough, the rest is taken from the club balance and shows as a club expense in that month.</p>
+          <div class="elec-row"><p>If an event's money isn't enough, the rest is taken from the club balance. Money left over is added to the club balance.</p>
             <button type="button" class="btn primary" data-act="ev-new"${S.canWrite ? "" : " disabled"}>+ New event</button></div>
         </section>
         ${list.length ? `<ul class="bd-list">${cards}</ul>` : `<div class="card notice"><h2>No events yet</h2><p>Tap <b>+ New event</b> when you start collecting for a tournament or event.</p></div>`}
@@ -2120,7 +2148,7 @@ html:root[data-style="pearl"] {
   function fillEv() {
     const ev = evGet();
     if (!ev) { $("evDlg").close(); return; }
-    const t = evTotals(ev), per = ev.per > 0 ? ev.per : 0, top = readDoc(evTopPath(ev.id));
+    const t = evTotals(ev), per = ev.per > 0 ? ev.per : 0, top = readDoc(evTopPath(ev.id)), inc = readDoc(evIncPath(ev.id));
     $("evNo").textContent = `Event · ${ev.no || ""}`;
     $("evTitle").textContent = ev.name ? `🏆 ${ev.name}` : "New event";
     if (document.activeElement !== $("evName")) $("evName").value = ev.name || "";
@@ -2129,8 +2157,9 @@ html:root[data-style="pearl"] {
     $("evCover").checked = ev.cover !== false;
     const rows = [`<div><span>Collected${t.n ? ` from ${t.n}` : ""}</span><span>${rs(t.collected)}</span></div>`, `<div><span>Spent</span><span>− ${rs(t.spent)}</span></div>`];
     if (t.fromClub) rows.push(`<div><span>From the club balance${top && top.no ? ` (${esc(top.no)})` : ""}</span><span>+ ${rs(t.fromClub)}</span></div>`);
+    if (t.toClub) rows.push(`<div><span>Added to the club balance${inc && inc.no ? ` (${esc(inc.no)})` : ""}</span><span>− ${rs(t.toClub)}</span></div>`);
     if (t.short && !t.fromClub) rows.push(`<div class="after"><span>Short (not taken from the club)</span><span style="color:var(--due)">${rs(t.short)}</span></div>`);
-    else rows.push(`<div class="after"><span>${t.left > 0 ? "Left over" : "Balance"}</span><span style="color:var(--ok)">${rs(t.left)}</span></div>`);
+    else rows.push(`<div class="after"><span>${t.left > 0 ? "Left over (kept with the event)" : "Balance"}</span><span style="color:var(--ok)">${rs(t.left)}</span></div>`);
     $("evSum").innerHTML = rows.join("");
     // inactive members are left out unless they gave for this event
     const members = allMembers().filter((m) => !m.removed && (!isOff(m, CY, CM) || (ev.c && ev.c[m.id] && ev.c[m.id].a > 0)));
@@ -2201,7 +2230,8 @@ html:root[data-style="pearl"] {
     const { id, ...body } = ev;
     writeDoc("events/" + id, null); evSync(ev, true);
     $("evDlg").close(); render();
-    toast(`Deleted ${ev.name || "the event"}${evTotals(ev).fromClub ? " and its top-up from the club" : ""}.`, () => { writeDoc("events/" + id, body); evSync(ev); render(); });
+    const tt = evTotals(ev);
+    toast(`Deleted ${ev.name || "the event"}${tt.fromClub ? " and its top-up from the club" : tt.toClub ? " and the money it added to the club" : ""}.`, () => { writeDoc("events/" + id, body); evSync(ev); render(); });
   });
   $("evDlg").addEventListener("close", () => {
     // an event that was opened but never filled in is removed again
@@ -2214,7 +2244,7 @@ html:root[data-style="pearl"] {
   function buildEventBill(ev) {
     const C = PDF_C, { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
-    const W = 148, H = 210, M = 12, t = evTotals(ev), top = readDoc(evTopPath(ev.id));
+    const W = 148, H = 210, M = 12, t = evTotals(ev), top = readDoc(evTopPath(ev.id)), inc = readDoc(evIncPath(ev.id));
     slipWatermark(doc, W, 80, 96);
     slipHeader(doc, W, M, `Event  ·  ${ev.no || ""}`);
     doc.setFillColor(...C.CREAM); doc.roundedRect(M, 39, W - 2 * M, 21, 2.5, 2.5, "F");
@@ -2250,6 +2280,7 @@ html:root[data-style="pearl"] {
     const money = (n) => `Rs. ${n < 0 ? "-" : ""}${fmt(Math.abs(n))}`;
     const calc = [["+", "Collected from members and others", money(t.collected)], ["\u2013", "Spent for this event", money(t.spent)]];
     if (t.fromClub) calc.push(["+", `Taken from the club balance${top && top.no ? ` (bill ${top.no})` : ""}`, money(t.fromClub)]);
+    if (t.toClub) calc.push(["\u2013", `Added to the club balance${inc && inc.no ? ` (${inc.no})` : ""}`, money(t.toClub)]);
     doc.autoTable({
       startY: ty, margin: { left: M, right: M }, theme: "plain", body: calc,
       styles: { font: "helvetica", fontSize: 9.2, textColor: C.INK, cellPadding: { top: 1.3, bottom: 1.3, left: 2, right: 3 } },
@@ -2270,7 +2301,7 @@ html:root[data-style="pearl"] {
     if (checker()) sigBlock(doc, M, sy, 52, sh, 2, `Checked by ${checker()}`);
     doc.setDrawColor(...C.LINE); doc.setLineWidth(0.3); doc.line(M, footTop, W - M, footTop);
     doc.setFont("helvetica", compact ? "normal" : "bold"); doc.setFontSize(compact ? 7 : 8.6); doc.setTextColor(...(compact ? C.GREY : C.BROWN));
-    doc.text(t.fromClub ? "Event money is kept separate; the shortfall was paid from the club balance." : "Event money is kept separate from the club's subscription account.", W / 2, compact ? H - 6 : H - 12, { align: "center" });
+    doc.text(t.fromClub ? "Event money is kept separate; the shortfall was paid from the club balance." : t.toClub ? "Event money is kept separate; the money left over was added to the club balance." : "Event money is kept separate from the club's subscription account.", W / 2, compact ? H - 6 : H - 12, { align: "center" });
     return doc.output("blob");
   }
 
@@ -2941,7 +2972,9 @@ html:root[data-style="pearl"] {
       body.push(pr);
     }
     let yc = 0, ye = 0;
-    const r1 = [label("Total collected (Rs.)")], r2 = [label("Paid for electricity (Rs.)")], r2x = [label("Other expenses (Rs.)")], r3 = [label("Selvarajah's signature")], r4 = [label("Net: collected - spent (Rs.)")];
+    let yi = 0;
+    for (let k = 0; k < 12; k++) yi += incTotal(k);
+    const r1 = [label("Total collected (Rs.)")], r1i = [label("Other income (Rs.)")], r2 = [label("Paid for electricity (Rs.)")], r2x = [label("Other expenses (Rs.)")], r3 = [label("Selvarajah's signature")], r4 = [label(yi ? "Net: money in - spent (Rs.)" : "Net: collected - spent (Rs.)")];
     let yx = 0;
     for (let k = 0; k < 12; k++) {
       const t = monthTotal(k), e = elec(k);
@@ -2952,16 +2985,19 @@ html:root[data-style="pearl"] {
       const x = expTotal(k);
       yx += x;
       r2x.push({ content: x ? fmt(x) : "-", styles: sumStyle });
-      const b = t - e.amount - x;
+      const inc = incTotal(k);
+      r1i.push({ content: inc ? fmt(inc) : "-", styles: sumStyle });
+      const b = t + inc - e.amount - x;
       r4.push({ content: b ? (b < 0 ? "-" : "") + fmt(Math.abs(b)) : "-", styles: b < 0 ? { ...sumStyle, textColor: RED } : sumStyle });
     }
     r1.push({ content: fmt(yc), styles: sumStyle }, { content: dueTotal ? fmt(dueTotal) : "-", styles: { ...sumStyle, textColor: RED } });
     r2.push({ content: fmt(ye), styles: sumStyle }, { content: "", styles: sumStyle });
     r3.push({ content: "", styles: sumStyle }, { content: "", styles: sumStyle });
     r2x.push({ content: yx ? fmt(yx) : "-", styles: sumStyle }, { content: "", styles: sumStyle });
-    const yb = yc - ye - yx;
+    r1i.push({ content: yi ? fmt(yi) : "-", styles: sumStyle }, { content: "", styles: sumStyle });
+    const yb = yc + yi - ye - yx;
     r4.push({ content: (yb < 0 ? "-" : "") + fmt(Math.abs(yb)), styles: yb < 0 ? { ...sumStyle, textColor: RED } : sumStyle }, { content: "", styles: sumStyle });
-    body.push(r1, r2, r2x, r3, r4);
+    body.push(...(yi ? [r1, r1i] : [r1]), r2, r2x, r3, r4);
 
     const colStyles = { 0: { cellWidth: 9, textColor: GREY, fontSize: 7.5 }, 1: { cellWidth: 44, halign: "left", fontStyle: "bold" }, [14 + B]: { cellWidth: 25 }, [15 + B]: { cellWidth: 25 } };
     for (let k = 2 + B; k < 14 + B; k++) colStyles[k] = { cellWidth: anyBf ? 13.2 : 14.5 };
@@ -3220,7 +3256,7 @@ html:root[data-style="pearl"] {
   // Extra paid ahead isn't in it yet; it joins the balance in the month it is used for.
   function balanceBefore(y, i) {
     const raw = S.db && typeof S.db.raw === "function" ? S.db.raw() : null;
-    if (!raw) { let b = 0; for (let k = 0; k < i; k++) b += monthTotal(k) - elec(k).amount - expTotal(k); return b; }
+    if (!raw) { let b = 0; for (let k = 0; k < i; k++) b += monthTotal(k) + incTotal(k) - elec(k).amount - expTotal(k); return b; }
     const before = (yy, mk) => yy < y || (yy === y && +mk < i);
     let bal = 0;
     const known = new Set();
@@ -3235,6 +3271,7 @@ html:root[data-style="pearl"] {
       if (k.startsWith("payments/") && !known.has(d.member)) for (const mk in d.m || {}) { if (before(d.year, mk) && d.m[mk] > 0) bal += d.m[mk]; }
       if (k.startsWith("electricity/")) for (const mk in d.m || {}) { const e = d.m[mk]; if (before(d.year, mk) && e && e.amount > 0) bal -= e.amount; }
       if (k.startsWith("expenses/") && Number.isInteger(d.month) && before(d.year, d.month) && d.amount > 0) bal -= d.amount;
+      if (k.startsWith("income/") && Number.isInteger(d.month) && before(d.year, d.month) && d.amount > 0) bal += d.amount;
     }
     return bal;
   }
@@ -3251,10 +3288,11 @@ html:root[data-style="pearl"] {
         if (k.startsWith("payments/")) for (const mk in d.m || {}) { if (before(mk) && d.m[mk] > 0) bal += d.m[mk]; }
         if (k.startsWith("electricity/")) for (const mk in d.m || {}) { const e = d.m[mk]; if (before(mk) && e && e.amount > 0) bal -= e.amount; }
         if (k.startsWith("expenses/") && Number.isInteger(d.month) && before(d.month) && d.amount > 0) bal -= d.amount;
+        if (k.startsWith("income/") && Number.isInteger(d.month) && before(d.month) && d.amount > 0) bal += d.amount;
       }
       return bal;
     }
-    for (let k = 0; k < i; k++) bal += monthTotal(k) - elec(k).amount - expTotal(k);
+    for (let k = 0; k < i; k++) bal += monthTotal(k) + incTotal(k) - elec(k).amount - expTotal(k);
     return bal;
   }
   function monthStats(i) {
@@ -3281,7 +3319,8 @@ html:root[data-style="pearl"] {
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
     const W = 148, H = 210, M = 12, y = S.year, e = elec(i), st = monthStats(i);
     const exps = expensesIn(i), expSum = exps.reduce((a, x) => a + x.amount, 0);
-    const opening = balanceBefore(y, i), closing = opening + st.collected - e.amount - expSum;
+    const incs = incomeIn(i), incSum = incs.reduce((a, x) => a + x.amount, 0);
+    const opening = balanceBefore(y, i), closing = opening + st.collected + incSum - e.amount - expSum;
     const mName = `${MONTHS_FULL[i]} ${y}`;
     slipWatermark(doc, W, 80, 96);
     slipHeader(doc, W, M, `Monthly account  \u00B7  ${mName}`);
@@ -3319,6 +3358,7 @@ html:root[data-style="pearl"] {
     const calc = [
       ["", `Balance brought forward (end of ${prevName})`, `Rs. ${opening < 0 ? "-" : ""}${fmt(Math.abs(opening))}`],
       ["+", `Collected for ${MONTHS_FULL[i]}`, `Rs. ${fmt(st.collected)}`],
+      ...incs.map((x) => ["+", `${x.desc}${x.t ? ` (${dayLabel(x.t)})` : ""}`, `Rs. ${fmt(x.amount)}`]),
       ["\u2013", `Electricity bill (${MONTHS_FULL[i]})`, `Rs. ${fmt(e.amount)}`],
       ...(exps.length > 6
         ? EXP_CATS.map(([c, n]) => { const t = exps.filter((x) => (x.cat || "other") === c).reduce((a, x) => a + x.amount, 0); const cnt = exps.filter((x) => (x.cat || "other") === c).length; return t ? ["\u2013", `${n} (${cnt} ${cnt === 1 ? "bill" : "bills"})`, `Rs. ${fmt(t)}`] : null; }).filter(Boolean)
@@ -3377,13 +3417,14 @@ html:root[data-style="pearl"] {
     // the club balance for the bill's month, the same way the monthly account works it out
     const opening = balanceBefore(y, i), collected = monthTotal(i), bill = elec(i).amount;
     const others = expensesIn(i).filter((e) => e.id !== x.id), otherSum = others.reduce((t, e) => t + e.amount, 0);
-    const before = opening + collected - bill - otherSum, after = before - x.amount;
+    const incSum = incTotal(i);
+    const before = opening + collected + incSum - bill - otherSum, after = before - x.amount;
     const LOGO = pdfLogo();
     const W = 105, M = 9, rowH = 5, calcH = 5;
     const nLines = 3 + (items.length === 1 ? 1 : 0) + (x.to ? 1 : 0);
     const itemsH = items.length > 1 ? 0.5 + 4.4 + items.length * rowH + 1 : 0;
     const held = heldAt(y, i);
-    const calcRows = 6 + (otherSum ? 1 : 0) + (held > 0 ? 2 : 0);
+    const calcRows = 6 + (otherSum ? 1 : 0) + (incSum ? 1 : 0) + (held > 0 ? 2 : 0);
     const contentEnd = (LOGO ? 44.5 : 29.5) + nLines * 5.8 + itemsH + 1.5 + 14 + 4.6 + calcRows * calcH + 1.6;
     const H = Math.max(148, Math.ceil(contentEnd + 20));
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [W, H] });
@@ -3433,6 +3474,7 @@ html:root[data-style="pearl"] {
     const rule = () => { doc.setDrawColor(...C.BROWN); doc.setLineWidth(0.3); doc.line(M, yy - 3.4, W - M, yy - 3.4); yy += 0.8; };
     calcRow("", `Brought forward (end of ${i > 0 ? MONTHS[i - 1] : `Dec ${y - 1}`})`, money(opening));
     calcRow("+", `Collected for ${mon}`, money(collected));
+    if (incSum) calcRow("+", `Other income in ${mon}`, money(incSum));
     calcRow("–", `Electricity bill (${mon})`, money(bill));
     if (otherSum) calcRow("–", `Other bills in ${mon} (${others.length})`, money(otherSum));
     rule();
@@ -3517,7 +3559,7 @@ html:root[data-style="pearl"] {
   $("memDlg").addEventListener("close", () => { confirmId = null; offAsk = null; });
 
   /* ---------- data ---------- */
-  let unsubPay = null, unsubElec = null, unsubExp = null;
+  let unsubPay = null, unsubElec = null, unsubExp = null, unsubInc = null;
   function onSubErr(e) {
     if (e && (e.code === "revoked" || e.code === "not_granted")) { S.canWrite = false; render(); return; }
     if (e && e.code === "unavailable") setTimeout(() => { if (S.db) { startMembers(); subYear(); } }, 3000);
@@ -3527,7 +3569,8 @@ html:root[data-style="pearl"] {
     if (unsubPay) unsubPay();
     if (unsubElec) unsubElec();
     if (unsubExp) unsubExp();
-    S.payServer = {}; S.elecServer = {}; S.expServer = []; S.payLoaded = false;
+    if (unsubInc) unsubInc();
+    S.payServer = {}; S.elecServer = {}; S.expServer = []; S.incServer = []; S.payLoaded = false;
     const y = S.year;
     unsubPay = S.db.collection("payments").where("year", "==", y).onSnapshot((snap) => {
       if (y !== S.year) return;
@@ -3542,6 +3585,11 @@ html:root[data-style="pearl"] {
     unsubExp = S.db.collection("expenses").where("year", "==", y).onSnapshot((snap) => {
       if (y !== S.year) return;
       S.expServer = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
+      render();
+    }, onSubErr);
+    unsubInc = S.db.collection("income").where("year", "==", y).onSnapshot((snap) => {
+      if (y !== S.year) return;
+      S.incServer = snap.docs.map((d) => ({ ...d.data(), id: d.id }));
       render();
     }, onSubErr);
   }
@@ -3565,7 +3613,7 @@ html:root[data-style="pearl"] {
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.11.0";
+  const APP_VERSION = "1.12.0";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty";
   const SEED = {};
@@ -3996,7 +4044,7 @@ html:root[data-style="pearl"] {
       let data = null;
       try { data = JSON.parse(fr.result); } catch (e) {}
       const st = data && data.app === "pirampady-sc" && data.store && typeof data.store === "object" ? data.store : null;
-      const valid = st && Object.keys(st).every((k) => /^(members|payments|electricity|settings|expenses|birthdays|events)\/[A-Za-z0-9_.:@+~-]+$/.test(k) && st[k] && typeof st[k] === "object");
+      const valid = st && Object.keys(st).every((k) => /^(members|payments|electricity|settings|expenses|income|birthdays|events)\/[A-Za-z0-9_.:@+~-]+$/.test(k) && st[k] && typeof st[k] === "object");
       if (!valid) { showErr("bakErr", "That file isn't a Pirampady SC backup. Choose the .json file made with “Save backup file”."); return; }
       const c = countRecords(st);
       pendingRestore = st;
@@ -4046,6 +4094,10 @@ html:root[data-style="pearl"] {
       for (const mid in b.c || {}) if (b.c[mid] && b.c[mid].a > 0) rows.push(["Birthday contribution", (b.date || "").slice(0, 4), b.date || "", names[mid] || mid, b.c[mid].a, b.c[mid].t || "", `For ${b.name || "birthday"} · ${b.no || ""}`]);
       for (const g of b.g || []) if (g && g.a > 0) rows.push(["Birthday contribution", (b.date || "").slice(0, 4), b.date || "", g.n + " (guest)", g.a, g.t || "", `For ${b.name || "birthday"} · ${b.no || ""}`]);
       for (const x of b.x || []) if (x && x.a > 0) rows.push(["Birthday cost", (b.date || "").slice(0, 4), b.date || "", "", x.a, x.t || "", `${x.d} · for ${b.name || "birthday"}`]);
+    }
+    for (const k of Object.keys(st).filter((k) => k.startsWith("income/")).sort((a, b) => (st[a].year - st[b].year) || (st[a].month - st[b].month))) {
+      const x = st[k];
+      if (x && x.amount > 0) rows.push(["Other income", x.year, MONTHS_FULL[x.month] || "", "", x.amount, x.t || "", [x.desc, x.no].filter(Boolean).join(" · ")]);
     }
     for (const k of Object.keys(st).filter((k) => k.startsWith("events/"))) {
       const e = st[k];
