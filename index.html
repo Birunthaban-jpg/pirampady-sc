@@ -610,7 +610,7 @@ html:root[data-style="pearl"] {
     <div class="seg" role="tablist" aria-label="View">
       <button type="button" role="tab" id="tabMonth" data-act="view" data-v="month" aria-selected="true">Month</button>
       <button type="button" role="tab" id="tabYear" data-act="view" data-v="year" aria-selected="false">Whole year</button>
-      <button type="button" role="tab" id="tabBday" data-act="view" data-v="bday" aria-selected="false">Birthdays</button>
+      <button type="button" role="tab" id="tabBday" data-act="view" data-v="bday" aria-selected="false">Events</button>
     </div>
     <div class="tools">
       <span class="chip-ro" id="roChip" hidden>View only</span>
@@ -728,6 +728,45 @@ html:root[data-style="pearl"] {
       <button type="button" class="btn" id="expSave">Save only</button>
     </div>
   </form>
+</dialog>
+
+<dialog class="dlg" id="evDlg" aria-labelledby="evTitle">
+  <div class="inner">
+    <div class="dlg-head">
+      <div><p class="eyebrow" id="evNo">Event</p><h3 id="evTitle">New event</h3></div>
+      <button type="button" class="close" data-close aria-label="Close">×</button>
+    </div>
+    <div class="field">
+      <label for="evName">Event or tournament</label>
+      <input id="evName" autocomplete="off" placeholder="e.g. Volleyball tournament">
+    </div>
+    <div class="inrow">
+      <div class="field" style="flex:1;min-width:0"><label for="evDate">Date</label><input id="evDate" type="date"></div>
+      <div class="field" style="flex:1;min-width:0"><label for="evPer">Same for everyone? (optional)</label><input id="evPer" inputmode="numeric" autocomplete="off" placeholder="Leave empty"></div>
+    </div>
+    <div class="state calc" id="evSum"></div>
+    <label class="check" for="evCover"><input type="checkbox" id="evCover"> If the money isn't enough, take the rest from the club balance</label>
+    <span class="lbl2" id="evContribHead">Contributions</span>
+    <p class="hint" style="margin-top:-8px" id="evHint">Type how much each person gave.</p>
+    <ul class="bd-people" id="evList"></ul>
+    <button type="button" class="btn ghost" id="evGuestBtn">+ Sponsor or someone who isn't a member</button>
+    <div class="inrow" id="evGuestForm" hidden>
+      <input id="evGuestName" autocomplete="off" placeholder="Name" aria-label="Name">
+      <input id="evGuestAmt" inputmode="numeric" autocomplete="off" placeholder="Rs." aria-label="Amount" style="max-width:90px">
+      <button type="button" class="btn" id="evGuestAdd">Add</button>
+    </div>
+    <span class="lbl2">Costs</span>
+    <ul class="bd-costs" id="evCosts"></ul>
+    <div class="sugs" id="evCostSugs"></div>
+    <div class="inrow">
+      <input id="evCostDesc" autocomplete="off" placeholder="What was it for" aria-label="What was it for">
+      <input id="evCostAmt" inputmode="numeric" autocomplete="off" placeholder="Rs." aria-label="Cost" style="max-width:90px">
+      <button type="button" class="btn" id="evCostAdd">Add</button>
+    </div>
+    <p class="err" id="evErr" hidden></p>
+    <button type="button" class="btn primary big" id="evBill">Share event bill (PDF)</button>
+    <div class="foot-row"><button type="button" class="btn danger" id="evDel">Delete this event</button></div>
+  </div>
 </dialog>
 
 <dialog class="dlg" id="bdDlg" aria-labelledby="bdTitle">
@@ -1294,7 +1333,8 @@ html:root[data-style="pearl"] {
     // keep the user's own sideways scroll across live updates; only re-centre when the month, year or view changes
     const prevBar = main.querySelector(".months, .sheet-wrap");
     const keepLeft = prevBar ? prevBar.scrollLeft : 0;
-    main.innerHTML = S.view === "bday" ? bdayHTML() : S.view === "month" ? monthHTML(ms) : yearHTML(ms);
+    main.innerHTML = S.view === "bday" ? `<div style="display:grid;gap:22px">${eventsHTML()}${bdayHTML()}</div>` : S.view === "month" ? monthHTML(ms) : yearHTML(ms);
+    if ($("evDlg").open && document.activeElement && !$("evDlg").contains(document.activeElement)) fillEv();
     if (S.view === "bday") { if ($("bdDlg").open && document.activeElement && !$("bdDlg").contains(document.activeElement)) fillBd(); return; }
     const key = `${S.view}-${S.year}-${S.month}`;
     const bar = main.querySelector(S.view === "month" ? ".months" : ".sheet-wrap");
@@ -1977,6 +2017,262 @@ html:root[data-style="pearl"] {
     render();
     toast(`Deleted the expense “${x.desc}”.`, () => { writeDoc("expenses/" + id, body); render(); });
   });
+
+  /* ======================================================================
+     Events and tournaments: each event has its own money, kept apart from the
+     subscription account. If the costs are more than what was collected, the
+     shortfall is taken from the club balance: it is saved as a club expense
+     (category "Events & tournaments", in the event's month, with its own bill
+     number) and follows the event, so it shrinks or goes away when more money
+     comes in. One record per event:
+     events/<id> = { name, date, per, no, cover, c: {memberId: {a, t}}, g: [{n, a, t}], x: [{d, a, t}] }
+     its club top-up = expenses/ev<id> = { year, month, cat: "event", desc, amount, t, no, ev: <id> }
+     (the top-up's bill number matches the event's: EVT-2611-ABCD → EXP-2611-ABCD)
+     ====================================================================== */
+  const EV_COSTS = ["Trophies", "Medals", "Prizes", "Ground booking", "Referee", "Balls", "Refreshments", "Transport", "Banner"];
+  function eventsAll() {
+    const map = new Map((S.evServer || []).map((b) => [b.id, b]));
+    for (const [p, b] of overlay) if (p.startsWith("events/")) { const id = p.slice(7); if (b) map.set(id, { ...b, id }); else map.delete(id); }
+    return [...map.values()].sort((a, b) => String(b.date || "").localeCompare(String(a.date || "")) || String(b.id).localeCompare(String(a.id)));
+  }
+  // collected = from members and others; short = costs not covered by it; fromClub = the part taken from the club
+  function evTotals(ev) {
+    let collected = 0, n = 0, spent = 0;
+    for (const k in ev.c || {}) { const v = ev.c[k]; if (v && v.a > 0) { collected += v.a; n++; } }
+    for (const g of ev.g || []) if (g && g.a > 0) { collected += g.a; n++; }
+    for (const x of ev.x || []) if (x && x.a > 0) spent += x.a;
+    const short = Math.max(0, spent - collected), fromClub = ev.cover === false ? 0 : short;
+    return { collected, n, spent, short, fromClub, left: collected + fromClub - spent };
+  }
+  const evTopPath = (id) => "expenses/ev" + id;
+  // a saved record as it stands now (changes still being saved included)
+  function readDoc(path) {
+    if (overlay.has(path)) return overlay.get(path) || null;
+    const raw = S.db && typeof S.db.raw === "function" ? S.db.raw() : null;
+    const d = raw && raw[path];
+    return d && !d._deleted ? d : null;
+  }
+  // keep the club top-up (a club expense) equal to what the event is short
+  function evSync(ev, gone) {
+    const path = evTopPath(ev.id), cur = readDoc(path), t = evTotals(ev);
+    const dated = /^\d{4}-\d{2}-\d{2}$/.test(ev.date || "");
+    if (!gone && t.fromClub > 0 && dated) {
+      const y = +ev.date.slice(0, 4), m = +ev.date.slice(5, 7) - 1;
+      const rec = { year: y, month: m, cat: "event", desc: `${ev.name || "Event"}: shortfall from club balance`, amount: t.fromClub, t: ev.date, no: (cur && cur.no) || (/^EVT-/.test(ev.no || "") ? "EXP-" + ev.no.slice(4) : newReceipt(y, m).replace("PSC-", "EXP-")), ev: ev.id };
+      if (!cur || cur.amount !== rec.amount || cur.year !== y || cur.month !== m || cur.desc !== rec.desc || cur.t !== rec.t) writeDoc(path, rec);
+    } else if (cur) writeDoc(path, null);
+  }
+  // Make every event's club top-up match the event (after a sync or a restore), and remove top-ups whose event is gone.
+  // The top-up's place and bill number come from the event, so two devices doing this always agree.
+  function evReconcile() {
+    if (!S.canWrite || !S.db || typeof S.db.raw !== "function" || !Array.isArray(S.evServer)) return;
+    const evs = eventsAll(), ids = new Set(evs.map((e) => e.id));
+    for (const ev of evs) evSync(ev);
+    const raw = S.db.raw();
+    for (const k in raw) {
+      const d = raw[k];
+      if (k.startsWith("expenses/ev") && d && !d._deleted && d.ev && !ids.has(d.ev) && !overlay.has(k)) writeDoc(k, null);
+    }
+  }
+  function eventsHTML() {
+    const list = eventsAll();
+    let collected = 0, spent = 0, fromClub = 0;
+    for (const ev of list) { const t = evTotals(ev); collected += t.collected; spent += t.spent; fromClub += t.fromClub; }
+    const cards = list.map((ev) => {
+      const t = evTotals(ev);
+      return `<li><button type="button" class="bd-card" data-act="ev-open" data-id="${esc(ev.id)}">
+        <span class="bd-top"><b>🏆 ${esc(ev.name || "Event")}</b><span>${ev.date ? esc(longDate(ev.date)) : ""}</span></span>
+        <span class="bd-figs"><span>Collected <b>${rs(t.collected)}</b>${t.n ? ` · ${t.n} ${t.n === 1 ? "person" : "people"}` : ""}</span><span>Spent <b>${rs(t.spent)}</b></span>${t.fromClub ? `<span>From club <b>${rs(t.fromClub)}</b></span>` : ""}${t.short && !t.fromClub ? `<span class="neg">Short <b>${rs(t.short)}</b></span>` : `<span>Left <b>${rs(Math.max(0, t.left))}</b></span>`}</span>
+      </button></li>`;
+    }).join("");
+    return `
+      <div style="display:grid;gap:12px">
+        <section class="card msum">
+          <div class="msum-head"><h2>Events &amp; tournaments</h2><span>Each event's money kept separate</span></div>
+          <div class="figs">
+            <div class="fig"><span>Collected</span><b>${rs(collected)}</b></div>
+            <div class="fig"><span>Spent</span><b>${rs(spent)}</b></div>
+            <div class="fig"><span>From club</span><b>${rs(fromClub)}</b></div>
+          </div>
+          <div class="elec-row"><p>If an event's money isn't enough, the rest is taken from the club balance and shows as a club expense in that month.</p>
+            <button type="button" class="btn primary" data-act="ev-new"${S.canWrite ? "" : " disabled"}>+ New event</button></div>
+        </section>
+        ${list.length ? `<ul class="bd-list">${cards}</ul>` : `<div class="card notice"><h2>No events yet</h2><p>Tap <b>+ New event</b> when you start collecting for a tournament or event.</p></div>`}
+      </div>`;
+  }
+  let evId = null, evGuestOpen = false;
+  const evGet = () => eventsAll().find((b) => b.id === evId) || null;
+  function evWrite(ev) { const { id, ...body } = ev; writeDoc("events/" + id, body); evSync(ev); render(); }
+  function evNew() {
+    if (!S.canWrite) return;
+    const id = "e" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5);
+    const d = todayStr();
+    evWrite({ id, name: "", date: d, per: 0, cover: true, no: newReceipt(+d.slice(0, 4), +d.slice(5, 7) - 1).replace("PSC-", "EVT-"), c: {}, g: [], x: [] });
+    evOpen(id, true);
+  }
+  function evOpen(id, fresh) {
+    if (!eventsAll().some((e) => e.id === id)) { toast("That event isn't on this device yet. Sync and try again."); return; }
+    evId = id; evGuestOpen = false;
+    fillEv();
+    $("evDlg").showModal();
+    if (fresh) setTimeout(() => $("evName").focus(), 50);
+  }
+  function fillEv() {
+    const ev = evGet();
+    if (!ev) { $("evDlg").close(); return; }
+    const t = evTotals(ev), per = ev.per > 0 ? ev.per : 0, top = readDoc(evTopPath(ev.id));
+    $("evNo").textContent = `Event · ${ev.no || ""}`;
+    $("evTitle").textContent = ev.name ? `🏆 ${ev.name}` : "New event";
+    if (document.activeElement !== $("evName")) $("evName").value = ev.name || "";
+    if (document.activeElement !== $("evDate")) $("evDate").value = ev.date || "";
+    if (document.activeElement !== $("evPer")) $("evPer").value = per ? String(per) : "";
+    $("evCover").checked = ev.cover !== false;
+    const rows = [`<div><span>Collected${t.n ? ` from ${t.n}` : ""}</span><span>${rs(t.collected)}</span></div>`, `<div><span>Spent</span><span>− ${rs(t.spent)}</span></div>`];
+    if (t.fromClub) rows.push(`<div><span>From the club balance${top && top.no ? ` (${esc(top.no)})` : ""}</span><span>+ ${rs(t.fromClub)}</span></div>`);
+    if (t.short && !t.fromClub) rows.push(`<div class="after"><span>Short (not taken from the club)</span><span style="color:var(--due)">${rs(t.short)}</span></div>`);
+    else rows.push(`<div class="after"><span>${t.left > 0 ? "Left over" : "Balance"}</span><span style="color:var(--ok)">${rs(t.left)}</span></div>`);
+    $("evSum").innerHTML = rows.join("");
+    // inactive members are left out unless they gave for this event
+    const members = allMembers().filter((m) => !m.removed && (!isOff(m, CY, CM) || (ev.c && ev.c[m.id] && ev.c[m.id].a > 0)));
+    const paid = members.filter((m) => ev.c && ev.c[m.id] && ev.c[m.id].a > 0).length;
+    $("evHint").textContent = per ? `Tap ✓ when someone gives Rs. ${fmt(per)}, or type a different amount.` : "Type how much each person gave. Leave it empty if they didn't give.";
+    $("evContribHead").textContent = `Contributions · ${paid + (ev.g || []).filter((g) => g.a > 0).length} paid`;
+    $("evList").innerHTML = members.map((m) => {
+      const v = ev.c && ev.c[m.id] && ev.c[m.id].a > 0 ? ev.c[m.id].a : 0;
+      return `<li class="${v ? "on" : ""}"><span class="bd-nm">${esc(m.name)}</span>
+        <input class="bd-amt" data-mid="${esc(m.id)}" inputmode="numeric" autocomplete="off" value="${v ? v : ""}" placeholder="${per ? fmt(per) : "Rs."}" aria-label="Amount from ${esc(m.name)}">
+        ${v ? `<button type="button" class="bd-x" data-clear="${esc(m.id)}" aria-label="Remove ${esc(m.name)}'s contribution">×</button>` : per ? `<button type="button" class="bd-ok" data-tick="${esc(m.id)}" aria-label="${esc(m.name)} gave Rs. ${fmt(per)}">✓ ${fmt(per)}</button>` : "<span></span>"}
+      </li>`;
+    }).join("") + (ev.g || []).map((g, k) => `<li class="on guest"><span class="bd-nm">${esc(g.n)} <small>other</small></span><input class="bd-gamt" data-g="${k}" inputmode="numeric" autocomplete="off" value="${g.a}" aria-label="Amount from ${esc(g.n)}"><button type="button" class="bd-x" data-gdel="${k}" aria-label="Remove ${esc(g.n)}">×</button></li>`).join("");
+    $("evGuestForm").hidden = !evGuestOpen;
+    $("evCosts").innerHTML = (ev.x || []).map((x, k) => `<li><span>${esc(x.d)}${x.t ? ` <small>${esc(dayLabel(x.t))}</small>` : ""}</span><b>${rs(x.a)}</b><button type="button" class="bd-x" data-xdel="${k}" aria-label="Remove ${esc(x.d)}">×</button></li>`).join("") || `<li class="hint">No costs yet.</li>`;
+    $("evCostSugs").innerHTML = EV_COSTS.map((c) => `<button type="button" data-csug="${c}">${c}</button>`).join("");
+    $("evErr").hidden = true;
+  }
+  function evSet(mut) { const ev = evGet(); if (!ev) return; const next = JSON.parse(JSON.stringify(ev)); mut(next); evWrite(next); fillEv(); }
+  $("evName").addEventListener("change", () => evSet((ev) => { ev.name = $("evName").value.trim().replace(/\s+/g, " ").slice(0, 60); }));
+  $("evDate").addEventListener("change", () => { if (/^\d{4}-\d{2}-\d{2}$/.test($("evDate").value)) evSet((ev) => { ev.date = $("evDate").value; }); });
+  $("evPer").addEventListener("change", () => evSet((ev) => { const v = parseAmt($("evPer").value); ev.per = v > 0 ? v : 0; }));
+  $("evCover").addEventListener("change", () => evSet((ev) => { ev.cover = $("evCover").checked; }));
+  $("evList").addEventListener("click", (e) => {
+    const tk = e.target.closest("[data-tick]"), cl = e.target.closest("[data-clear]"), gd = e.target.closest("[data-gdel]");
+    if (tk) evSet((b) => { b.c = b.c || {}; b.c[tk.dataset.tick] = { a: b.per, t: todayStr() }; });
+    else if (cl) evSet((b) => { if (b.c) delete b.c[cl.dataset.clear]; });
+    else if (gd) evSet((b) => { b.g.splice(+gd.dataset.gdel, 1); });
+  });
+  $("evList").addEventListener("change", (e) => {
+    const inp = e.target;
+    if (inp.classList.contains("bd-amt")) {
+      const v = parseAmt(inp.value);
+      evSet((b) => { b.c = b.c || {}; if (v > 0) b.c[inp.dataset.mid] = { a: v, t: todayStr() }; else delete b.c[inp.dataset.mid]; });
+    } else if (inp.classList.contains("bd-gamt")) {
+      const v = parseAmt(inp.value), k = +inp.dataset.g;
+      evSet((b) => { if (v > 0) b.g[k].a = v; else b.g.splice(k, 1); });
+    }
+  });
+  $("evList").addEventListener("keydown", (e) => { if (e.key === "Enter" && e.target.tagName === "INPUT") { e.preventDefault(); e.target.blur(); } });
+  $("evGuestBtn").addEventListener("click", () => { evGuestOpen = !evGuestOpen; $("evGuestForm").hidden = !evGuestOpen; if (evGuestOpen) $("evGuestName").focus(); });
+  $("evGuestAdd").addEventListener("click", () => {
+    const n = $("evGuestName").value.trim().slice(0, 40), v = parseAmt($("evGuestAmt").value);
+    if (!n || !(v > 0)) { $("evErr").textContent = "Write the name and the amount they gave."; $("evErr").hidden = false; return; }
+    evSet((b) => { b.g = b.g || []; b.g.push({ n, a: v, t: todayStr() }); });
+    $("evGuestName").value = ""; $("evGuestAmt").value = "";
+  });
+  $("evCostSugs").addEventListener("click", (e) => { const b = e.target.closest("[data-csug]"); if (!b) return; $("evCostDesc").value = b.dataset.csug; $("evCostAmt").focus(); });
+  $("evCostAdd").addEventListener("click", () => {
+    const d = $("evCostDesc").value.trim().slice(0, 40), v = parseAmt($("evCostAmt").value);
+    if (!d || !(v > 0)) { $("evErr").textContent = "Write what the money was for and the amount, for example Trophies and 3000."; $("evErr").hidden = false; return; }
+    evSet((b) => { b.x = b.x || []; b.x.push({ d, a: v, t: todayStr() }); });
+    $("evCostDesc").value = ""; $("evCostAmt").value = "";
+  });
+  $("evCosts").addEventListener("click", (e) => { const b = e.target.closest("[data-xdel]"); if (b) evSet((x) => { x.x.splice(+b.dataset.xdel, 1); }); });
+  $("evBill").addEventListener("click", () => {
+    const ev = evGet();
+    if (!ev) return;
+    if (!ev.name) { $("evErr").textContent = "Write the event's name first."; $("evErr").hidden = false; $("evName").focus(); return; }
+    if (!pdfReady()) { toast("The PDF maker didn't load. Close and reopen the app."); return; }
+    sharePdf(buildEventBill(ev), `Pirampady_SC_event_${safeName(ev.name)}_${ev.date || ""}.pdf`);
+  });
+  let evDelArm = false;
+  $("evDel").addEventListener("click", () => {
+    if (!evDelArm) { evDelArm = true; $("evDel").textContent = "Tap again to delete this event"; setTimeout(() => { evDelArm = false; $("evDel").textContent = "Delete this event"; }, 4000); return; }
+    const ev = evGet(); evDelArm = false; $("evDel").textContent = "Delete this event";
+    if (!ev) return;
+    const { id, ...body } = ev;
+    writeDoc("events/" + id, null); evSync(ev, true);
+    $("evDlg").close(); render();
+    toast(`Deleted ${ev.name || "the event"}${evTotals(ev).fromClub ? " and its top-up from the club" : ""}.`, () => { writeDoc("events/" + id, body); evSync(ev); render(); });
+  });
+  $("evDlg").addEventListener("close", () => {
+    // an event that was opened but never filled in is removed again
+    const ev = evGet();
+    if (ev && !ev.name && !Object.keys(ev.c || {}).length && !(ev.g || []).length && !(ev.x || []).length) { writeDoc("events/" + ev.id, null); evSync(ev, true); render(); }
+    evId = null;
+  });
+
+  // A5 event bill: who gave, what was spent, what came from the club, and what is left
+  function buildEventBill(ev) {
+    const C = PDF_C, { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
+    const W = 148, H = 210, M = 12, t = evTotals(ev), top = readDoc(evTopPath(ev.id));
+    slipWatermark(doc, W, 80, 96);
+    slipHeader(doc, W, M, `Event  ·  ${ev.no || ""}`);
+    doc.setFillColor(...C.CREAM); doc.roundedRect(M, 39, W - 2 * M, 21, 2.5, 2.5, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...C.GREY); doc.text("EVENT / TOURNAMENT", M + 5, 46);
+    doc.setFontSize(16); doc.setTextColor(...C.INK); doc.text(doc.splitTextToSize(ev.name || "", W - 2 * M - 10)[0], M + 5, 53.5);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...C.GREY);
+    doc.text([ev.date ? longDate(ev.date) : "", ev.per > 0 ? `Rs. ${fmt(ev.per)} per person` : ""].filter(Boolean).join("  ·  "), M + 5, 57.8);
+    const people = [];
+    for (const m of allMembers()) { const v = ev.c && ev.c[m.id]; if (v && v.a > 0) people.push([m.private ? "Private member" : m.name, v.a]); }
+    for (const g of ev.g || []) if (g.a > 0) people.push([g.n, g.a]);
+    const half = Math.ceil(people.length / 2), rows = [];
+    for (let k = 0; k < half; k++) { const a = people[k], b = people[k + half]; rows.push([a[0], `Rs. ${fmt(a[1])}`, b ? b[0] : "", b ? `Rs. ${fmt(b[1])}` : ""]); }
+    if (!rows.length) rows.push([{ content: "No contributions yet.", colSpan: 4, styles: { halign: "center", textColor: C.GREY } }]);
+    doc.autoTable({
+      startY: 64, margin: { left: M, right: M }, theme: "grid",
+      head: [[{ content: `Contributions · ${t.n} ${t.n === 1 ? "person" : "people"}`, colSpan: 4 }]], body: rows,
+      styles: { font: "helvetica", fontSize: people.length > 24 ? 7.4 : 8.3, textColor: C.INK, lineColor: C.LINE, lineWidth: 0.15, cellPadding: { top: 1.2, bottom: 1.2, left: 2.5, right: 2.5 }, fillColor: false },
+      headStyles: { fillColor: C.BROWN, textColor: [255, 255, 255], fontStyle: "bold" },
+      columnStyles: { 1: { halign: "right", cellWidth: 20 }, 3: { halign: "right", cellWidth: 20 } },
+    });
+    let ty = doc.lastAutoTable.finalY + 5;
+    const costs = (ev.x || []).filter((x) => x.a > 0).map((x) => [x.d + (x.t ? `  (${dayLabel(x.t)})` : ""), `Rs. ${fmt(x.a)}`]);
+    doc.autoTable({
+      startY: ty, margin: { left: M, right: M }, theme: "grid",
+      head: [[{ content: "Spent on", styles: { fillColor: C.BROWN } }, { content: "", styles: { fillColor: C.BROWN } }]],
+      body: costs.length ? costs : [[{ content: "Nothing spent yet.", colSpan: 2, styles: { halign: "center", textColor: C.GREY } }]],
+      styles: { font: "helvetica", fontSize: 8.6, textColor: C.INK, lineColor: C.LINE, lineWidth: 0.15, cellPadding: { top: 1.4, bottom: 1.4, left: 2.5, right: 2.5 }, fillColor: false },
+      headStyles: { textColor: [255, 255, 255], fontStyle: "bold" },
+      columnStyles: { 1: { halign: "right", cellWidth: 30 } },
+    });
+    ty = doc.lastAutoTable.finalY + 6;
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(...C.BROWN); doc.text("EVENT MONEY", M, ty); ty += 2.5;
+    const money = (n) => `Rs. ${n < 0 ? "-" : ""}${fmt(Math.abs(n))}`;
+    const calc = [["+", "Collected from members and others", money(t.collected)], ["\u2013", "Spent for this event", money(t.spent)]];
+    if (t.fromClub) calc.push(["+", `Taken from the club balance${top && top.no ? ` (bill ${top.no})` : ""}`, money(t.fromClub)]);
+    doc.autoTable({
+      startY: ty, margin: { left: M, right: M }, theme: "plain", body: calc,
+      styles: { font: "helvetica", fontSize: 9.2, textColor: C.INK, cellPadding: { top: 1.3, bottom: 1.3, left: 2, right: 3 } },
+      columnStyles: { 0: { cellWidth: 7, halign: "center", fontStyle: "bold", textColor: C.BROWN }, 2: { halign: "right", cellWidth: 36 } },
+    });
+    ty = doc.lastAutoTable.finalY + 1;
+    doc.setDrawColor(...C.BROWN); doc.setLineWidth(0.6); doc.line(M, ty, W - M, ty); ty += 2;
+    const shortNotCovered = t.short && !t.fromClub, endVal = shortNotCovered ? -t.short : t.left;
+    doc.setFillColor(...(endVal < 0 ? [251, 234, 231] : [226, 242, 230])); doc.rect(M, ty, W - 2 * M, 10, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(10); doc.setTextColor(...(endVal < 0 ? C.RED : C.GREEN));
+    doc.text("=", M + 3.5, ty + 6.8); doc.text(shortNotCovered ? "Still short" : endVal > 0 ? "Left over" : "Balance", M + 9, ty + 6.8); doc.text(money(endVal), W - M - 3, ty + 6.8, { align: "right" });
+    ty += 10;
+    let footTop = H - 19, compact = false, room = footTop - 4.5 - (ty + 3);
+    if (room < 10) { compact = true; footTop = H - 10; room = footTop - 4.5 - (ty + 3); }
+    if (room < 7) { doc.addPage("a5", "portrait"); slipHeader(doc, W, M, `Event  ·  ${ev.name || ""} (signatures)`); ty = 45; compact = false; footTop = H - 19; room = 14; }
+    const sh = Math.min(13, room), sy = Math.min(footTop - 4.5, ty + 3 + sh);
+    sigBlock(doc, W - M - 52, sy, 52, sh, 1, "Collected by the club collector");
+    if (checker()) sigBlock(doc, M, sy, 52, sh, 2, `Checked by ${checker()}`);
+    doc.setDrawColor(...C.LINE); doc.setLineWidth(0.3); doc.line(M, footTop, W - M, footTop);
+    doc.setFont("helvetica", compact ? "normal" : "bold"); doc.setFontSize(compact ? 7 : 8.6); doc.setTextColor(...(compact ? C.GREY : C.BROWN));
+    doc.text(t.fromClub ? "Event money is kept separate; the shortfall was paid from the club balance." : "Event money is kept separate from the club's subscription account.", W / 2, compact ? H - 6 : H - 12, { align: "center" });
+    return doc.output("blob");
+  }
 
   /* ======================================================================
      Birthday fund: a separate pot for cake money. Never mixed with the
@@ -3207,7 +3503,9 @@ html:root[data-style="pearl"] {
     else if (act === "exp-add") openExpense(null, +b.dataset.m);
     else if (act === "bd-new") bdNew();
     else if (act === "bd-open") bdOpen(b.dataset.id);
-    else if (act === "exp-edit") openExpense(b.dataset.id);
+    else if (act === "exp-edit") { const x = expensesAll().find((e) => e.id === b.dataset.id); if (x && x.ev) evOpen(x.ev); else openExpense(b.dataset.id); }
+    else if (act === "ev-new") evNew();
+    else if (act === "ev-open") evOpen(b.dataset.id);
     else if (act === "members") { if (!S.db) { toast("Members can't load in this view."); return; } openMembers(); }
     else if (act === "settings") { if (!S.canWrite || !S.db) { toast("You can view this register, but you can't change its settings."); return; } openSettings(); }
     else if (act === "pdf") downloadPdf();
@@ -3247,11 +3545,13 @@ html:root[data-style="pearl"] {
       render();
     }, onSubErr);
   }
-  let unsubMem = null, unsubSet = null, unsubBd = null;
+  let unsubMem = null, unsubSet = null, unsubBd = null, unsubEv = null;
   function startMembers() {
     if (unsubMem) unsubMem();
     if (unsubSet) unsubSet();
     if (unsubBd) unsubBd();
+    if (unsubEv) unsubEv();
+    unsubEv = S.db.collection("events").onSnapshot((snap) => { S.evServer = snap.docs.map((d) => ({ ...d.data(), id: d.id })); evReconcile(); render(); }, onSubErr);
     unsubBd = S.db.collection("birthdays").onSnapshot((snap) => { S.bdServer = snap.docs.map((d) => ({ ...d.data(), id: d.id })); render(); }, onSubErr);
     unsubMem = S.db.collection("members").onSnapshot((snap) => {
       S.membersServer = snap.docs.map((d) => ({ ...d.data(), id: d.id })).filter((m) => typeof m.name === "string");
@@ -3265,7 +3565,7 @@ html:root[data-style="pearl"] {
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.10.0";
+  const APP_VERSION = "1.11.0";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty";
   const SEED = {};
@@ -3696,7 +3996,7 @@ html:root[data-style="pearl"] {
       let data = null;
       try { data = JSON.parse(fr.result); } catch (e) {}
       const st = data && data.app === "pirampady-sc" && data.store && typeof data.store === "object" ? data.store : null;
-      const valid = st && Object.keys(st).every((k) => /^(members|payments|electricity|settings|expenses|birthdays)\/[A-Za-z0-9_.:@+~-]+$/.test(k) && st[k] && typeof st[k] === "object");
+      const valid = st && Object.keys(st).every((k) => /^(members|payments|electricity|settings|expenses|birthdays|events)\/[A-Za-z0-9_.:@+~-]+$/.test(k) && st[k] && typeof st[k] === "object");
       if (!valid) { showErr("bakErr", "That file isn't a Pirampady SC backup. Choose the .json file made with “Save backup file”."); return; }
       const c = countRecords(st);
       pendingRestore = st;
@@ -3746,6 +4046,13 @@ html:root[data-style="pearl"] {
       for (const mid in b.c || {}) if (b.c[mid] && b.c[mid].a > 0) rows.push(["Birthday contribution", (b.date || "").slice(0, 4), b.date || "", names[mid] || mid, b.c[mid].a, b.c[mid].t || "", `For ${b.name || "birthday"} · ${b.no || ""}`]);
       for (const g of b.g || []) if (g && g.a > 0) rows.push(["Birthday contribution", (b.date || "").slice(0, 4), b.date || "", g.n + " (guest)", g.a, g.t || "", `For ${b.name || "birthday"} · ${b.no || ""}`]);
       for (const x of b.x || []) if (x && x.a > 0) rows.push(["Birthday cost", (b.date || "").slice(0, 4), b.date || "", "", x.a, x.t || "", `${x.d} · for ${b.name || "birthday"}`]);
+    }
+    for (const k of Object.keys(st).filter((k) => k.startsWith("events/"))) {
+      const e = st[k];
+      if (!e) continue;
+      for (const mid in e.c || {}) if (e.c[mid] && e.c[mid].a > 0) rows.push(["Event contribution", (e.date || "").slice(0, 4), e.date || "", names[mid] || mid, e.c[mid].a, e.c[mid].t || "", `For ${e.name || "event"} · ${e.no || ""}`]);
+      for (const g of e.g || []) if (g && g.a > 0) rows.push(["Event contribution", (e.date || "").slice(0, 4), e.date || "", g.n + " (other)", g.a, g.t || "", `For ${e.name || "event"} · ${e.no || ""}`]);
+      for (const x of e.x || []) if (x && x.a > 0) rows.push(["Event cost", (e.date || "").slice(0, 4), e.date || "", "", x.a, x.t || "", `${x.d} · for ${e.name || "event"}`]);
     }
     const csv = "﻿" + rows.map((r) => r.map(q).join(",")).join("\r\n");
     const d = new Date();
