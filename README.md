@@ -4,9 +4,12 @@ An installable, offline-first web app for running the monthly subscription regis
 
 Members pay a monthly fee (Rs. 650 at the start; it can change from any month). Some pay part of it, some pay ahead. The club also pays an electricity bill each month, signed for by the provider. This app replaces the paper register:
 
-- **Month view:** record a full payment with one tap, record part payments, and complete them later with one tap.
+- **Five sections:** Home, Members, Payments, Reports and More, in a bottom bar on the phone and a sidebar on the Mac.
+- **Home:** cash in hand first, then money collected, spent and still due, this month's collection progress, money in and out for each month of the year, and the latest payments, bills and expenses.
+- **Members:** search by name, filter by owing, paid up or paid ahead, and open any member for their balance, month-by-month status, payment history with receipts, and their slip.
+- **Payments (month view):** record a full payment with one tap, record part payments, and complete them later with one tap.
 - **Extra payments carry forward:** paying Rs. 750 against Rs. 650 marks the month paid and puts Rs. 100 towards the next month; a large advance fills the following months in order. Every month's total counts only the money used for that month, so the Rs. 100 is counted in the next month's total, never twice. The monthly account shows extra still held for later months separately.
-- **Whole-year view:** the full register, with each member's total paid and what is still due.
+- **Reports:** the yearly register PDF, member slips, the monthly account, expense and event bills, the CSV export, and the whole-year view: the full register, with each member's total paid and what is still due.
 - **Automatic sums:** total collected, electricity paid, balance in hand, and dues counted from the club's start month up to the current month.
 - **Electricity bill and signature** recorded for each month, with the date paid and an optional note.
 - **Monthly account slip** (A5 PDF) for the whole club: the electricity bill, the month's collections (totals only, no names) and the calculation, from the balance brought forward to the balance in hand.
@@ -22,7 +25,7 @@ Members pay a monthly fee (Rs. 650 at the start; it can change from any month). 
 - **Across years:** money paid ahead carries into the next year, and anything still owed from an earlier year is brought forward into "Still due". A "Before <year>" column shows it on the sheet and the register when anyone has it.
 - **Backup and restore** with a single JSON file, plus a CSV export for Excel.
 - **Phone and Mac share one register**, synced through a private GitHub repository, and every change is kept as a version you can restore.
-- **App styles:** Classic (follows the phone's light or dark mode), Floodlight (a night stadium in club gold), Scoreboard (match-day kit) and Pearl (light frosted glass), all from the logo's brown, gold, white and grey. Chosen in Settings for each device; PDFs keep the club colours.
+- **App styles:** Elite (obsidian black, champagne gold and off-white; the main style), Classic (follows the phone's light or dark mode), Floodlight (a night stadium in club gold), Scoreboard (match-day kit) and Pearl (light frosted glass). Chosen in Settings for each device. PDFs use an obsidian header band with champagne-gold accents on white paper, so they print cleanly; the TO PAY and PAID UP stamps stay red and green.
 - **Works fully offline.** Changes are saved on the device first and synced once it's back online.
 
 ## How it works
