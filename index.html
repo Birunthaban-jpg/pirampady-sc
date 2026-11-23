@@ -1072,6 +1072,36 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
 .chkrow b .ic { width: 15px; height: 15px; vertical-align: -2px; margin-right: 3px; }
 .stat:not(.is-bal) strong.long { font-size: 15.5px; }
 @media (min-width: 640px) { .stat:not(.is-bal) strong.long { font-size: 21px; } }
+/* 1.15: bills, checking, approval */
+.filter.scroll { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+.filter.scroll::-webkit-scrollbar { display: none; }
+.filter.scroll button { flex: none; }
+.bill-sel select { height: 40px; font-size: 14px; }
+.bill-list .row-main b { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+.bill-list .tag { margin-left: 0; }
+.tag.ok { color: var(--ok); background: var(--ok-bg); border-color: transparent; }
+.tag.x { color: var(--due); background: var(--due-bg); border-color: transparent; }
+.row.is-x .row-main b { opacity: .8; }
+.ver-res { margin: 0; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); }
+.ver-res b { display: flex; align-items: center; gap: 6px; font-size: 17px; }
+.ver-res b .ic { width: 18px; height: 18px; }
+.ver-res p { margin: 4px 0 0; color: var(--muted); font-size: 13.5px; }
+.ver-res.ok { background: var(--ok-bg); } .ver-res.ok b { color: var(--ok); }
+.ver-res.due { background: var(--due-bg); } .ver-res.due b { color: var(--due); }
+.ver-res.warn { background: var(--warn-bg); } .ver-res.warn b { color: var(--warn); }
+.ver-det { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 4px 14px; margin: 4px 2px 0; font-size: 14px; }
+.ver-det dt { color: var(--muted); } .ver-det dd { margin: 0; font-weight: 600; overflow-wrap: anywhere; }
+.ver-hist { margin: 4px 0 0; padding-left: 18px; color: var(--muted); font-size: 13px; display: grid; gap: 3px; }
+#verOut { display: grid; gap: 10px; }
+.apprv { display: grid; gap: 8px; padding: 12px 14px; border-radius: 14px; background: var(--surface-2); font-size: 14px; }
+.apprv > span { display: flex; align-items: center; gap: 6px; color: var(--muted); font-weight: 600; }
+.apprv .ic { width: 16px; height: 16px; }
+.apprv .btn { justify-self: start; }
+.apprv.ok > span { color: var(--ok); }
+.apprv.due { background: var(--warn-bg); } .apprv.due > span { color: var(--warn); }
+.apprv ul { margin: 0; padding-left: 18px; display: grid; gap: 2px; }
+.apprv .hint { margin: 0; }
+@media (min-width: 640px) { .apprv { grid-template-columns: minmax(0, 1fr) auto; align-items: center; } .apprv.due { grid-template-columns: 1fr; } }
 .chart .is-pre .bars { opacity: .35; border-bottom-style: dashed; }
 .chart .is-pre span { opacity: .5; }
 .msummary { grid-template-columns: minmax(0, .8fr) minmax(0, .8fr) minmax(0, 1.4fr); }
@@ -1132,6 +1162,63 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   </main>
   </div>
 </div>
+
+<dialog class="dlg" id="verDlg" aria-labelledby="verTitle">
+  <form id="verForm" novalidate>
+    <div class="dlg-head">
+      <div><p class="eyebrow">Check a bill</p><h3 id="verTitle">Is this bill genuine?</h3></div>
+      <button type="button" class="close" data-close aria-label="Close">×</button>
+    </div>
+    <p class="hint">Type the bill number and the 4-letter check code printed under its QR code, or take a photo of the QR code.</p>
+    <div class="inrow"><input id="verIn" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="e.g. EXP-2610-G5TL 7K2Q" aria-label="Bill number and check code"><button type="submit" class="btn primary">Check</button></div>
+    <label class="btn" for="verFile">Scan the QR code (take a photo)</label>
+    <input type="file" id="verFile" class="vh" accept="image/*" capture="environment">
+    <div id="verOut" aria-live="polite"></div>
+  </form>
+</dialog>
+
+<dialog class="dlg" id="donDlg" aria-labelledby="donTitle">
+  <form id="donForm" novalidate>
+    <div class="dlg-head">
+      <div><p class="eyebrow">Other income</p><h3 id="donTitle">Record a donation</h3></div>
+      <button type="button" class="close" data-close aria-label="Close">×</button>
+    </div>
+    <div class="field"><label for="donFrom">Received from</label><input id="donFrom" autocomplete="off" placeholder="e.g. a sponsor or well-wisher"></div>
+    <div class="field"><label for="donWhat">What it's for (optional)</label><input id="donWhat" autocomplete="off" placeholder="e.g. new football nets"></div>
+    <div class="field"><label for="donAmt">Amount (Rs.)</label><input id="donAmt" inputmode="numeric" autocomplete="off" placeholder="e.g. 5000"></div>
+    <div class="field"><label for="donDate">Received on</label><input id="donDate" type="date"></div>
+    <p class="hint">It is added to the club balance in the month it was received, and shows under Other income.</p>
+    <p class="err" id="donErr" hidden></p>
+    <button type="submit" class="btn primary big">Save and share receipt (PDF)</button>
+    <div class="foot-row">
+      <button type="button" class="btn danger" id="donDel" hidden>Cancel this donation</button>
+      <button type="button" class="btn" id="donShare" hidden>Share receipt again</button>
+      <button type="button" class="btn" id="donSave">Save only</button>
+    </div>
+  </form>
+</dialog>
+
+<dialog class="dlg" id="hoDlg" aria-labelledby="hoTitle">
+  <form id="hoForm" novalidate>
+    <div class="dlg-head">
+      <div><p class="eyebrow">Cash handover</p><h3 id="hoTitle">Hand over cash</h3></div>
+      <button type="button" class="close" data-close aria-label="Close">×</button>
+    </div>
+    <div class="state" id="hoCash"></div>
+    <div class="field"><label for="hoFrom">Handed over by</label><input id="hoFrom" autocomplete="off"></div>
+    <div class="field"><label for="hoTo">Received by</label><input id="hoTo" autocomplete="off" placeholder="a person, or Bank deposit"><datalist id="hoPeople"></datalist></div>
+    <div class="field"><label for="hoAmt">Amount handed over (Rs.)</label><input id="hoAmt" inputmode="numeric" autocomplete="off"></div>
+    <div class="field"><label for="hoDate">Date</label><input id="hoDate" type="date"></div>
+    <div class="field"><label for="hoNote">Note (optional)</label><input id="hoNote" autocomplete="off" maxlength="80" placeholder="e.g. deposit slip number"></div>
+    <p class="hint">A handover doesn't change the club's money: it records who holds it. Both people sign the voucher.</p>
+    <p class="err" id="hoErr" hidden></p>
+    <button type="submit" class="btn primary big" id="hoSave">Save and share voucher (PDF)</button>
+    <div class="foot-row">
+      <button type="button" class="btn danger" id="hoDel" hidden>Cancel this voucher</button>
+      <button type="button" class="btn" id="hoShare" hidden>Share voucher again</button>
+    </div>
+  </form>
+</dialog>
 
 <dialog class="dlg" id="attDlg">
   <div class="inner" id="attBody"></div>
@@ -1512,6 +1599,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
 
 <script src="vendor/jspdf.umd.min.js"></script>
 <script src="vendor/jspdf.plugin.autotable.min.js"></script>
+<script src="vendor/qrcode.min.js"></script>
 <script>
 (() => {
   "use strict";
@@ -1528,7 +1616,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   const rsH = (n) => `<span class="cur">Rs.</span> ${fmt(n)}`;   // same text as rs(), with a smaller "Rs." on screen
   const parseAmt = (v) => { const d = String(v ?? "").replace(/[^0-9]/g, ""); return d ? parseInt(d, 10) : NaN; };
 
-  const VIEWS = ["home", "members", "month", "year", "more", "bday", "expenses", "elec", "income", "history"];
+  const VIEWS = ["home", "members", "month", "year", "more", "bday", "expenses", "elec", "income", "history", "bills"];
   let savedView = null;
   try { savedView = localStorage.getItem("psc.view13"); } catch (e) {}   // a new key, so everyone opens on Home once after the redesign
 
@@ -1880,7 +1968,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   /* ---------- rendering ---------- */
   // Sections: Home, Members, Payments (the month view), Reports (the whole-year sheet and documents) and More.
   // More opens further pages: events and birthdays, expenses, electricity and other income.
-  const TAB_OF = { bday: "more", expenses: "more", elec: "more", income: "more", history: "more" };
+  const TAB_OF = { bday: "more", expenses: "more", elec: "more", income: "more", history: "more", bills: "more" };
   const NAV_TABS = [["tabHome", "home"], ["tabMembers", "members"], ["tabMonth", "month"], ["tabYear", "year"], ["tabMore", "more"]];
   let lastView = "", enterTimer = null;
   function render() {
@@ -1913,6 +2001,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     if (S.view === "elec") { main.innerHTML = elecPageHTML(); return; }
     if (S.view === "income") { main.innerHTML = incomePageHTML(); return; }
     if (S.view === "history") { main.innerHTML = historyPageHTML(); return; }
+    if (S.view === "bills") { const keepQ = document.activeElement && document.activeElement.id === "bSearch"; main.innerHTML = billsPageHTML(); if (keepQ) { const q = $("bSearch"); q.focus(); q.setSelectionRange(q.value.length, q.value.length); } return; }
     if (S.view === "bday") {
       main.innerHTML = `${subHead("Events &amp; birthday fund", "Money for each event is kept separate")}<div style="display:grid;gap:22px">${eventsHTML()}${bdayHTML()}</div>`;
       if ($("evDlg").open && document.activeElement && !$("evDlg").contains(document.activeElement)) fillEv();
@@ -2018,7 +2107,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     });
     for (const x of expensesAll()) if (x.t) out.push({ t: x.t, kind: "out", ic: "receipt", title: x.desc || catName(x.cat), sub: `${catName(x.cat)}${x.no ? ` · ${x.no}` : ""}`, amt: -x.amount, attrs: `data-act="exp-edit" data-id="${esc(x.id)}"` });
     for (let k = 0; k < 12; k++) { const e = elec(k); if (e.amount && e.t) out.push({ t: e.t, kind: "out", ic: "bolt", title: "Electricity bill", sub: `${MONTHS_FULL[k]}${e.signed ? " · signed by Selvarajah" : " · not signed yet"}`, amt: -e.amount, attrs: `data-act="elec" data-m="${k}"` }); }
-    for (const x of incomeAll()) if (x.t) out.push({ t: x.t, kind: "inc", ic: "coins", title: x.desc || "Other income", sub: `Added to the club${x.no ? ` · ${x.no}` : ""}`, amt: x.amount, attrs: `data-act="ev-open" data-id="${esc(x.ev || "")}"` });
+    for (const x of incomeAll()) if (x.t) out.push({ t: x.t, kind: "inc", ic: "coins", title: x.desc || "Other income", sub: `Added to the club${x.no ? ` · ${x.no}` : ""}`, amt: x.amount, attrs: (x.src === "donation" ? `data-act="don-open" data-id="${esc(x.id || x._id || "")}"` : `data-act="ev-open" data-id="${esc(x.ev || "")}"`) });
     out.sort((a, b) => String(b.t).localeCompare(String(a.t)));
     return out.slice(0, limit);
   }
@@ -2046,6 +2135,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       const who = (p) => `${dayLabel(p.t)}${p.c ? ` by ${p.c}` : ""}`;
       items.push(`<li><span class="att-ic warn">${icon("receipt")}</span><span class="att-txt"><b>${esc(d.m.name)} · ${MONTHS_FULL[d.i]}: ${rs(d.p.a)} recorded twice?</b><small>${esc(who(d.p))} and ${esc(who(d.q))}${d.q.r ? ` · ${esc(d.q.r)}` : ""}</small></span><span class="att-acts"><button type="button" class="btn sm" data-act="dup-cancel" data-id="${esc(d.m.id)}" data-m="${d.i}" data-k="${esc(d.q.id)}"${S.canWrite ? "" : " disabled"}>Cancel the second</button><button type="button" class="btn sm" data-act="dup-ok" data-id="${esc(d.m.id)}" data-m="${d.i}" data-k="${esc(d.q.id)}"${S.canWrite ? "" : " disabled"}>Both are right</button></span></li>`);
     }
+    for (const a of changedApprovals()) items.push(`<li><span class="att-ic warn">${icon("statement")}</span><span class="att-txt"><b>${MONTHS_FULL[a.i]} ${a.y} changed after approval</b><small>Approved by ${esc(a.by || "someone")}; its figures are different now.</small></span><span class="att-acts"><button type="button" class="btn sm" data-act="view-month" data-m="${a.i}">See ${MONTHS[a.i]}</button></span></li>`);
     if (!items.length) return "";
     return `<section class="card hm-block hm-att"><p class="eyebrow">Needs your attention</p><ul class="att-list">${items.join("")}</ul></section>`;
   }
@@ -2238,6 +2328,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       tileHTML("receipt", "Expense bills", "Open any expense to share its bill", `<button type="button" class="btn" data-act="view" data-v="expenses">Expenses</button>`),
       tileHTML("trophy", "Event reports", "Collections, costs and the club's share", `<button type="button" class="btn" data-act="view" data-v="bday">Events</button>`),
       tileHTML("table", "Export for Excel", "Every payment as a .csv file", `<button type="button" class="btn" data-act="csv">Export CSV</button>`),
+      tileHTML("check", "Bills &amp; receipts", "Find any bill, check it's genuine, share it again", `<span class="inrow"><button type="button" class="btn" data-act="view" data-v="bills">Open</button><button type="button" class="btn" data-act="verify">Check a bill</button></span>`),
     ];
     return `${pageHead("Reports", `Documents and the full register for ${y}`)}<div class="tiles">${tiles.join("")}</div>
       <div class="sec-head"><h3>Register ${y}</h3><span>Tap any box to change it</span></div>${yearHTML(ms)}`;
@@ -2266,6 +2357,9 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       ["Checks", [
         rowHTML("coins", "Count the cash", (() => { const c = cashCounts()[0]; return c ? `Last counted ${esc(dayLabel(c.d))}: ${c.diff === 0 ? "matched" : c.diff < 0 ? `${rs(-c.diff)} short` : `${rs(c.diff)} over`}` : "Compare the cash you hold with the app"; })(), 'data-act="cash"'),
         rowHTML("clock", "Change history", "Who recorded, changed or cancelled what", 'data-act="view" data-v="history"'),
+        rowHTML("doc", "Bills &amp; receipts", "Every bill and receipt: search, filter and share again", 'data-act="view" data-v="bills"'),
+        rowHTML("check", "Check a bill", "Is a paper bill genuine? Type its code or scan its QR", 'data-act="verify"'),
+        rowHTML("send", "Hand over cash", "A voucher when club cash passes to someone else or the bank", 'data-act="ho-new"'),
       ]],
       ["Your data", [
         ...(typeof openSync === "function" ? [rowHTML("sync", "Sync &amp; backup", esc(syncTxt) || "Phone and Mac, backup file", 'data-act="sync"')] : []),
@@ -2296,6 +2390,76 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     });
     return `${subHead("Electricity bills", `${rs(total)} paid in ${y} · Selvarajah signs each bill`)}<ul class="rows card">${rows.join("")}</ul>`;
   }
+  const KIND = { receipt: ["Receipt", "pay"], expense: ["Expense bill", "receipt"], elec: ["Electricity bill", "bolt"], event: ["Event bill", "trophy"], birthday: ["Birthday bill", "cake"], account: ["Monthly account", "statement"], donation: ["Donation receipt", "coins"], handover: ["Cash handover", "send"] };
+  // every bill and receipt, made from the saved records (yr = one year, or null for all years)
+  function allBills(yr) {
+    const out = [], keep = (y) => yr == null || y === yr, day = (t) => String(t || "").slice(0, 10);
+    for (const d of scanDocs("payments/")) {
+      if (!d || !keep(d.year)) continue;
+      const months = new Set([...Object.keys(d.h || {}), ...Object.keys(d.x || {})]);
+      for (const ik of months) {
+        const i = +ik, base = { kind: "receipt", y: d.year, i, mid: d.member, title: nameOf(d.member), sub: `${MONTHS_FULL[i]} ${d.year} subscription` };
+        docParts(d, i).forEach((p, k) => { if (p.r) out.push({ ...base, no: p.r, k, a: p.a, t: p.t, by: p.c || "", code: rcCode(p.r, d.member, d.year, i, p.a, p.t), state: "ok" }); });
+        docCancelled(d, i).forEach((p) => { if (p.r) out.push({ ...base, no: p.r, a: p.a, t: p.t, by: p.c || "", code: rcCode(p.r, d.member, d.year, i, p.a, p.t), state: "cancelled", xb: p.xb, xt: p.xt }); });
+      }
+    }
+    for (const x of scanDocs("expenses/")) if (x && keep(x.year) && x.amount > 0 && x.no) out.push({ kind: "expense", no: x.no, y: x.year, i: x.month, id: x._id, title: x.desc || catName(x.cat), sub: `${catName(x.cat)}${x.to ? ` · paid to ${x.to}` : ""}`, a: x.amount, t: x.t, by: x.by || "", chk: x.chk || null, code: expCode(x), state: "ok" });
+    for (const d of scanDocs("electricity/")) if (d && keep(d.year)) for (const ik in d.m || {}) { const e = d.m[ik]; if (e && e.amount > 0) out.push({ kind: "elec", no: `ELEC-${String(d.year).slice(2)}${String(+ik + 1).padStart(2, "0")}`, y: d.year, i: +ik, title: `Electricity bill · ${MONTHS_FULL[+ik]}`, sub: e.signed ? "Signed by Selvarajah" : "Not signed yet", a: e.amount, t: e.t, by: "", signed: !!e.signed, state: "ok" }); }
+    for (const [pre, kind, ck] of [["events/", "event", "V"], ["birthdays/", "birthday", "B"]]) for (const ev of scanDocs(pre)) {
+      const y = +day(ev && ev.date).slice(0, 4);
+      if (!ev || !ev.no || !keep(y)) continue;
+      const tt = evTotals(ev);
+      out.push({ kind, no: ev.no, y, i: +day(ev.date).slice(5, 7) - 1, id: ev._id, title: ev.name || (kind === "event" ? "Event" : "Birthday"), sub: `Collected ${rs(tt.collected)} · spent ${rs(tt.spent)}`, a: tt.collected, t: ev.date, by: "", code: evCode(ev, ck), state: "ok" });
+    }
+    for (const d of scanDocs("income/")) if (d && d.src === "donation" && keep(d.year) && d.no) out.push({ kind: "donation", no: d.no, y: d.year, i: d.month, id: d._id, title: d.from ? `From ${d.from}` : "Donation", sub: d.what || "Donation to the club", a: d.amount, t: d.t, by: d.by || "", code: donCode(d), state: "ok" });
+    for (const h of scanDocs("handover/")) if (h && keep(h.year) && h.no) out.push({ kind: "handover", no: h.no, y: h.year, i: h.month, id: h._id, title: `${h.from || "?"} → ${h.to || "?"}`, sub: h.note || "Cash handed over", a: h.amount, t: h.t, by: h.from || "", code: hoCode(h), state: "ok" });
+    // cancelled bills live on in the change history
+    const seen = new Set(out.map((b) => b.no));
+    for (const l of scanDocs("log/").sort((a, b) => String(b.t).localeCompare(String(a.t)))) {
+      if (l.act !== "cancel" || !l.no || seen.has(l.no) || !keep(l.y)) continue;
+      const kind = l.k === "exp" ? "expense" : l.k === "don" ? "donation" : l.k === "ho" ? "handover" : null;
+      if (!kind) continue;
+      seen.add(l.no);
+      out.push({ kind, no: l.no, y: l.y, i: l.i, title: l.desc || l.from || KIND[kind][0], sub: KIND[kind][0], a: l.a, t: day(l.t), by: l.by || "", state: "cancelled", xb: l.by, xt: day(l.t) });
+    }
+    return out.sort((a, b) => day(b.t).localeCompare(day(a.t)) || String(b.no).localeCompare(String(a.no)));
+  }
+  // the monthly account's figures (the same sums as the account PDF)
+  function monthFigs(i) {
+    const y = S.year, st = monthStats(i), e = elec(i), income = incTotal(i), other = expTotal(i), open = balanceBefore(y, i);
+    return { open, collected: st.collected, income, elec: e.amount, other, close: open + st.collected + income - e.amount - other, held: heldAt(y, i) };
+  }
+  const FIG_NAMES = { open: "Brought forward", collected: "Collected", income: "Other income", elec: "Electricity bill", other: "Other bills", close: "Balance in hand", held: "Paid in advance" };
+  const approvalOf = (y, i) => scanDocs("approve/").find((a) => a && a.y === y && a.i === i) || null;
+  function approvalDiff(a, i) { const now = monthFigs(i); return Object.keys(FIG_NAMES).filter((k) => a.f && a.f[k] !== now[k]).map((k) => ({ k, was: a.f[k], now: now[k] })); }
+  function approvalHTML(i) {
+    const y = S.year;
+    if (y > CY || (y === CY && i > CM)) return "";
+    const a = approvalOf(y, i);
+    if (!a) return `<div class="apprv"><span>${icon("check")}Not approved yet</span><button type="button" class="btn sm" data-act="approve" data-m="${i}"${S.canWrite ? "" : " disabled"}>Approve ${MONTHS[i]}</button></div>`;
+    const diff = approvalDiff(a, i), when = esc(longDate(String(a.t).slice(0, 10)));
+    if (!diff.length) return `<div class="apprv ok"><span>${icon("check")}Approved by ${esc(a.by || "someone")} on ${when}</span></div>`;
+    const changes = scanDocs("log/").filter((l) => l.y === y && l.i === i && String(l.t) > String(a.t) && l.k !== "acct").sort((p, q) => String(q.t).localeCompare(String(p.t))).slice(0, 5);
+    return `<div class="apprv due"><span><b>Changed after approval</b> · approved by ${esc(a.by || "someone")} on ${when}</span>
+      <ul>${diff.map((d) => `<li>${FIG_NAMES[d.k]}: ${rs(d.was)} → <b>${rs(d.now)}</b></li>`).join("")}</ul>
+      ${changes.length ? `<p class="hint">${changes.map((l) => esc(logText(l))).join("<br>")}</p>` : ""}
+      <button type="button" class="btn sm" data-act="approve" data-m="${i}"${S.canWrite ? "" : " disabled"}>Approve again</button></div>`;
+  }
+  function approveMonth(i) {
+    if (!S.canWrite) return;
+    const y = S.year, f = monthFigs(i), by = whoAmI();
+    const rec = { y, i, t: new Date().toISOString(), f };
+    if (by) rec.by = by;
+    writeDoc(`approve/${y}-${String(i + 1).padStart(2, "0")}`, rec);
+    logChange({ k: "acct", act: "approve", y, i, a: f.close });
+    render();
+    toast(`${MONTHS_FULL[i]} approved: balance in hand ${rsSigned(f.close)}.`);
+  }
+  // approved months whose figures have changed since (shown on Home)
+  function changedApprovals() {
+    if (!S.membersLoaded || !S.payLoaded) return [];
+    return scanDocs("approve/").filter((a) => a && a.y === S.year).filter((a) => approvalDiff(a, a.i).length);
+  }
   function logText(l) {
     const who = l.by || l.dev || "Someone", mon = Number.isInteger(l.i) ? `${MONTHS_FULL[l.i]} ${l.y}` : String(l.y || "");
     const nm = l.name || "a member", what = `“${l.desc || "expense"}”`;
@@ -2310,22 +2474,256 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
         cancel: `${who} cleared the ${mon} electricity bill (${rs(l.a)})`, signed: `${who} marked the ${mon} electricity bill as signed by Selvarajah`,
         unsigned: `${who} marked the ${mon} electricity bill as not signed` },
       cash: { count: `${who} counted ${rs(l.a)} in cash (${l.a === l.old ? "matched the app" : l.a < l.old ? `${rs(l.old - l.a)} short` : `${rs(l.a - l.old)} over`})` },
+      acct: { approve: `${who} approved the ${mon} account (balance in hand ${rs(l.a)})` },
+      don: { add: `${who} recorded a donation of ${rs(l.a)}${l.from ? ` from ${l.from}` : ""}`, edit: `${who} changed the donation${l.from ? ` from ${l.from}` : ""} from ${rs(l.old)} to ${rs(l.a)}`,
+        cancel: `${who} cancelled the donation${l.from ? ` from ${l.from}` : ""} (${rs(l.a)})` },
+      ho: { add: `${who} handed over ${rs(l.a)} in cash${l.to ? ` to ${l.to}` : ""}`, cancel: `${who} cancelled the cash handover${l.to ? ` to ${l.to}` : ""} (${rs(l.a)})` },
     };
     return (T[l.k] && T[l.k][l.act]) || `${who} made a change`;
+  }
+  // bills for this year, with the month accounts added (they are worked out for the year on screen)
+  function billsOfYear() {
+    const y = S.year, list = allBills(y);
+    if (S.membersLoaded && S.payLoaded) for (let i = 0; i < 12; i++) {
+      if (y > CY || (y === CY && i > CM)) break;
+      const f = monthFigs(i);
+      if (!f.collected && !f.elec && !f.other && !f.income) continue;
+      const a = approvalOf(y, i), ch = a && approvalDiff(a, i).length;
+      list.push({ kind: "account", no: `ACC-${String(y).slice(2)}${String(i + 1).padStart(2, "0")}`, y, i, title: `Monthly account · ${MONTHS_FULL[i]}`, sub: a ? (ch ? "Changed after approval" : `Approved by ${a.by || "someone"}`) : "Not approved yet", a: f.close, t: `${y}-${String(i + 1).padStart(2, "0")}-28`, by: "", state: "ok", appr: a ? (ch ? "changed" : "ok") : "" });
+    }
+    return list.sort((p, q) => String(q.t || "").slice(0, 10).localeCompare(String(p.t || "").slice(0, 10)));
+  }
+  function billListHTML(list) {
+    const q = (S.bq || "").trim().toLowerCase(), k = S.bk || "all", st = S.bs || "all", m = S.bm == null ? "" : String(S.bm), who = S.bp || "";
+    const shown = list.filter((b) => (k === "all" || b.kind === k || (k === "event" && b.kind === "birthday"))
+      && (st === "all" || (st === "cancelled" && b.state === "cancelled") || (st === "checked" && (b.chk || b.appr === "ok" || b.signed)) || (st === "notchecked" && b.state === "ok" && (b.kind === "expense" ? !b.chk : b.kind === "account" ? b.appr !== "ok" : b.kind === "elec" ? !b.signed : false)))
+      && (m === "" || b.i === +m) && (!who || b.by === who)
+      && (!q || [b.no, b.title, b.sub, b.by].join(" ").toLowerCase().includes(q)));
+    if (!shown.length) return `<p class="empty-filter">${q ? `Nothing matches “${esc(S.bq)}”.` : "No bills in this list."}</p>`;
+    return `<ul class="rows card bill-list">${shown.slice(0, 400).map((b) => {
+      const tags = [b.state === "cancelled" ? '<span class="tag x">Cancelled</span>' : "", b.chk ? '<span class="tag ok">✓ Checked</span>' : "", b.appr === "ok" ? '<span class="tag ok">✓ Approved</span>' : b.appr === "changed" ? '<span class="tag x">Changed</span>' : "", b.kind === "elec" ? (b.signed ? '<span class="tag ok">✓ Signed</span>' : '<span class="tag">Not signed</span>') : ""].join("");
+      return `<li><button type="button" class="row${b.state === "cancelled" ? " is-x" : ""}" data-act="bill-open" data-kind="${b.kind}" data-no="${esc(b.no)}"><span class="row-ic${b.state === "cancelled" ? " x" : ""}">${icon(KIND[b.kind][1])}</span><span class="row-main"><b>${esc(b.title)}${tags}</b><small>${esc(b.no)}${b.t ? ` · ${esc(dayLabel(String(b.t).slice(0, 10)))}` : ""}${b.by ? ` · ${esc(b.by)}` : ""}${b.sub ? ` · ${esc(b.sub)}` : ""}</small></span><b class="row-amt num">${b.state === "cancelled" ? `<s>${rs(b.a)}</s>` : rs(b.a)}</b>${icon("chevron", "chev")}</button></li>`;
+    }).join("")}</ul>`;
+  }
+  function billsPageHTML() {
+    const list = billsOfYear(), y = S.year;
+    const people = [...new Set(list.map((b) => b.by).filter(Boolean))].sort();
+    const kinds = [["all", "All"], ["receipt", "Receipts"], ["expense", "Expenses"], ["elec", "Electricity"], ["account", "Accounts"], ["event", "Events"], ["donation", "Donations"], ["handover", "Handovers"]];
+    const states = [["all", "Any status"], ["notchecked", "Not checked or approved"], ["checked", "Checked or approved"], ["cancelled", "Cancelled"]];
+    return `${subHead("Bills &amp; receipts", `${list.length} documents in ${y} · tap one to share it again`, `<button type="button" class="btn" data-act="verify">${icon("check")}Check a bill</button>`)}
+      <label class="search">${icon("search")}<input id="bSearch" type="search" placeholder="Bill number, name or item" value="${esc(S.bq || "")}" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-label="Search bills"></label>
+      <div class="filter scroll" role="group" aria-label="Type">${kinds.map(([kk, l]) => `<button type="button" data-act="bk" data-f="${kk}" aria-pressed="${(S.bk || "all") === kk}">${l}</button>`).join("")}</div>
+      <div class="inrow bill-sel">
+        <select id="bMonth" aria-label="Month"><option value="">All months</option>${MONTHS_FULL.map((n, k) => `<option value="${k}"${String(S.bm) === String(k) ? " selected" : ""}>${n}</option>`).join("")}</select>
+        <select id="bStatus" aria-label="Status">${states.map(([kk, l]) => `<option value="${kk}"${(S.bs || "all") === kk ? " selected" : ""}>${l}</option>`).join("")}</select>
+        <select id="bPerson" aria-label="Person"><option value="">Everyone</option>${people.map((p) => `<option${S.bp === p ? " selected" : ""}>${esc(p)}</option>`).join("")}</select>
+      </div>
+      <div id="bList">${billListHTML(list)}</div>
+      <p class="hint pad">Bills are made again from the saved records, exactly as they were, so nothing needs to be stored twice. A cancelled bill stays listed but can't be shared as valid.</p>`;
+  }
+  function openBill(kind, no) {
+    const b = billsOfYear().find((x) => x.kind === kind && x.no === no);
+    if (!b) return;
+    if (b.state === "cancelled") { toast(`${KIND[kind][0]} ${no} was cancelled${b.xb ? ` by ${b.xb}` : ""}${b.xt ? ` on ${longDate(b.xt)}` : ""}. It can't be shared as a valid bill.`); return; }
+    if (!pdfReady()) { toast("The PDF maker didn't load. Close and reopen the app."); return; }
+    if (kind === "receipt") sendReceipt(b.mid, b.i, b.k);
+    else if (kind === "expense") { const x = expensesAll().find((e) => e.id === b.id); if (x) sharePdf(buildExpenseVoucher(x), `Pirampady_SC_bill_${x.no}.pdf`); }
+    else if (kind === "elec" || kind === "account") shareAccountSlip(b.i);
+    else if (kind === "event") { const ev = eventsAll().find((e) => e.no === no); if (ev) sharePdf(buildEventBill(ev), `Pirampady_SC_event_${safeName(ev.name || "event")}_${ev.date || ""}.pdf`); }
+    else if (kind === "birthday") { const ev = bdaysAll().find((e) => e.no === no); if (ev) sharePdf(buildBirthdayBill(ev), `Pirampady_SC_birthday_${safeName(ev.name || "birthday")}_${ev.date || ""}.pdf`); }
+    else if (kind === "donation") openDonation(b.id);
+    else if (kind === "handover") openHandover(b.id);
+  }
+
+  /* ---------- checking a bill: type the number and check code, or scan its QR code ---------- */
+  function openVerify() { $("verIn").value = ""; $("verOut").innerHTML = ""; $("verDlg").showModal(); }
+  function verifyBill(text) {
+    const raw = String(text || "").trim().toUpperCase().replace(/^PSC:/, "");
+    const toks = raw.split(/[\s:|,]+/).filter(Boolean);
+    const no = toks.find((t) => /^[A-Z]{2,4}-\d{4}-[A-Z0-9]{4}$/.test(t)) || toks[0] || "";
+    const code = toks.find((t) => t !== no && /^[A-Z0-9]{4}$/.test(t)) || "";
+    const out = $("verOut");
+    if (!no) { out.innerHTML = ""; return; }
+    const b = allBills(null).find((x) => String(x.no).toUpperCase() === no);
+    if (!b) { out.innerHTML = `<div class="ver-res due"><b>Not in the register</b><p>No bill or receipt numbered ${esc(no)} was ever recorded on these phones. Check the number, or treat the paper as not genuine.</p></div>`; return; }
+    const hist = scanDocs("log/").filter((l) => l.r === b.no || l.no === b.no).sort((p, q) => String(p.t).localeCompare(String(q.t)));
+    const det = `<dl class="ver-det"><dt>${KIND[b.kind][0]}</dt><dd>${esc(b.no)}</dd><dt>For</dt><dd>${esc(b.title)}${b.sub ? ` · ${esc(b.sub)}` : ""}</dd><dt>Amount</dt><dd>${rs(b.a)}</dd>${b.t ? `<dt>Date</dt><dd>${esc(longDate(String(b.t).slice(0, 10)))}</dd>` : ""}${b.by ? `<dt>By</dt><dd>${esc(b.by)}</dd>` : ""}${b.kind === "expense" ? `<dt>Checked</dt><dd>${b.chk ? `Yes${b.chk.by ? `, by ${esc(b.chk.by)}` : ""}${b.chk.t ? ` on ${esc(longDate(b.chk.t))}` : ""}` : "Not yet"}</dd>` : ""}</dl>`;
+    const histHTML = hist.length ? `<p class="lbl2">History</p><ul class="ver-hist">${hist.map((l) => `<li>${esc(longDate(String(l.t).slice(0, 10)))} · ${esc(logText(l))}</li>`).join("")}</ul>` : "";
+    let head;
+    if (b.state === "cancelled") head = `<div class="ver-res due"><b>Cancelled</b><p>This ${KIND[b.kind][0].toLowerCase()} was cancelled${b.xb ? ` by ${esc(b.xb)}` : ""}${b.xt ? ` on ${esc(longDate(b.xt))}` : ""}. It no longer counts.</p></div>`;
+    else if (!b.code) head = `<div class="ver-res"><b>In the register</b><p>This document is in the register. It has no check code to compare.</p></div>`;
+    else if (!code) head = `<div class="ver-res"><b>In the register</b><p>Now enter the 4-letter check code printed on the paper (under the QR code) to make sure it wasn't changed.</p></div>`;
+    else if (code === b.code) head = `<div class="ver-res ok"><b>${icon("check")}Genuine</b><p>The paper matches the register exactly.</p></div>`;
+    else head = `<div class="ver-res warn"><b>Changed since it was printed</b><p>The number is real, but the bill was changed after this copy was made (or the paper was altered). The register now says:</p></div>`;
+    out.innerHTML = head + det + histHTML;
+  }
+  // reading a QR code from a photo: the reader is loaded only when it is needed
+  function loadQrReader() {
+    if (window.jsQR) return Promise.resolve();
+    return new Promise((res, rej) => { const sc = document.createElement("script"); sc.src = "vendor/jsQR.min.js"; sc.onload = res; sc.onerror = rej; document.head.appendChild(sc); });
+  }
+  async function scanPhoto(file) {
+    const out = $("verOut");
+    out.innerHTML = `<div class="ver-res"><b>Reading the QR code…</b></div>`;
+    try {
+      await loadQrReader();
+      const url = URL.createObjectURL(file);
+      const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = url; });
+      let found = null;
+      for (const max of [1400, 900, 2200]) {
+        const sc = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+        const c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * sc); c.height = Math.round(img.naturalHeight * sc);
+        const g = c.getContext("2d"); g.drawImage(img, 0, 0, c.width, c.height);
+        const r = window.jsQR(g.getImageData(0, 0, c.width, c.height).data, c.width, c.height, { inversionAttempts: "attemptBoth" });
+        if (r && r.data) { found = r.data; break; }
+      }
+      URL.revokeObjectURL(url);
+      if (!found) { out.innerHTML = `<div class="ver-res warn"><b>No QR code found</b><p>Take the photo closer, straight on and in good light, or type the bill number and check code instead.</p></div>`; return; }
+      $("verIn").value = found.replace(/^PSC:/, "").replace(/:/g, " ");
+      verifyBill(found);
+    } catch (e) { out.innerHTML = `<div class="ver-res warn"><b>The photo couldn't be read</b><p>Type the bill number and check code instead.</p></div>`; }
+  }
+
+  /* ---------- donations: money given to the club (counted as other income) ---------- */
+  let donCtx = null;
+  function openDonation(id) {
+    if (!S.canWrite && !id) return;
+    const d = id ? scanDocs("income/").find((x) => x._id === id) : null;
+    donCtx = { id: d ? d._id : null, no: d ? d.no : null };
+    $("donTitle").textContent = d ? "Donation" : "Record a donation";
+    $("donFrom").value = d ? d.from || "" : "";
+    $("donWhat").value = d ? d.what || "" : "";
+    $("donAmt").value = d ? String(d.amount) : "";
+    $("donDate").value = d && d.t ? d.t : todayStr();
+    $("donErr").hidden = true;
+    $("donDel").hidden = !d;
+    $("donShare").hidden = !d;
+    $("donDlg").showModal();
+  }
+  function saveDonation() {
+    const from = $("donFrom").value.trim().slice(0, 60), what = $("donWhat").value.trim().slice(0, 80), v = parseAmt($("donAmt").value);
+    const err = (t) => { $("donErr").textContent = t; $("donErr").hidden = false; return null; };
+    if (!from) return err("Write who gave the money, for example a sponsor's name.");
+    if (!(v > 0) || v > 10000000) return err("Enter the amount in rupees, for example 5000.");
+    const t = /^\d{4}-\d{2}-\d{2}$/.test($("donDate").value) ? $("donDate").value : todayStr();
+    const [ty, tm] = t.split("-").map(Number);
+    const id = donCtx.id || ("d" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5));
+    const prev = donCtx.id ? scanDocs("income/").find((x) => x._id === donCtx.id) : null;
+    const no = donCtx.no || newReceipt(ty, tm - 1).replace("PSC-", "DON-");
+    const rec = { year: ty, month: tm - 1, src: "donation", from, what, desc: `Donation from ${from}${what ? ` · ${what}` : ""}`, amount: v, t, no };
+    const by = whoAmI();
+    if (by) rec.by = by;
+    writeDoc("income/" + id, rec);
+    if (!prev) logChange({ k: "don", act: "add", y: ty, i: tm - 1, a: v, no, from, desc: rec.desc });
+    else if (prev.amount !== v || prev.from !== from || prev.t !== t || prev.what !== what) logChange({ k: "don", act: "edit", y: ty, i: tm - 1, a: v, old: prev.amount, no, from, desc: rec.desc });
+    render();
+    return { ...rec, id };
+  }
+  function buildDonationPdf(d) {
+    const C = PDF_C, { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a6" });
+    const W = 105, H = 148, M = 9;
+    slipWatermark(doc, W, 52, 70);
+    centerHeader(doc, W, "DONATION RECEIPT", { no: d.no, code: donCode(d) });
+    let yy = 48;
+    const line = (k, v) => { doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...C.GREY); doc.text(k, M + 1, yy); doc.setFont("helvetica", "bold"); doc.setTextColor(...C.INK); doc.text(doc.splitTextToSize(String(v), W - 2 * M - 34)[0], W - M - 1, yy, { align: "right" }); yy += 6; };
+    line("Receipt no.", d.no); line("Date", longDate(d.t)); line("Received from", d.from || "—"); if (d.what) line("For", d.what);
+    yy += 1;
+    doc.setFillColor(...C.CREAM); doc.roundedRect(M, yy, W - 2 * M, 15, 2, 2, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...C.GREY); doc.text("AMOUNT RECEIVED", M + 4, yy + 5.6);
+    doc.setFontSize(15); doc.setTextColor(...C.GREEN); doc.text(`Rs. ${fmt(d.amount)}`, W - M - 4, yy + 10.2, { align: "right" });
+    yy += 22;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...C.INK);
+    doc.text(doc.splitTextToSize("Added to the club's funds. Thank you for supporting Pirampady Sports Club!", W - 2 * M - 2), M + 1, yy);
+    yy = Math.max(yy + 18, H - 22);
+    sigBlock(doc, W - M - 46, yy, 46, 13, signerFor(d.by), d.by ? `Received by ${d.by}` : "Received for the club");
+    return doc.output("blob");
+  }
+
+  /* ---------- cash handover: club cash passed from one person to another (or into a bank) ---------- */
+  let hoCtx = null;
+  function openHandover(id) {
+    const h = id ? scanDocs("handover/").find((x) => x._id === id) : null;
+    if (!h && !S.canWrite) return;
+    hoCtx = { id: h ? h._id : null };
+    $("hoTitle").textContent = h ? `Cash handover · ${h.no}` : "Hand over cash";
+    $("hoCash").innerHTML = `Cash in hand now, by the register: <b>${rs(cashNow())}</b>`;
+    $("hoFrom").value = h ? h.from || "" : whoAmI();
+    $("hoTo").value = h ? h.to || "" : "";
+    $("hoAmt").value = h ? String(h.amount) : String(Math.max(0, cashNow()));
+    $("hoDate").value = h && h.t ? h.t : todayStr();
+    $("hoNote").value = h ? h.note || "" : "";
+    $("hoTo").setAttribute("list", "hoPeople");
+    $("hoPeople").innerHTML = [settings().sig.text, checker(), "Bank deposit"].filter(Boolean).map((n) => `<option value="${esc(n)}">`).join("");
+    for (const f of ["hoFrom", "hoTo", "hoAmt", "hoDate", "hoNote"]) $(f).disabled = !!h;
+    $("hoSave").hidden = !!h;
+    $("hoShare").hidden = !h;
+    $("hoDel").hidden = !h;
+    $("hoErr").hidden = true;
+    $("hoDlg").showModal();
+  }
+  function saveHandover() {
+    const from = $("hoFrom").value.trim().slice(0, 60), to = $("hoTo").value.trim().slice(0, 60), v = parseAmt($("hoAmt").value);
+    const err = (t) => { $("hoErr").textContent = t; $("hoErr").hidden = false; return null; };
+    if (!from || !to) return err("Write who handed the cash over and who received it.");
+    if (!(v > 0)) return err("Enter the amount handed over in rupees.");
+    const t = /^\d{4}-\d{2}-\d{2}$/.test($("hoDate").value) ? $("hoDate").value : todayStr();
+    const [ty, tm] = t.split("-").map(Number);
+    const rec = { year: ty, month: tm - 1, from, to, amount: v, t, no: newReceipt(ty, tm - 1).replace("PSC-", "HO-"), cash: cashNow() };
+    const note = $("hoNote").value.trim().slice(0, 80);
+    if (note) rec.note = note;
+    const by = whoAmI();
+    if (by) rec.by = by;
+    writeDoc("handover/h" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5), rec);
+    logChange({ k: "ho", act: "add", y: ty, i: tm - 1, a: v, no: rec.no, to, from });
+    render();
+    return rec;
+  }
+  // a signature line with a caption, and the signature itself when the name is one of the two set in Settings
+  function sigFor(doc, x, y, w, maxH, name, caption) {
+    const n = normName(name), s1 = normName(settings().sig.text), s2 = normName(checker());
+    const known = n && ((s1 && (s1.includes(n) || n.includes(s1))) || (s2 && (s2.includes(n) || n.includes(s2))));
+    if (known) { sigBlock(doc, x, y, w, maxH, signerFor(name), caption); return; }
+    const C = PDF_C;
+    doc.setDrawColor(...C.GREY); doc.setLineWidth(0.25); doc.setLineDashPattern([0.8, 0.8], 0); doc.line(x, y, x + w, y); doc.setLineDashPattern([], 0);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7.2); doc.setTextColor(...C.GREY); doc.text(caption, x + w / 2, y + 3.6, { align: "center" });
+  }
+  function buildHandoverPdf(h) {
+    const C = PDF_C, { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a6" });
+    const W = 105, H = 148, M = 9;
+    slipWatermark(doc, W, 52, 70);
+    centerHeader(doc, W, "CASH HANDOVER", { no: h.no, code: hoCode(h) });
+    let yy = 48;
+    const line = (k, v) => { doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...C.GREY); doc.text(k, M + 1, yy); doc.setFont("helvetica", "bold"); doc.setTextColor(...C.INK); doc.text(doc.splitTextToSize(String(v), W - 2 * M - 34)[0], W - M - 1, yy, { align: "right" }); yy += 6; };
+    line("Voucher no.", h.no); line("Date", longDate(h.t)); line("Handed over by", h.from); line("Received by", h.to);
+    if (h.note) line("Note", h.note);
+    yy += 1;
+    doc.setFillColor(...C.CREAM); doc.roundedRect(M, yy, W - 2 * M, 15, 2, 2, "F");
+    doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...C.GREY); doc.text("CASH HANDED OVER", M + 4, yy + 5.6);
+    doc.setFontSize(15); doc.setTextColor(...C.INK); doc.text(`Rs. ${fmt(h.amount)}`, W - M - 4, yy + 10.2, { align: "right" });
+    yy += 21;
+    if (typeof h.cash === "number") { doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...C.GREY); doc.text(`Cash in hand by the register that day: Rs. ${fmt(h.cash)}`, M + 1, yy); yy += 5; }
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...C.GREY);
+    doc.text(doc.splitTextToSize("The money stays the club's: this voucher records who holds it from this date.", W - 2 * M - 2), M + 1, yy);
+    yy = Math.max(yy + 20, H - 18);
+    sigFor(doc, W - M - 41, yy, 41, 11, h.from, `Handed over by ${h.from}`);
+    sigFor(doc, M, yy, 41, 11, h.to, `Received by ${h.to}`);
+    return doc.output("blob");
   }
   function historyPageHTML() {
     const all = scanDocs("log/").filter((l) => l && l.t).sort((a, b) => String(b.t).localeCompare(String(a.t)));
     const f = S.hf || "all";
-    const keep = (l) => f === "all" || (f === "pay" && l.k === "pay") || (f === "exp" && (l.k === "exp" || l.k === "elec")) || (f === "cash" && l.k === "cash") || (f === "cancel" && (l.act === "cancel" || l.act === "undo" || l.act === "choose"));
+    const keep = (l) => f === "all" || (f === "pay" && l.k === "pay") || (f === "exp" && (l.k === "exp" || l.k === "elec" || l.k === "don")) || (f === "cash" && (l.k === "cash" || l.k === "ho" || l.k === "acct")) || (f === "cancel" && (l.act === "cancel" || l.act === "undo" || l.act === "choose"));
     const list = all.filter(keep).slice(0, 300);
-    const chips = [["all", "All"], ["pay", "Payments"], ["exp", "Bills"], ["cancel", "Cancelled"], ["cash", "Cash counts"]];
+    const chips = [["all", "All"], ["pay", "Payments"], ["exp", "Bills"], ["cancel", "Cancelled"], ["cash", "Cash & approvals"]];
     const dayOf = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
     const hm = (t) => { const d = new Date(t); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
     let html = "", last = "";
     for (const l of list) {
       const day = dayOf(l.t);
       if (day !== last) { if (last) html += "</ul>"; html += `<p class="grp-h">${esc(longDate(day))}</p><ul class="rows card hist-list">`; last = day; }
-      const bad = l.act === "cancel" || l.act === "undo", ic = l.k === "pay" ? "pay" : l.k === "elec" ? "bolt" : l.k === "cash" ? "coins" : "receipt";
+      const bad = l.act === "cancel" || l.act === "undo", ic = l.k === "pay" ? "pay" : l.k === "elec" ? "bolt" : l.k === "cash" || l.k === "don" ? "coins" : l.k === "ho" ? "send" : l.k === "acct" ? "statement" : "receipt";
       html += `<li><div class="row hrow${bad ? " is-x" : ""}"><span class="row-ic${bad ? " x" : ""}">${icon(ic)}</span><span class="row-main"><b>${esc(logText(l))}</b><small>${hm(l.t)}${l.r || l.no ? ` · ${esc(l.r || l.no)}` : ""}${l.dev && l.by ? ` · ${esc(l.dev)}` : ""}</small></span></div></li>`;
     }
     if (last) html += "</ul>";
@@ -2336,9 +2734,9 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   function incomePageHTML() {
     const y = S.year, list = incomeAll().slice().sort((a, b) => b.month - a.month || String(b.t || "").localeCompare(String(a.t || "")));
     let total = 0; for (const x of list) total += x.amount;
-    const rows = list.map((x) => rowHTML("coins", esc(x.desc || "Other income"), `${MONTHS_FULL[x.month]} ${y}${x.no ? ` · ${esc(x.no)}` : ""}`, `data-act="ev-open" data-id="${esc(x.ev || "")}"`, `<b class="row-amt pos num">+ ${rs(x.amount)}</b>`));
-    return `${subHead("Other income", `${rs(total)} added to the club in ${y}`)}
-      ${rows.length ? `<ul class="rows card">${rows.join("")}</ul>` : `<div class="card notice"><h2>No other income in ${y}</h2><p>When an event has money left over, it is added to the club balance and listed here.</p></div>`}`;
+    const rows = list.map((x) => rowHTML("coins", esc(x.desc || "Other income"), `${MONTHS_FULL[x.month]} ${y}${x.no ? ` · ${esc(x.no)}` : ""}`, (x.src === "donation" ? `data-act="don-open" data-id="${esc(x.id || x._id || "")}"` : `data-act="ev-open" data-id="${esc(x.ev || "")}"`), `<b class="row-amt pos num">+ ${rs(x.amount)}</b>`));
+    return `${subHead("Other income", `${rs(total)} added to the club in ${y}`, `<button type="button" class="btn primary" data-act="don-new"${S.canWrite ? "" : " disabled"}>${icon("plus")}Record a donation</button>`)}
+      ${rows.length ? `<ul class="rows card">${rows.join("")}</ul>` : `<div class="card notice"><h2>No other income in ${y}</h2><p>Money left over from an event, and donations from sponsors and well-wishers, are added to the club balance and listed here.</p></div>`}`;
   }
 
   function statusFor(m, i) {
@@ -2423,6 +2821,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
               <button type="button" class="btn" data-act="elec" data-m="${i}"${S.canWrite ? "" : " disabled"}>${e.amount || e.signed ? "Edit" : "Record bill"}</button>
             </span>
           </div>
+          ${approvalHTML(i)}
           <div class="exp-block">
             <div class="elec-row exp-head">
               <p>Other expenses: <b>${expTotal(i) ? rs(expTotal(i)) : "none yet"}</b></p>
@@ -2735,6 +3134,15 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     if (dev) body.dev = dev;
     writeDoc("log/" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), body);
   }
+  /* ---------- check codes: a short code printed on each bill, worked out from what the bill says ---------- */
+  function fnv(str) { let h = 0x811c9dc5; for (let k = 0; k < str.length; k++) { h ^= str.charCodeAt(k); h = Math.imul(h, 0x01000193) >>> 0; } return h >>> 0; }
+  const CODE_CHARS = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
+  function checkCode(...parts) { let h = fnv(parts.map((x) => String(x == null ? "" : x)).join("|")), out = ""; for (let k = 0; k < 4; k++) { out += CODE_CHARS[h % 32]; h = Math.floor(h / 32); } return out; }
+  const rcCode = (r, mid, y, i, a, t) => checkCode("R", r, mid, y, i, a, t || "");
+  const expCode = (x) => checkCode("E", x.no, x.amount, x.t || "", x.desc || "", JSON.stringify(x.items || []), x.to || "");
+  const evCode = (ev, kind) => { const t = evTotals(ev); return checkCode(kind, ev.no, t.collected, t.spent); };
+  const donCode = (d) => checkCode("D", d.no, d.amount, d.t || "", d.from || "", d.what || "");
+  const hoCode = (h) => checkCode("H", h.no, h.amount, h.t || "", h.from || "", h.to || "");
   // records kept on this device: the change history, cash counts and clashes
   function scanDocs(pre) { try { return LocalDB.scan(pre); } catch (e) { return []; } }
   const nameOf = (mid) => { const m = allMembers().find((x) => x.id === mid); return m ? m.name : "Member"; };
@@ -2904,6 +3312,43 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     $("cashDlg").close();
     render();
     toast(`Cash count saved: ${cashDiffTxt(v - exp).replace(" ✓", "")}.`);
+  });
+
+  $("verForm").addEventListener("submit", (ev) => { ev.preventDefault(); verifyBill($("verIn").value); });
+  $("verFile").addEventListener("change", (ev) => { const f = ev.target.files && ev.target.files[0]; if (f) scanPhoto(f); ev.target.value = ""; });
+  $("donForm").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const d = saveDonation();
+    if (!d) return;
+    $("donDlg").close();
+    if (pdfReady()) sharePdf(buildDonationPdf(d), `Pirampady_SC_donation_${d.no}.pdf`); else toast(`Saved: donation of ${rs(d.amount)}.`);
+  });
+  $("donSave").addEventListener("click", () => { const d = saveDonation(); if (!d) return; $("donDlg").close(); toast(`Saved: donation of ${rs(d.amount)} from ${d.from}. It is added to the club balance.`); });
+  $("donShare").addEventListener("click", () => { const d = donCtx && donCtx.id ? scanDocs("income/").find((x) => x._id === donCtx.id) : null; if (d && pdfReady()) sharePdf(buildDonationPdf(d), `Pirampady_SC_donation_${d.no}.pdf`); });
+  $("donDel").addEventListener("click", () => {
+    const d = donCtx && donCtx.id ? scanDocs("income/").find((x) => x._id === donCtx.id) : null;
+    if (!d || !S.canWrite) return;
+    const { _id, _u, ...body } = d;
+    writeDoc("income/" + _id, null);
+    logChange({ k: "don", act: "cancel", y: d.year, i: d.month, a: d.amount, no: d.no, from: d.from, desc: d.desc });
+    $("donDlg").close(); render();
+    toast(`Cancelled the donation ${d.no}. It stays in the change history.`, () => { writeDoc("income/" + _id, body); logChange({ k: "don", act: "add", y: d.year, i: d.month, a: d.amount, no: d.no, from: d.from, desc: d.desc }); render(); });
+  });
+  $("hoForm").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const h = saveHandover();
+    if (!h) return;
+    $("hoDlg").close();
+    if (pdfReady()) sharePdf(buildHandoverPdf(h), `Pirampady_SC_handover_${h.no}.pdf`); else toast(`Saved: ${rs(h.amount)} handed over to ${h.to}.`);
+  });
+  $("hoShare").addEventListener("click", () => { const h = hoCtx && hoCtx.id ? scanDocs("handover/").find((x) => x._id === hoCtx.id) : null; if (h && pdfReady()) sharePdf(buildHandoverPdf(h), `Pirampady_SC_handover_${h.no}.pdf`); });
+  $("hoDel").addEventListener("click", () => {
+    const h = hoCtx && hoCtx.id ? scanDocs("handover/").find((x) => x._id === hoCtx.id) : null;
+    if (!h || !S.canWrite) return;
+    writeDoc("handover/" + h._id, null);
+    logChange({ k: "ho", act: "cancel", y: h.year, i: h.month, a: h.amount, no: h.no, to: h.to, from: h.from });
+    $("hoDlg").close(); render();
+    toast(`Cancelled the handover voucher ${h.no}. It stays in the change history.`);
   });
 
   /* ---------- electricity ---------- */
@@ -3326,7 +3771,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
     const W = 148, H = 210, M = 12, t = evTotals(ev), top = readDoc(evTopPath(ev.id)), inc = readDoc(evIncPath(ev.id));
     slipWatermark(doc, W, 80, 96);
-    slipHeader(doc, W, M, `Event  ·  ${ev.no || ""}`);
+    slipHeader(doc, W, M, `Event  ·  ${ev.no || ""}`, ev.no ? { no: ev.no, code: evCode(ev, "V") } : null);
     doc.setFillColor(...C.CREAM); doc.roundedRect(M, 39, W - 2 * M, 21, 2.5, 2.5, "F");
     doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...C.GREY); doc.text("EVENT / TOURNAMENT", M + 5, 46);
     doc.setFontSize(16); doc.setTextColor(...C.INK); doc.text(doc.splitTextToSize(ev.name || "", W - 2 * M - 10)[0], M + 5, 53.5);
@@ -3555,7 +4000,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
     const W = 148, H = 210, M = 12, t = bdTotals(ev), before = bdFundBefore(ev);
     slipWatermark(doc, W, 80, 96);
-    slipHeader(doc, W, M, `Birthday celebration  ·  ${ev.no || ""}`);
+    slipHeader(doc, W, M, `Birthday celebration  ·  ${ev.no || ""}`, ev.no ? { no: ev.no, code: evCode(ev, "B") } : null);
     doc.setFillColor(...C.CREAM); doc.roundedRect(M, 39, W - 2 * M, 21, 2.5, 2.5, "F");
     doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...C.GREY); doc.text("HAPPY BIRTHDAY", M + 5, 46);
     doc.setFontSize(16); doc.setTextColor(...C.INK); doc.text(doc.splitTextToSize(ev.name || "", W - 2 * M - 10)[0], M + 5, 53.5);
@@ -4179,9 +4624,10 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   }
   // letter-spaced text centred on cx (jsPDF doesn't count the spacing when it centres)
   function spaced(doc, txt, cx, y, cs) { doc.text(txt, cx - (doc.getTextWidth(txt) + (txt.length - 1) * cs) / 2, y, { charSpace: cs }); }
-  function slipHeader(doc, W, M, title) {
+  function slipHeader(doc, W, M, title, qr) {
     const C = PDF_C;
     pdfBand(doc, W, 31);
+    if (qr) pdfQR(doc, W - M - 19, 3.6, 19, qr);
     pdfBadge(doc, M + 10.5, 15.5, 10);
     const tx = M + 26;
     doc.setFont("helvetica", "bold"); doc.setFontSize(14.5); doc.setTextColor(...C.CHAMP);
@@ -4191,9 +4637,23 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     doc.text(`Issued ${issuedToday()}`, tx, 25.4);
   }
   // receipts and bills: the crest centred, the club name and the kind of document under it
-  function centerHeader(doc, W, label) {
+  // a QR code (bill number and check code) on a white tile, with the check code under it
+  function pdfQR(doc, x, y, size, qr) {
+    if (!qr || !qr.no || typeof qrcode !== "function") return;
+    try {
+      const q = qrcode(0, "M"); q.addData(`PSC:${qr.no}:${qr.code}`); q.make();
+      const n = q.getModuleCount(), cell = size / (n + 4), pad = cell * 2;
+      doc.setFillColor(255, 255, 255); doc.roundedRect(x, y, size, size, 1.4, 1.4, "F");
+      doc.setFillColor(20, 18, 15);
+      for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) doc.rect(x + pad + c * cell, y + pad + r * cell, cell + 0.03, cell + 0.03, "F");
+      doc.setFont("helvetica", "bold"); doc.setFontSize(6.4); doc.setTextColor(...PDF_C.CHAMP);
+      doc.text(`CHECK ${qr.code}`, x + size / 2, y + size + 2.9, { align: "center", charSpace: 0.2 });
+    } catch (e) {}
+  }
+  function centerHeader(doc, W, label, qr) {
     const C = PDF_C;
     pdfBand(doc, W, 41);
+    if (qr) pdfQR(doc, W - 6 - 19, 4.2, 19, qr);
     pdfBadge(doc, W / 2, 14.2, 9.4);
     doc.setFont("helvetica", "bold"); doc.setFontSize(11.5); doc.setTextColor(...C.CHAMP);
     spaced(doc, "PIRAMPADY SPORTS CLUB", W / 2, 30.6, 0.25);
@@ -4337,7 +4797,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a6" });
     const W = 105, H = 148, M = 9, y = S.year, fee = feeAt(y, i), rc = cov(m, i), a = rc.covered;
     slipWatermark(doc, W, 52, 70);
-    centerHeader(doc, W, "PAYMENT RECEIPT");
+    centerHeader(doc, W, "PAYMENT RECEIPT", p.r ? { no: p.r, code: rcCode(p.r, m.id, y, i, p.a, p.t) } : null);
     let yy = 48;
     // label on the left, value on the right; a long value gets smaller, then wraps onto a second line
     const line = (label, value, opts) => {
@@ -4523,6 +4983,12 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     const sh = Math.min(13, room), sy = Math.min(footTop - 4.5, ty + 3 + sh);
     sigBlock(doc, W - M - 52, sy, 52, sh, 1, "Prepared by the club collector");
     if (checker()) sigBlock(doc, M, sy, 52, sh, 2, `Accounts checked by ${checker()}`);
+    const apv = approvalOf(y, i);
+    if (apv) {
+      const changed = approvalDiff(apv, i).length;
+      doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(...(changed ? C.RED : C.GREEN));
+      doc.text(changed ? "CHANGED AFTER APPROVAL" : `APPROVED${apv.by ? ` BY ${apv.by.toUpperCase()}` : ""} · ${longDate(String(apv.t).slice(0, 10)).toUpperCase()}`, M + 26, sy + 7.4, { align: "center" });
+    }
     // footer
     doc.setDrawColor(...C.LINE); doc.setLineWidth(0.3); doc.line(M, footTop, W - M, footTop);
     if (compact) {
@@ -4557,7 +5023,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     const H = Math.max(148, Math.ceil(contentEnd + 20));
     const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: [W, H] });
     slipWatermark(doc, W, 52, 70);
-    centerHeader(doc, W, "EXPENSE BILL");
+    centerHeader(doc, W, "EXPENSE BILL", x.no ? { no: x.no, code: expCode(x) } : null);
     let yy = 48;
     const line = (label, value) => {
       doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...C.GREY); doc.text(label, M + 1, yy);
@@ -4670,6 +5136,14 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     else if (act === "hf") { S.hf = b.dataset.f; render(); }
     else if (act === "owing") { S.mf = "owing"; S.q = ""; S.view = "members"; try { localStorage.setItem("psc.view13", S.view); } catch (e) {} render(); window.scrollTo(0, 0); }
     else if (act === "cash") openCash();
+    else if (act === "bk") { S.bk = b.dataset.f; render(); }
+    else if (act === "bill-open") openBill(b.dataset.kind, b.dataset.no);
+    else if (act === "verify") openVerify();
+    else if (act === "approve") approveMonth(+b.dataset.m);
+    else if (act === "view-month") { S.view = "month"; S.month = +b.dataset.m; try { localStorage.setItem("psc.view13", S.view); } catch (e) {} render(); window.scrollTo(0, 0); }
+    else if (act === "don-new") openDonation(null);
+    else if (act === "don-open") openDonation(b.dataset.id);
+    else if (act === "ho-new") openHandover(null);
     else if (act === "clash-open") openClash(b.dataset.id);
     else if (act === "clash-pick") resolveClash(b.dataset.id, b.dataset.side);
     else if (act === "dup-cancel" || act === "dup-ok") {
@@ -4714,7 +5188,16 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   document.addEventListener("keydown", (ev) => {
     if ((ev.key === "Enter" || ev.key === " ") && ev.target && ev.target.matches && ev.target.matches('[role="button"][data-act]')) { ev.preventDefault(); ev.target.click(); }
   });
+  $("main").addEventListener("change", (ev) => {
+    const id = ev.target.id;
+    if (id === "bMonth") S.bm = ev.target.value === "" ? null : +ev.target.value;
+    else if (id === "bStatus") S.bs = ev.target.value;
+    else if (id === "bPerson") S.bp = ev.target.value;
+    else return;
+    const box = $("bList"); if (box) box.innerHTML = billListHTML(billsOfYear());
+  });
   $("main").addEventListener("input", (ev) => {
+    if (ev.target.id === "bSearch") { S.bq = ev.target.value; const box = $("bList"); if (box) box.innerHTML = billListHTML(billsOfYear()); return; }
     if (ev.target.id !== "mSearch") return;
     S.q = ev.target.value;
     const box = $("mList");
@@ -4777,7 +5260,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.14.0";
+  const APP_VERSION = "1.15.0";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty";
   const SEED = {};
@@ -5273,7 +5756,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       let data = null;
       try { data = JSON.parse(fr.result); } catch (e) {}
       const st = data && data.app === "pirampady-sc" && data.store && typeof data.store === "object" ? data.store : null;
-      const valid = st && Object.keys(st).every((k) => /^(members|payments|electricity|settings|expenses|income|birthdays|events|log|cash|clash)\/[A-Za-z0-9_.:@+~-]+$/.test(k) && st[k] && typeof st[k] === "object");
+      const valid = st && Object.keys(st).every((k) => /^(members|payments|electricity|settings|expenses|income|birthdays|events|log|cash|clash|approve|handover)\/[A-Za-z0-9_.:@+~-]+$/.test(k) && st[k] && typeof st[k] === "object");
       if (!valid) { showErr("bakErr", "That file isn't a Pirampady SC backup. Choose the .json file made with “Save backup file”."); return; }
       const c = countRecords(st);
       pendingRestore = st;

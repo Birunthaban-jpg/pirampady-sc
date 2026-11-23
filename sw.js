@@ -1,5 +1,5 @@
 // Offline support for Pirampady SC Subscriptions. Bump VERSION on every release.
-const VERSION = "1.14.0";
+const VERSION = "1.15.0";
 const CACHE = "psc-" + VERSION;
 const FILES = [
   "./",
@@ -7,6 +7,8 @@ const FILES = [
   "manifest.webmanifest",
   "vendor/jspdf.umd.min.js",
   "vendor/jspdf.plugin.autotable.min.js",
+  "vendor/qrcode.min.js",
+  "vendor/jsQR.min.js",
   "icons/logo.jpg",
   "icons/apple-touch-icon.png",
   "icons/icon-192.png",
