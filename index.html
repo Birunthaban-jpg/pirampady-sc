@@ -1614,7 +1614,19 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   const fmt = (n) => Math.round(n).toLocaleString("en-US");
   const rs = (n) => "Rs. " + fmt(n);
   const rsH = (n) => `<span class="cur">Rs.</span> ${fmt(n)}`;   // same text as rs(), with a smaller "Rs." on screen
-  const parseAmt = (v) => { const d = String(v ?? "").replace(/[^0-9]/g, ""); return d ? parseInt(d, 10) : NaN; };
+  // Amounts are whole rupees. "1,500", "Rs. 1500", "1500/-" and "1500.00" are all Rs. 1,500. An amount with cents
+  // ("250.50"), or anything that isn't a plain number, is refused (NaN): it is never read as a different amount.
+  const parseAmt = (v) => {
+    const s = String(v ?? "").trim().replace(/^rs\.?\s*/i, "").replace(/\s*\/[-=]?\s*$/, "").replace(/[\s,]/g, "");
+    const mm = /^(\d+)(?:\.(\d*))?$/.exec(s);
+    if (!mm || (mm[2] && /[1-9]/.test(mm[2]))) return NaN;
+    return parseInt(mm[1], 10);
+  };
+  // why an amount was refused, in plain words
+  const amtWhy = (v, fallback) => (/\d\.\d*[1-9]/.test(String(v ?? "")) ? "Use whole rupees only (no cents), for example 250." : fallback);
+  const APP_URL = "https://birunthaban-jpg.github.io/pirampady-sc/";
+  // the calendar day of a saved time, in this phone's time zone (Sri Lanka), e.g. "2026-11-24"
+  const localDay = (iso) => { const d = new Date(iso); return isNaN(d) ? String(iso || "").slice(0, 10) : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
   const VIEWS = ["home", "members", "month", "year", "more", "bday", "expenses", "elec", "income", "history", "bills"];
   let savedView = null;
@@ -1755,11 +1767,18 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   const cancelledOf = (mid, i) => docCancelled(payDoc(mid), i);
   const RC_CHARS = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
   function newReceipt(year, i) {
-    let s = "";
-    const buf = new Uint32Array(4);
-    (window.crypto || {}).getRandomValues ? crypto.getRandomValues(buf) : buf.forEach((_, k) => { buf[k] = Math.floor(Math.random() * 1e9); });
-    for (const n of buf) s += RC_CHARS[n % RC_CHARS.length];
-    return `PSC-${String(year).slice(2)}${String(i + 1).padStart(2, "0")}-${s}`;
+    const ym = `${String(year).slice(2)}${String(i + 1).padStart(2, "0")}`;
+    let all = "";
+    try { all = localStorage.getItem("psc.store.v1") || ""; } catch (e) {}
+    for (let tries = 0; ; tries++) {
+      let s = "";
+      const buf = new Uint32Array(4);
+      (window.crypto || {}).getRandomValues ? crypto.getRandomValues(buf) : buf.forEach((_, k) => { buf[k] = Math.floor(Math.random() * 1e9); });
+      for (const n of buf) s += RC_CHARS[n % RC_CHARS.length];
+      // a number already used on any bill (receipt, expense, event...) is never given out again
+      if (tries < 8 && all.includes(`-${ym}-${s}"`)) continue;
+      return `PSC-${ym}-${s}`;
+    }
   }
   const COLLECTOR_KEY = "psc.collector";
   const getCollector = () => { try { return localStorage.getItem(COLLECTOR_KEY) || ""; } catch (e) { return ""; } };
@@ -1833,12 +1852,14 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   // or while inactive) take nothing: money paid in them moves on as well. So a month's total is exactly the money used
   // for that month, extra paid in October is counted in November, and nothing is counted twice.
   // Payments of every member for every year, read once from the local store; rebuilt on every render or change.
-  var payIdx = null, covMemo = new Map();
-  function invalidateCalc() { payIdx = null; covMemo = new Map(); }
+  var payIdx = null, covMemo = new Map(), billsMemo = null;
+  function invalidateCalc() { payIdx = null; covMemo = new Map(); billsMemo = null; }
+  // the saved register, read-only (a fresh copy is made only after something changes)
+  const rawView = () => (S.db && typeof S.db.view === "function" ? S.db.view() : S.db && typeof S.db.raw === "function" ? S.db.raw() : null);
   function payIndex() {
     if (payIdx) return payIdx;
     const idx = {};
-    const raw = S.db && typeof S.db.raw === "function" ? S.db.raw() : null;
+    const raw = rawView();
     if (raw) for (const k in raw) {
       if (!k.startsWith("payments/")) continue;
       const d = raw[k];
@@ -1982,6 +2003,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     for (const [id, v] of NAV_TABS) $(id).setAttribute("aria-current", tab === v ? "page" : "false");
     $("stats").hidden = S.view !== "home";
     renderStats();
+    if (!linkDone && S.membersLoaded && S.payLoaded) { linkDone = true; setTimeout(checkFromLink, 0); }
     const main = $("main");
     // a new page fades in; later redraws (sync, a payment) don't animate or move the page
     const entering = S.view !== lastView;
@@ -2039,6 +2061,21 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     if (target && bar.scrollWidth > bar.clientWidth) bar.scrollLeft = Math.max(0, target.offsetLeft - (bar.clientWidth - target.offsetWidth) / 2);
   }
   let lastCentered = "";
+  let linkDone = false;
+  function checkFromLink() {
+    const hash = location.hash || "";
+    if (!/#c=/i.test(hash)) return;
+    try { history.replaceState(null, "", location.pathname + location.search); } catch (e) {}
+    const text = qrToText(hash), toks = text.split(/\s+/), no = toks[0] || "", code = toks[1] || "";
+    openVerify();
+    $("verIn").value = text;
+    if (!scanDocs("members/").length) {
+      $("verOut").innerHTML = `<div class="ver-res"><b>${esc(no)} · check code ${esc(code)}</b><p>The club's register isn't on this browser, so the bill can't be checked here. Open the Pirampady SC app on the collector's or the accounts checker's phone, tap <b>More → Check a bill</b>, and type the number and code.</p><button type="button" class="btn" data-act="ver-copy" data-t="${esc(text)}">Copy the number and code</button></div>`;
+      return;
+    }
+    verifyBill(text);
+  }
+  window.addEventListener("hashchange", () => { if (/#c=/i.test(location.hash || "")) checkFromLink(); });
 
   function renderStats() {
     const el = $("stats");
@@ -2135,6 +2172,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       const who = (p) => `${dayLabel(p.t)}${p.c ? ` by ${p.c}` : ""}`;
       items.push(`<li><span class="att-ic warn">${icon("receipt")}</span><span class="att-txt"><b>${esc(d.m.name)} · ${MONTHS_FULL[d.i]}: ${rs(d.p.a)} recorded twice?</b><small>${esc(who(d.p))} and ${esc(who(d.q))}${d.q.r ? ` · ${esc(d.q.r)}` : ""}</small></span><span class="att-acts"><button type="button" class="btn sm" data-act="dup-cancel" data-id="${esc(d.m.id)}" data-m="${d.i}" data-k="${esc(d.q.id)}"${S.canWrite ? "" : " disabled"}>Cancel the second</button><button type="button" class="btn sm" data-act="dup-ok" data-id="${esc(d.m.id)}" data-m="${d.i}" data-k="${esc(d.q.id)}"${S.canWrite ? "" : " disabled"}>Both are right</button></span></li>`);
     }
+    for (const c of conflictsAll()) items.push(`<li><span class="att-ic due">${icon("sync")}</span><span class="att-txt"><b>${esc(confTitle(c))} · changed on two phones</b><small>Both phones changed it before they synced. The newer change is used for now. Choose which is right.</small></span><span class="att-acts"><button type="button" class="btn sm primary" data-act="conf-open" data-id="${esc(c._id)}">Choose</button></span></li>`);
     for (const a of changedApprovals()) items.push(`<li><span class="att-ic warn">${icon("statement")}</span><span class="att-txt"><b>${MONTHS_FULL[a.i]} ${a.y} changed after approval</b><small>Approved by ${esc(a.by || "someone")}; its figures are different now.</small></span><span class="att-acts"><button type="button" class="btn sm" data-act="view-month" data-m="${a.i}">See ${MONTHS[a.i]}</button></span></li>`);
     if (!items.length) return "";
     return `<section class="card hm-block hm-att"><p class="eyebrow">Needs your attention</p><ul class="att-list">${items.join("")}</ul></section>`;
@@ -2177,6 +2215,58 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       logChange({ k: "pay", act: "choose", y: body.year, i, mid, name: nameOf(mid), a: chosen.a, r: chosen.r });
     }
     writeDoc("clash/" + cid, null);
+    $("attDlg").close();
+    render();
+    toast("Saved. Both phones will use this version.");
+  }
+  function conflictsAll() { return scanDocs("conflict/").filter((c) => c && c.path && c.a && c.b); }
+  function confWhat(path, d) {
+    const col = path.split("/")[0], x = d && !d._deleted ? d : null;
+    if (col === "expenses") return `The expense${x && x.desc ? ` “${x.desc}”` : ""}`;
+    if (col === "income") return x && x.src === "donation" ? `The donation${x.from ? ` from ${x.from}` : ""}` : "Other income";
+    if (col === "events") return `The event${x && x.name ? ` “${x.name}”` : ""}`;
+    if (col === "birthdays") return `The birthday${x && x.name ? ` “${x.name}”` : ""}`;
+    if (col === "members") return x && x.name ? x.name : "A member";
+    if (col === "handover") return "A cash handover";
+    return "The club settings";
+  }
+  const confTitle = (c) => confWhat(c.path, c.b && !c.b._deleted ? c.b : c.a);
+  function confCard(path, d) {
+    if (!d || d._deleted) return { main: "Cancelled / deleted", more: "" };
+    const col = path.split("/")[0], when = (t) => (t ? ` · ${longDate(t)}` : "");
+    if (col === "expenses") return { main: `${rs(d.amount)}${when(d.t)}${d.chk ? " · ✓ checked" : ""}`, more: expItemsOf(d).map((it) => `${it.d} ${rs(it.a)}`).join(", ") };
+    if (col === "income" || col === "handover") return { main: `${rs(d.amount)}${when(d.t)}`, more: [d.from, d.to ? `to ${d.to}` : "", d.what].filter(Boolean).join(" · ") };
+    if (col === "events" || col === "birthdays") {
+      const t = col === "events" ? evTotals(d) : bdTotals(d), names = [];
+      for (const mid in d.c || {}) if (d.c[mid] && d.c[mid].a > 0) names.push(`${nameOf(mid)} ${fmt(d.c[mid].a)}`);
+      for (const g of d.g || []) if (g && g.a > 0) names.push(`${g.n} ${fmt(g.a)}`);
+      return { main: `Collected ${rs(t.collected)} · spent ${rs(t.spent)}${when(d.date)}`, more: [names.length ? `Gave: ${names.join(", ")}` : "", (d.x || []).length ? `Costs: ${(d.x || []).map((x) => `${x.d} ${fmt(x.a)}`).join(", ")}` : ""].filter(Boolean).join(" · ") };
+    }
+    if (col === "members") return { main: d.name || "", more: [d.removed ? "left the club" : "", Array.isArray(d.off) && d.off.some((p) => p && !p.b) ? "inactive" : "", d.phone || "", d.private ? "name private" : ""].filter(Boolean).join(" · ") };
+    if (col === "settings") return { main: `Fees: ${Object.entries(d.fees || {}).map(([k, v]) => `${k} ${rs(v)}`).join(", ") || "-"}`, more: [d.sig && d.sig.text, d.sig2 && d.sig2.text].filter(Boolean).join(" · ") };
+    return { main: "", more: "" };
+  }
+  function openConflict(cid) {
+    const c = conflictsAll().find((x) => x._id === cid);
+    if (!c) return;
+    const when = (u) => { const d = new Date(u || 0); return u ? `Changed ${d.getDate()} ${MONTHS[d.getMonth()]}, ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}` : "Changed earlier"; };
+    const card = (d, side) => { const s = confCard(c.path, d); return `<section class="clash-opt"><p class="lbl2">${side === "b" ? "The newer change" : "The other change"}</p>
+        <p class="clash-amt num">${esc(s.main)}</p><p class="hint">${esc(when(d && d._u))}${s.more ? ` · ${esc(s.more)}` : ""}</p>
+        <button type="button" class="btn${side === "b" ? " primary" : ""}" data-act="conf-pick" data-id="${esc(cid)}" data-side="${side}"${S.canWrite ? "" : " disabled"}>Keep this one</button></section>`; };
+    $("attBody").innerHTML = `<div class="dlg-head"><div><p class="eyebrow">Changed on two phones</p><h3>${esc(confTitle(c))}</h3></div><button type="button" class="close" data-close aria-label="Close">×</button></div>
+      <p class="hint">Two phones changed this before they synced. The app is using the newer change for now. Choose the right one; the other stays in the change history.</p>
+      <div class="clash-grid">${card(c.b, "b")}${card(c.a, "a")}</div>`;
+    if (!$("attDlg").open) $("attDlg").showModal();
+  }
+  function resolveConflict(cid, side) {
+    const c = conflictsAll().find((x) => x._id === cid);
+    if (!c || !S.canWrite) return;
+    const chosen = side === "a" ? c.a : c.b, other = side === "a" ? c.b : c.a;
+    const col = c.path.split("/")[0], id = c.path.slice(col.length + 1);
+    if (!chosen || chosen._deleted) { const cur = readDoc(c.path); writeDoc(c.path, null); if (col === "events") evSync({ ...(cur || {}), id }, true); }
+    else { const { _u, _r, _id, ...body } = chosen; writeDoc(c.path, body); if (col === "events") evSync({ ...body, id }); }
+    writeDoc("conflict/" + cid, null);
+    logChange({ k: "sync", act: "choose", what: confWhat(c.path, chosen && !chosen._deleted ? chosen : other).replace(/^The /, "the ") });
     $("attDlg").close();
     render();
     toast("Saved. Both phones will use this version.");
@@ -2416,11 +2506,11 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     // cancelled bills live on in the change history
     const seen = new Set(out.map((b) => b.no));
     for (const l of scanDocs("log/").sort((a, b) => String(b.t).localeCompare(String(a.t)))) {
-      if (l.act !== "cancel" || !l.no || seen.has(l.no) || !keep(l.y)) continue;
-      const kind = l.k === "exp" ? "expense" : l.k === "don" ? "donation" : l.k === "ho" ? "handover" : null;
+      if (!(l.act === "cancel" || (l.act === "delete" && (l.k === "ev" || l.k === "bd"))) || !l.no || seen.has(l.no) || !keep(l.y)) continue;
+      const kind = l.k === "exp" ? "expense" : l.k === "don" ? "donation" : l.k === "ho" ? "handover" : l.k === "ev" ? "event" : l.k === "bd" ? "birthday" : null;
       if (!kind) continue;
       seen.add(l.no);
-      out.push({ kind, no: l.no, y: l.y, i: l.i, title: l.desc || l.from || KIND[kind][0], sub: KIND[kind][0], a: l.a, t: day(l.t), by: l.by || "", state: "cancelled", xb: l.by, xt: day(l.t) });
+      out.push({ kind, no: l.no, y: l.y, i: l.i, title: l.desc || l.name || l.from || KIND[kind][0], sub: KIND[kind][0], a: l.a, t: localDay(l.t), by: l.by || "", state: "cancelled", xb: l.by, xt: localDay(l.t) });
     }
     return out.sort((a, b) => day(b.t).localeCompare(day(a.t)) || String(b.no).localeCompare(String(a.no)));
   }
@@ -2437,7 +2527,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     if (y > CY || (y === CY && i > CM)) return "";
     const a = approvalOf(y, i);
     if (!a) return `<div class="apprv"><span>${icon("check")}Not approved yet</span><button type="button" class="btn sm" data-act="approve" data-m="${i}"${S.canWrite ? "" : " disabled"}>Approve ${MONTHS[i]}</button></div>`;
-    const diff = approvalDiff(a, i), when = esc(longDate(String(a.t).slice(0, 10)));
+    const diff = approvalDiff(a, i), when = esc(longDate(localDay(a.t)));
     if (!diff.length) return `<div class="apprv ok"><span>${icon("check")}Approved by ${esc(a.by || "someone")} on ${when}</span></div>`;
     const changes = scanDocs("log/").filter((l) => l.y === y && l.i === i && String(l.t) > String(a.t) && l.k !== "acct").sort((p, q) => String(q.t).localeCompare(String(p.t))).slice(0, 5);
     return `<div class="apprv due"><span><b>Changed after approval</b> · approved by ${esc(a.by || "someone")} on ${when}</span>
@@ -2460,6 +2550,15 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     if (!S.membersLoaded || !S.payLoaded) return [];
     return scanDocs("approve/").filter((a) => a && a.y === S.year).filter((a) => approvalDiff(a, a.i).length);
   }
+  const clubTxt = (n) => (n > 0 ? `+ ${rs(n)} to the club` : n < 0 ? `− ${rs(-n)} from the club` : "nothing from the club");
+  function potChange(l) {
+    const out = [];
+    if (l.a !== l.old) out.push(`collected ${rs(l.old)} → ${rs(l.a)}`);
+    if (l.sp !== l.osp) out.push(`spent ${rs(l.osp)} → ${rs(l.sp)}`);
+    if ((l.club || 0) !== (l.oclub || 0)) out.push(`${clubTxt(l.oclub || 0)} → ${clubTxt(l.club || 0)}`);
+    if (l.date) out.push(`date moved to ${longDate(l.date)}`);
+    return out.join(", ") || "details changed";
+  }
   function logText(l) {
     const who = l.by || l.dev || "Someone", mon = Number.isInteger(l.i) ? `${MONTHS_FULL[l.i]} ${l.y}` : String(l.y || "");
     const nm = l.name || "a member", what = `“${l.desc || "expense"}”`;
@@ -2478,11 +2577,15 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       don: { add: `${who} recorded a donation of ${rs(l.a)}${l.from ? ` from ${l.from}` : ""}`, edit: `${who} changed the donation${l.from ? ` from ${l.from}` : ""} from ${rs(l.old)} to ${rs(l.a)}`,
         cancel: `${who} cancelled the donation${l.from ? ` from ${l.from}` : ""} (${rs(l.a)})` },
       ho: { add: `${who} handed over ${rs(l.a)} in cash${l.to ? ` to ${l.to}` : ""}`, cancel: `${who} cancelled the cash handover${l.to ? ` to ${l.to}` : ""} (${rs(l.a)})` },
+      ev: { edit: `${who} changed the event “${l.name || "event"}”: ${potChange(l)}`, delete: `${who} deleted the event “${l.name || "event"}” (collected ${rs(l.a)}, spent ${rs(l.sp)}${l.club ? `, club ${clubTxt(l.club)}` : ""})`, restore: `${who} brought back the event “${l.name || "event"}”` },
+      bd: { edit: `${who} changed the birthday “${l.name || "birthday"}”: ${potChange(l)}`, delete: `${who} deleted the birthday “${l.name || "birthday"}” (collected ${rs(l.a)}, spent ${rs(l.sp)})`, restore: `${who} brought back the birthday “${l.name || "birthday"}”` },
+      sync: { choose: `${who} chose which version of ${l.what || "a record"} to keep (it was changed on two phones)` },
     };
     return (T[l.k] && T[l.k][l.act]) || `${who} made a change`;
   }
   // bills for this year, with the month accounts added (they are worked out for the year on screen)
   function billsOfYear() {
+    if (billsMemo && billsMemo.y === S.year && billsMemo.ready === (S.membersLoaded && S.payLoaded)) return billsMemo.list.slice();
     const y = S.year, list = allBills(y);
     if (S.membersLoaded && S.payLoaded) for (let i = 0; i < 12; i++) {
       if (y > CY || (y === CY && i > CM)) break;
@@ -2491,7 +2594,9 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       const a = approvalOf(y, i), ch = a && approvalDiff(a, i).length;
       list.push({ kind: "account", no: `ACC-${String(y).slice(2)}${String(i + 1).padStart(2, "0")}`, y, i, title: `Monthly account · ${MONTHS_FULL[i]}`, sub: a ? (ch ? "Changed after approval" : `Approved by ${a.by || "someone"}`) : "Not approved yet", a: f.close, t: `${y}-${String(i + 1).padStart(2, "0")}-28`, by: "", state: "ok", appr: a ? (ch ? "changed" : "ok") : "" });
     }
-    return list.sort((p, q) => String(q.t || "").slice(0, 10).localeCompare(String(p.t || "").slice(0, 10)));
+    list.sort((p, q) => String(q.t || "").slice(0, 10).localeCompare(String(p.t || "").slice(0, 10)));
+    billsMemo = { y, ready: S.membersLoaded && S.payLoaded, list };
+    return list.slice();
   }
   function billListHTML(list) {
     const q = (S.bq || "").trim().toLowerCase(), k = S.bk || "all", st = S.bs || "all", m = S.bm == null ? "" : String(S.bm), who = S.bp || "";
@@ -2537,8 +2642,14 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
 
   /* ---------- checking a bill: type the number and check code, or scan its QR code ---------- */
   function openVerify() { $("verIn").value = ""; $("verOut").innerHTML = ""; $("verDlg").showModal(); }
+  // what a QR code or a typed line says: "PSC-2611-89HW GLMS", from a link (…#c=PSC-2611-89HW.GLMS) or an older code (PSC:…:…)
+  function qrToText(s) {
+    const str = String(s || "").trim(), hm = /#c=([^&\s]+)/i.exec(str);
+    if (hm) { let v = hm[1]; try { v = decodeURIComponent(v); } catch (e) {} return v.replace(/[.~]/g, " ").trim().toUpperCase(); }
+    return str.replace(/^PSC:/i, "").replace(/:/g, " ").trim().toUpperCase();
+  }
   function verifyBill(text) {
-    const raw = String(text || "").trim().toUpperCase().replace(/^PSC:/, "");
+    const raw = qrToText(text);
     const toks = raw.split(/[\s:|,]+/).filter(Boolean);
     const no = toks.find((t) => /^[A-Z]{2,4}-\d{4}-[A-Z0-9]{4}$/.test(t)) || toks[0] || "";
     const code = toks.find((t) => t !== no && /^[A-Z0-9]{4}$/.test(t)) || "";
@@ -2548,7 +2659,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     if (!b) { out.innerHTML = `<div class="ver-res due"><b>Not in the register</b><p>No bill or receipt numbered ${esc(no)} was ever recorded on these phones. Check the number, or treat the paper as not genuine.</p></div>`; return; }
     const hist = scanDocs("log/").filter((l) => l.r === b.no || l.no === b.no).sort((p, q) => String(p.t).localeCompare(String(q.t)));
     const det = `<dl class="ver-det"><dt>${KIND[b.kind][0]}</dt><dd>${esc(b.no)}</dd><dt>For</dt><dd>${esc(b.title)}${b.sub ? ` · ${esc(b.sub)}` : ""}</dd><dt>Amount</dt><dd>${rs(b.a)}</dd>${b.t ? `<dt>Date</dt><dd>${esc(longDate(String(b.t).slice(0, 10)))}</dd>` : ""}${b.by ? `<dt>By</dt><dd>${esc(b.by)}</dd>` : ""}${b.kind === "expense" ? `<dt>Checked</dt><dd>${b.chk ? `Yes${b.chk.by ? `, by ${esc(b.chk.by)}` : ""}${b.chk.t ? ` on ${esc(longDate(b.chk.t))}` : ""}` : "Not yet"}</dd>` : ""}</dl>`;
-    const histHTML = hist.length ? `<p class="lbl2">History</p><ul class="ver-hist">${hist.map((l) => `<li>${esc(longDate(String(l.t).slice(0, 10)))} · ${esc(logText(l))}</li>`).join("")}</ul>` : "";
+    const histHTML = hist.length ? `<p class="lbl2">History</p><ul class="ver-hist">${hist.map((l) => `<li>${esc(longDate(localDay(l.t)))} · ${esc(logText(l))}</li>`).join("")}</ul>` : "";
     let head;
     if (b.state === "cancelled") head = `<div class="ver-res due"><b>Cancelled</b><p>This ${KIND[b.kind][0].toLowerCase()} was cancelled${b.xb ? ` by ${esc(b.xb)}` : ""}${b.xt ? ` on ${esc(longDate(b.xt))}` : ""}. It no longer counts.</p></div>`;
     else if (!b.code) head = `<div class="ver-res"><b>In the register</b><p>This document is in the register. It has no check code to compare.</p></div>`;
@@ -2570,16 +2681,18 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       const url = URL.createObjectURL(file);
       const img = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = url; });
       let found = null;
-      for (const max of [1400, 900, 2200]) {
-        const sc = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
-        const c = document.createElement("canvas"); c.width = Math.round(img.naturalWidth * sc); c.height = Math.round(img.naturalHeight * sc);
-        const g = c.getContext("2d"); g.drawImage(img, 0, 0, c.width, c.height);
+      // the whole photo at three sizes, then the middle and the top corners (where bills carry their code), enlarged
+      const W0 = img.naturalWidth, H0 = img.naturalHeight;
+      for (const [max, cx, cy, cw, ch] of [[1400, 0, 0, 1, 1], [900, 0, 0, 1, 1], [2200, 0, 0, 1, 1], [1400, 0.2, 0.2, 0.6, 0.6], [1200, 0.5, 0, 0.5, 0.5], [1200, 0, 0, 0.5, 0.5], [1600, 0.25, 0, 0.75, 0.6]]) {
+        const sw = W0 * cw, sh = H0 * ch, sc = Math.min(2.5, max / Math.max(sw, sh));
+        const c = document.createElement("canvas"); c.width = Math.round(sw * sc); c.height = Math.round(sh * sc);
+        const g = c.getContext("2d"); g.drawImage(img, W0 * cx, H0 * cy, sw, sh, 0, 0, c.width, c.height);
         const r = window.jsQR(g.getImageData(0, 0, c.width, c.height).data, c.width, c.height, { inversionAttempts: "attemptBoth" });
         if (r && r.data) { found = r.data; break; }
       }
       URL.revokeObjectURL(url);
       if (!found) { out.innerHTML = `<div class="ver-res warn"><b>No QR code found</b><p>Take the photo closer, straight on and in good light, or type the bill number and check code instead.</p></div>`; return; }
-      $("verIn").value = found.replace(/^PSC:/, "").replace(/:/g, " ");
+      $("verIn").value = qrToText(found);
       verifyBill(found);
     } catch (e) { out.innerHTML = `<div class="ver-res warn"><b>The photo couldn't be read</b><p>Type the bill number and check code instead.</p></div>`; }
   }
@@ -2604,7 +2717,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     const from = $("donFrom").value.trim().slice(0, 60), what = $("donWhat").value.trim().slice(0, 80), v = parseAmt($("donAmt").value);
     const err = (t) => { $("donErr").textContent = t; $("donErr").hidden = false; return null; };
     if (!from) return err("Write who gave the money, for example a sponsor's name.");
-    if (!(v > 0) || v > 10000000) return err("Enter the amount in rupees, for example 5000.");
+    if (!(v > 0) || v > 10000000) return err(amtWhy($("donAmt").value, "Enter the amount in rupees, for example 5000."));
     const t = /^\d{4}-\d{2}-\d{2}$/.test($("donDate").value) ? $("donDate").value : todayStr();
     const [ty, tm] = t.split("-").map(Number);
     const id = donCtx.id || ("d" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5));
@@ -2666,7 +2779,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     const from = $("hoFrom").value.trim().slice(0, 60), to = $("hoTo").value.trim().slice(0, 60), v = parseAmt($("hoAmt").value);
     const err = (t) => { $("hoErr").textContent = t; $("hoErr").hidden = false; return null; };
     if (!from || !to) return err("Write who handed the cash over and who received it.");
-    if (!(v > 0)) return err("Enter the amount handed over in rupees.");
+    if (!(v > 0)) return err(amtWhy($("hoAmt").value, "Enter the amount handed over in rupees."));
     const t = /^\d{4}-\d{2}-\d{2}$/.test($("hoDate").value) ? $("hoDate").value : todayStr();
     const [ty, tm] = t.split("-").map(Number);
     const rec = { year: ty, month: tm - 1, from, to, amount: v, t, no: newReceipt(ty, tm - 1).replace("PSC-", "HO-"), cash: cashNow() };
@@ -2714,7 +2827,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   function historyPageHTML() {
     const all = scanDocs("log/").filter((l) => l && l.t).sort((a, b) => String(b.t).localeCompare(String(a.t)));
     const f = S.hf || "all";
-    const keep = (l) => f === "all" || (f === "pay" && l.k === "pay") || (f === "exp" && (l.k === "exp" || l.k === "elec" || l.k === "don")) || (f === "cash" && (l.k === "cash" || l.k === "ho" || l.k === "acct")) || (f === "cancel" && (l.act === "cancel" || l.act === "undo" || l.act === "choose"));
+    const keep = (l) => f === "all" || (f === "pay" && l.k === "pay") || (f === "exp" && (l.k === "exp" || l.k === "elec" || l.k === "don" || l.k === "ev" || l.k === "bd")) || (f === "cash" && (l.k === "cash" || l.k === "ho" || l.k === "acct")) || (f === "cancel" && (l.act === "cancel" || l.act === "undo" || l.act === "choose" || l.act === "delete"));
     const list = all.filter(keep).slice(0, 300);
     const chips = [["all", "All"], ["pay", "Payments"], ["exp", "Bills"], ["cancel", "Cancelled"], ["cash", "Cash & approvals"]];
     const dayOf = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
@@ -2723,7 +2836,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     for (const l of list) {
       const day = dayOf(l.t);
       if (day !== last) { if (last) html += "</ul>"; html += `<p class="grp-h">${esc(longDate(day))}</p><ul class="rows card hist-list">`; last = day; }
-      const bad = l.act === "cancel" || l.act === "undo", ic = l.k === "pay" ? "pay" : l.k === "elec" ? "bolt" : l.k === "cash" || l.k === "don" ? "coins" : l.k === "ho" ? "send" : l.k === "acct" ? "statement" : "receipt";
+      const bad = l.act === "cancel" || l.act === "undo" || l.act === "delete", ic = l.k === "pay" ? "pay" : l.k === "elec" ? "bolt" : l.k === "cash" || l.k === "don" ? "coins" : l.k === "ho" ? "send" : l.k === "acct" ? "statement" : l.k === "ev" ? "trophy" : l.k === "bd" ? "cake" : l.k === "sync" ? "sync" : "receipt";
       html += `<li><div class="row hrow${bad ? " is-x" : ""}"><span class="row-ic${bad ? " x" : ""}">${icon(ic)}</span><span class="row-main"><b>${esc(logText(l))}</b><small>${hm(l.t)}${l.r || l.no ? ` · ${esc(l.r || l.no)}` : ""}${l.dev && l.by ? ` · ${esc(l.dev)}` : ""}</small></span></div></li>`;
     }
     if (last) html += "</ul>";
@@ -2831,7 +2944,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
           </div>
           ${incomeIn(i).length ? `<div class="exp-block">
             <div class="elec-row exp-head"><p>Other income: <b>${rs(incTotal(i))}</b></p></div>
-            <ul class="exp-list">${incomeIn(i).map((x) => `<li><button type="button" class="exp-item inc" data-act="ev-open" data-id="${esc(x.ev || "")}"><span class="exp-cat">Added to the club</span><span class="exp-desc">${esc(x.desc)}</span><b class="exp-amt">+ ${rs(x.amount)}</b><small>${x.t ? esc(dayLabel(x.t)) : ""}${x.no ? ` · ${esc(x.no)}` : ""}</small></button></li>`).join("")}</ul>
+            <ul class="exp-list">${incomeIn(i).map((x) => `<li><button type="button" class="exp-item inc" ${x.src === "donation" ? `data-act="don-open" data-id="${esc(x.id || "")}"` : `data-act="ev-open" data-id="${esc(x.ev || "")}"`}><span class="exp-cat">Added to the club</span><span class="exp-desc">${esc(x.desc)}</span><b class="exp-amt">+ ${rs(x.amount)}</b><small>${x.t ? esc(dayLabel(x.t)) : ""}${x.no ? ` · ${esc(x.no)}` : ""}</small></button></li>`).join("")}</ul>
           </div>` : ""}
         </section>
         <div class="slipbar">
@@ -3230,7 +3343,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     ev.preventDefault();
     if (!payOk()) return;
     const v = parseAmt($("payAmt").value);
-    if (!(v > 0)) { $("payErr").textContent = "Enter the amount in rupees, for example 325."; $("payErr").hidden = false; $("payAmt").focus(); return; }
+    if (!(v > 0)) { $("payErr").textContent = amtWhy($("payAmt").value, "Enter the amount in rupees, for example 325."); $("payErr").hidden = false; $("payAmt").focus(); return; }
     if (v > 100000) { $("payErr").textContent = "That amount looks too large. Check the number and try again."; $("payErr").hidden = false; return; }
     const { mid, i } = payCtx;
     // the same amount for the same member and month within three days is probably entered twice
@@ -3302,7 +3415,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   $("cashForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
     const raw = $("cashAmt").value.trim(), v = parseAmt(raw);
-    if (!raw || !(v >= 0)) { $("cashErr").textContent = "Enter the cash you counted in rupees, for example 4400."; $("cashErr").hidden = false; return; }
+    if (!raw || !(v >= 0)) { $("cashErr").textContent = amtWhy(raw, "Enter the cash you counted in rupees, for example 4400."); $("cashErr").hidden = false; return; }
     const exp = cashNow(), rec = { t: new Date().toISOString(), d: todayStr(), y: CY, counted: v, expected: exp, diff: v - exp };
     const by = whoAmI(), note = $("cashNote").value.trim().slice(0, 80);
     if (by) rec.by = by;
@@ -3369,12 +3482,15 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   }
   function setElec(i, amount, signed, t, note) {
     const mp = { ...elecMap() }, old = mp[i] || null;
+    // each month carries when it last changed (u), and a cleared month stays as an empty record, so when two phones
+    // changed different months both changes are kept when they sync
     if (amount > 0 || signed) {
-      const rec = { amount: amount > 0 ? amount : 0, signed: !!signed };
+      const rec = { amount: amount > 0 ? amount : 0, signed: !!signed, u: Date.now() };
       if (t) rec.t = t;
       if (note) rec.note = note;
+      if (old && old.u && old.amount === rec.amount && !!old.signed === rec.signed && (old.t || "") === (rec.t || "") && (old.note || "") === (rec.note || "")) rec.u = old.u;
       mp[i] = rec;
-    } else delete mp[i];
+    } else if (old) mp[i] = { amount: 0, signed: false, u: Date.now() };
     writeDoc("electricity/" + S.year, { year: S.year, m: mp });
     const oa = old ? old.amount || 0 : 0, na = mp[i] ? mp[i].amount || 0 : 0, os = !!(old && old.signed), ns = !!(mp[i] && mp[i].signed);
     if (oa !== na) logChange({ k: "elec", act: !oa ? "add" : na ? "edit" : "cancel", y: S.year, i, a: na || oa, old: oa && na ? oa : undefined });
@@ -3386,7 +3502,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     if (!elecCtx || elecCtx.year !== S.year) return false;
     const raw = $("elecAmt").value.trim();
     const v = raw ? parseAmt(raw) : 0;
-    if (raw && !(v >= 0)) { $("elecErr").textContent = "Enter the bill amount in rupees, for example 3000."; $("elecErr").hidden = false; return false; }
+    if (raw && !(v >= 0)) { $("elecErr").textContent = amtWhy(raw, "Enter the bill amount in rupees, for example 3000."); $("elecErr").hidden = false; return false; }
     const t = /^\d{4}-\d{2}-\d{2}$/.test($("elecDate").value) ? $("elecDate").value : (v > 0 ? todayStr() : "");
     setElec(elecCtx.i, v || 0, $("elecSigned").checked, t, $("elecNote").value.trim().slice(0, 80));
     return true;
@@ -3509,16 +3625,16 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       const d = expRows[k].d.trim().replace(/\s+/g, " ").slice(0, 60), raw = String(expRows[k].a).trim(), a = parseAmt(raw);
       if (!d && !raw) continue;                       // an empty line is ignored
       if (!d) return err(`Write what item ${k + 1} was for, for example “Petrol”.`, k, "xi-d");
-      if (!(a > 0)) return err(`Enter the amount for “${d}” in rupees, for example 500.`, k, "xi-a");
+      if (!(a > 0)) return err(amtWhy(raw, `Enter the amount for “${d}” in rupees, for example 500.`), k, "xi-a");
       if (a > 1000000) return err(`The amount for “${d}” looks too large. Check the number.`, k, "xi-a");
       items.push({ d, a });
     }
     if (!items.length) return err("Write what the money was for and how much, for example “Grass cutting” Rs. 4000.", 0, "xi-d");
     const v = items.reduce((t, it) => t + it.a, 0), desc = items.map((it) => it.d).join(", ").slice(0, 200);
     let t = /^\d{4}-\d{2}-\d{2}$/.test($("expDate").value) ? $("expDate").value : todayStr();
-    let month = expCtx.i;
     const [ty, tm] = t.split("-").map(Number);
-    if (ty === S.year) month = tm - 1;     // the date decides the month
+    if (ty !== S.year) return err(`The date is in ${ty}, but ${S.year} is open. Change the date, or go to ${ty} and add the bill there.`);
+    const month = tm - 1;     // the date decides the month
     const id = expCtx.id || ("x" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5));
     const no = expCtx.no || newReceipt(S.year, month).replace("PSC-", "EXP-");
     const rec = { year: S.year, month, cat: expCat, desc, amount: v, t, no };
@@ -3528,7 +3644,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     const by = getCollector().trim();
     if (by) rec.by = by;
     const prevX = expCtx.id ? expensesAll().find((e) => e.id === expCtx.id) : null;
-    const same = prevX && prevX.amount === rec.amount && prevX.desc === rec.desc && prevX.t === rec.t && (prevX.to || "") === (rec.to || "") && prevX.month === rec.month && prevX.cat === rec.cat;
+    const same = prevX && prevX.amount === rec.amount && prevX.desc === rec.desc && prevX.t === rec.t && (prevX.to || "") === (rec.to || "") && prevX.month === rec.month && prevX.cat === rec.cat && JSON.stringify(expItemsOf(prevX)) === JSON.stringify(expItemsOf(rec));
     if (prevX && prevX.chk && same) rec.chk = prevX.chk;      // a check stays only while the bill is unchanged
     writeDoc("expenses/" + id, rec);
     if (!prevX) logChange({ k: "exp", act: "add", y: S.year, i: month, a: v, no, desc });
@@ -3594,7 +3710,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   // a saved record as it stands now (changes still being saved included)
   function readDoc(path) {
     if (overlay.has(path)) return overlay.get(path) || null;
-    const raw = S.db && typeof S.db.raw === "function" ? S.db.raw() : null;
+    const raw = rawView();
     const d = raw && raw[path];
     return d && !d._deleted ? d : null;
   }
@@ -3703,7 +3819,20 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     $("evCostSugs").innerHTML = EV_COSTS.map((c) => `<button type="button" data-csug="${c}">${c}</button>`).join("");
     $("evErr").hidden = true;
   }
-  function evSet(mut) { const ev = evGet(); if (!ev) return; const next = JSON.parse(JSON.stringify(ev)); mut(next); evWrite(next); fillEv(); }
+  function evSet(mut) { const ev = evGet(); if (!ev) return; const next = JSON.parse(JSON.stringify(ev)); mut(next); evWrite(next); potLog("ev", ev, next); fillEv(); }
+  // an event's or birthday's money changed: one line in the change history (what came in, what went out, the club's part)
+  function potLog(k, a, b) {
+    const T = k === "ev" ? evTotals : bdTotals, t0 = T(a), t1 = T(b);
+    const club = (t) => (k === "ev" ? (t.toClub || 0) - (t.fromClub || 0) : 0), c0 = club(t0), c1 = club(t1);
+    const moved = k === "ev" && c1 !== 0 && a.date !== b.date;
+    if (t0.collected === t1.collected && t0.spent === t1.spent && c0 === c1 && !moved) return;
+    const d = /^\d{4}-\d{2}/.test(b.date || "") ? b.date : null;
+    logChange({ k, act: "edit", name: b.name || undefined, no: b.no, y: d ? +d.slice(0, 4) : undefined, i: d ? +d.slice(5, 7) - 1 : undefined, a: t1.collected, old: t0.collected, sp: t1.spent, osp: t0.spent, club: c1, oclub: c0, date: moved ? d : undefined });
+  }
+  function potGoneLog(k, ev, act) {
+    const t = k === "ev" ? evTotals(ev) : bdTotals(ev), d = /^\d{4}-\d{2}/.test(ev.date || "") ? ev.date : null;
+    logChange({ k, act, name: ev.name || undefined, no: ev.no, y: d ? +d.slice(0, 4) : undefined, i: d ? +d.slice(5, 7) - 1 : undefined, a: t.collected, sp: t.spent, club: k === "ev" ? (t.toClub || 0) - (t.fromClub || 0) : 0 });
+  }
   $("evName").addEventListener("change", () => evSet((ev) => { ev.name = $("evName").value.trim().replace(/\s+/g, " ").slice(0, 60); }));
   $("evDate").addEventListener("change", () => { if (/^\d{4}-\d{2}-\d{2}$/.test($("evDate").value)) evSet((ev) => { ev.date = $("evDate").value; }); });
   $("evPer").addEventListener("change", () => evSet((ev) => { const v = parseAmt($("evPer").value); ev.per = v > 0 ? v : 0; }));
@@ -3716,6 +3845,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   });
   $("evList").addEventListener("change", (e) => {
     const inp = e.target;
+    if ((inp.classList.contains("bd-amt") || inp.classList.contains("bd-gamt")) && inp.value.trim() && Number.isNaN(parseAmt(inp.value))) { const msg = amtWhy(inp.value, "Enter the amount in rupees, for example 500."); fillEv(); $("evErr").textContent = msg; $("evErr").hidden = false; return; }
     if (inp.classList.contains("bd-amt")) {
       const v = parseAmt(inp.value);
       evSet((b) => { b.c = b.c || {}; if (v > 0) b.c[inp.dataset.mid] = { a: v, t: todayStr() }; else delete b.c[inp.dataset.mid]; });
@@ -3728,14 +3858,14 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   $("evGuestBtn").addEventListener("click", () => { evGuestOpen = !evGuestOpen; $("evGuestForm").hidden = !evGuestOpen; if (evGuestOpen) $("evGuestName").focus(); });
   $("evGuestAdd").addEventListener("click", () => {
     const n = $("evGuestName").value.trim().slice(0, 40), v = parseAmt($("evGuestAmt").value);
-    if (!n || !(v > 0)) { $("evErr").textContent = "Write the name and the amount they gave."; $("evErr").hidden = false; return; }
+    if (!n || !(v > 0)) { $("evErr").textContent = n ? amtWhy($("evGuestAmt").value, "Write the name and the amount they gave.") : "Write the name and the amount they gave."; $("evErr").hidden = false; return; }
     evSet((b) => { b.g = b.g || []; b.g.push({ n, a: v, t: todayStr() }); });
     $("evGuestName").value = ""; $("evGuestAmt").value = "";
   });
   $("evCostSugs").addEventListener("click", (e) => { const b = e.target.closest("[data-csug]"); if (!b) return; $("evCostDesc").value = b.dataset.csug; $("evCostAmt").focus(); });
   $("evCostAdd").addEventListener("click", () => {
     const d = $("evCostDesc").value.trim().slice(0, 40), v = parseAmt($("evCostAmt").value);
-    if (!d || !(v > 0)) { $("evErr").textContent = "Write what the money was for and the amount, for example Trophies and 3000."; $("evErr").hidden = false; return; }
+    if (!d || !(v > 0)) { $("evErr").textContent = d ? amtWhy($("evCostAmt").value, "Write what the money was for and the amount, for example Trophies and 3000.") : "Write what the money was for and the amount, for example Trophies and 3000."; $("evErr").hidden = false; return; }
     evSet((b) => { b.x = b.x || []; b.x.push({ d, a: v, t: todayStr() }); });
     $("evCostDesc").value = ""; $("evCostAmt").value = "";
   });
@@ -3754,9 +3884,10 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     if (!ev) return;
     const { id, ...body } = ev;
     writeDoc("events/" + id, null); evSync(ev, true);
+    potGoneLog("ev", ev, "delete");
     $("evDlg").close(); render();
     const tt = evTotals(ev);
-    toast(`Deleted ${ev.name || "the event"}${tt.fromClub ? " and its top-up from the club" : tt.toClub ? " and the money it added to the club" : ""}.`, () => { writeDoc("events/" + id, body); evSync(ev); render(); });
+    toast(`Deleted ${ev.name || "the event"}${tt.fromClub ? " and its top-up from the club" : tt.toClub ? " and the money it added to the club" : ""}. It stays in the change history.`, () => { writeDoc("events/" + id, body); evSync(ev); potGoneLog("ev", ev, "restore"); render(); });
   });
   $("evDlg").addEventListener("close", () => {
     // an event that was opened but never filled in is removed again
@@ -3934,7 +4065,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     $("bdCostSugs").innerHTML = BD_COSTS.map((c) => `<button type="button" data-csug="${c}">${c}</button>`).join("");
     $("bdErr").hidden = true;
   }
-  function bdSet(mut) { const ev = bdGet(); if (!ev) return; const next = JSON.parse(JSON.stringify(ev)); mut(next); bdWrite(next); fillBd(); }
+  function bdSet(mut) { const ev = bdGet(); if (!ev) return; const next = JSON.parse(JSON.stringify(ev)); mut(next); bdWrite(next); potLog("bd", ev, next); fillBd(); }
   $("bdName").addEventListener("change", () => bdSet((ev) => { ev.name = $("bdName").value.trim().replace(/\s+/g, " ").slice(0, 50); }));
   $("bdDate").addEventListener("change", () => { if (/^\d{4}-\d{2}-\d{2}$/.test($("bdDate").value)) bdSet((ev) => { ev.date = $("bdDate").value; }); });
   $("bdPer").addEventListener("change", () => bdSet((ev) => { const v = parseAmt($("bdPer").value); ev.per = v > 0 ? v : 0; }));
@@ -3946,6 +4077,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   });
   $("bdList").addEventListener("change", (ev) => {
     const inp = ev.target;
+    if ((inp.classList.contains("bd-amt") || inp.classList.contains("bd-gamt")) && inp.value.trim() && Number.isNaN(parseAmt(inp.value))) { const msg = amtWhy(inp.value, "Enter the amount in rupees, for example 500."); fillBd(); $("bdErr").textContent = msg; $("bdErr").hidden = false; return; }
     if (inp.classList.contains("bd-amt")) {
       const v = parseAmt(inp.value);
       bdSet((b) => { b.c = b.c || {}; if (v > 0) b.c[inp.dataset.mid] = { a: v, t: todayStr() }; else delete b.c[inp.dataset.mid]; });
@@ -3958,14 +4090,14 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   $("bdGuestBtn").addEventListener("click", () => { bdGuestOpen = !bdGuestOpen; $("bdGuestForm").hidden = !bdGuestOpen; if (bdGuestOpen) $("bdGuestName").focus(); });
   $("bdGuestAdd").addEventListener("click", () => {
     const n = $("bdGuestName").value.trim().slice(0, 40), v = parseAmt($("bdGuestAmt").value);
-    if (!n || !(v > 0)) { $("bdErr").textContent = "Write the person's name and the amount they gave."; $("bdErr").hidden = false; return; }
+    if (!n || !(v > 0)) { $("bdErr").textContent = n ? amtWhy($("bdGuestAmt").value, "Write the person's name and the amount they gave.") : "Write the person's name and the amount they gave."; $("bdErr").hidden = false; return; }
     bdSet((b) => { b.g = b.g || []; b.g.push({ n, a: v, t: todayStr() }); });
     $("bdGuestName").value = ""; $("bdGuestAmt").value = "";
   });
   $("bdCostSugs").addEventListener("click", (ev) => { const b = ev.target.closest("[data-csug]"); if (!b) return; $("bdCostDesc").value = b.dataset.csug; $("bdCostAmt").focus(); });
   $("bdCostAdd").addEventListener("click", () => {
     const d = $("bdCostDesc").value.trim().slice(0, 40), v = parseAmt($("bdCostAmt").value);
-    if (!d || !(v > 0)) { $("bdErr").textContent = "Write what was bought and the amount, for example Cake and 2500."; $("bdErr").hidden = false; return; }
+    if (!d || !(v > 0)) { $("bdErr").textContent = d ? amtWhy($("bdCostAmt").value, "Write what was bought and the amount, for example Cake and 2500.") : "Write what was bought and the amount, for example Cake and 2500."; $("bdErr").hidden = false; return; }
     bdSet((b) => { b.x = b.x || []; b.x.push({ d, a: v, t: todayStr() }); });
     $("bdCostDesc").value = ""; $("bdCostAmt").value = "";
   });
@@ -3984,8 +4116,9 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     if (!ev) return;
     const { id, ...body } = ev;
     writeDoc("birthdays/" + id, null);
+    potGoneLog("bd", ev, "delete");
     $("bdDlg").close(); render();
-    toast(`Deleted ${ev.name ? ev.name + "'s birthday" : "the birthday"}.`, () => { writeDoc("birthdays/" + id, body); render(); });
+    toast(`Deleted ${ev.name ? ev.name + "'s birthday" : "the birthday"}. It stays in the change history.`, () => { writeDoc("birthdays/" + id, body); potGoneLog("bd", ev, "restore"); render(); });
   });
   $("bdDlg").addEventListener("close", () => {
     // a birthday that was opened but never filled in is removed again
@@ -4641,7 +4774,8 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   function pdfQR(doc, x, y, size, qr) {
     if (!qr || !qr.no || typeof qrcode !== "function") return;
     try {
-      const q = qrcode(0, "M"); q.addData(`PSC:${qr.no}:${qr.code}`); q.make();
+      // a link to the app: the phone's own camera opens it, and the app checks the bill straight away
+      const q = qrcode(0, "L"); q.addData(`${APP_URL}#c=${qr.no}.${qr.code}`); q.make();
       const n = q.getModuleCount(), cell = size / (n + 4), pad = cell * 2;
       doc.setFillColor(255, 255, 255); doc.roundedRect(x, y, size, size, 1.4, 1.4, "F");
       doc.setFillColor(20, 18, 15);
@@ -4843,7 +4977,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   // The club balance before month i of year y: money used for every earlier month minus every bill paid before it.
   // Extra paid ahead isn't in it yet; it joins the balance in the month it is used for.
   function balanceBefore(y, i) {
-    const raw = S.db && typeof S.db.raw === "function" ? S.db.raw() : null;
+    const raw = rawView();
     if (!raw) { let b = 0; for (let k = 0; k < i; k++) b += monthTotal(k) + incTotal(k) - elec(k).amount - expTotal(k); return b; }
     const before = (yy, mk) => yy < y || (yy === y && +mk < i);
     let bal = 0;
@@ -4867,13 +5001,20 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   // included) minus every bill. Used for "Balance in hand".
   function cashBalanceBefore(y, i) {
     let bal = 0;
-    const raw = S.db && typeof S.db.raw === "function" ? S.db.raw() : null;
+    const raw = rawView();
     if (raw) {
       for (const k in raw) {
         const d = raw[k];
         if (!d || d._deleted || typeof d.year !== "number") continue;
         const before = (mk) => d.year < y || (d.year === y && +mk < i);
-        if (k.startsWith("payments/")) for (const mk in d.m || {}) { if (before(mk) && d.m[mk] > 0) bal += d.m[mk]; }
+        // a payment counts once it is for an earlier month, or once it was received: money paid ahead for a later
+        // month (or next year's sheet) is already in hand
+        if (k.startsWith("payments/")) for (const mk in d.m || {}) {
+          if (!(d.m[mk] > 0)) continue;
+          if (before(mk)) { bal += d.m[mk]; continue; }
+          const ph = (d.h || {})[mk];
+          if (Array.isArray(ph)) for (const p of ph) if (p && p.a > 0 && /^\d{4}-\d{2}/.test(p.t || "") && (+p.t.slice(0, 4)) * 12 + (+p.t.slice(5, 7) - 1) < y * 12 + i) bal += p.a;
+        }
         if (k.startsWith("electricity/")) for (const mk in d.m || {}) { const e = d.m[mk]; if (before(mk) && e && e.amount > 0) bal -= e.amount; }
         if (k.startsWith("expenses/") && Number.isInteger(d.month) && before(d.month) && d.amount > 0) bal -= d.amount;
         if (k.startsWith("income/") && Number.isInteger(d.month) && before(d.month) && d.amount > 0) bal += d.amount;
@@ -4987,7 +5128,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     if (apv) {
       const changed = approvalDiff(apv, i).length;
       doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(...(changed ? C.RED : C.GREEN));
-      doc.text(changed ? "CHANGED AFTER APPROVAL" : `APPROVED${apv.by ? ` BY ${apv.by.toUpperCase()}` : ""} · ${longDate(String(apv.t).slice(0, 10)).toUpperCase()}`, M + 26, sy + 7.4, { align: "center" });
+      doc.text(changed ? "CHANGED AFTER APPROVAL" : `APPROVED${apv.by ? ` BY ${apv.by.toUpperCase()}` : ""} · ${longDate(localDay(apv.t)).toUpperCase()}`, M + 26, sy + 7.4, { align: "center" });
     }
     // footer
     doc.setDrawColor(...C.LINE); doc.setLineWidth(0.3); doc.line(M, footTop, W - M, footTop);
@@ -5146,6 +5287,9 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     else if (act === "ho-new") openHandover(null);
     else if (act === "clash-open") openClash(b.dataset.id);
     else if (act === "clash-pick") resolveClash(b.dataset.id, b.dataset.side);
+    else if (act === "conf-open") openConflict(b.dataset.id);
+    else if (act === "conf-pick") resolveConflict(b.dataset.id, b.dataset.side);
+    else if (act === "ver-copy") copyText(b.dataset.t || "", "Copied. Paste it in the app: More → Check a bill.");
     else if (act === "dup-cancel" || act === "dup-ok") {
       const mid = b.dataset.id, i = +b.dataset.m, k = b.dataset.k, before = partsOf(mid, i);
       if (!before.some((p) => p.id === k)) return;
@@ -5260,9 +5404,9 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.15.0";
+  const APP_VERSION = "1.15.1";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
-  const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty";
+  const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty", BASE_KEY = "psc.syncbase.v1";
   const SEED = {};
   const readLS = (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } };
   const writeLS = (k, v) => { try { localStorage.setItem(k, v); } catch (e) {} };
@@ -5278,7 +5422,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       try { localStorage.setItem(STORE_KEY, JSON.stringify(store)); } catch (e) { ok = false; }
     }
     const subs = new Set();
-    let changeHook = null;
+    let changeHook = null, snap = null;
     const meta = { fromCache: false, hasPendingWrites: false };
     const snapDoc = (p) => ({ id: p.split("/").pop(), exists: live(store[p]), data: () => (live(store[p]) ? store[p] : undefined), metadata: meta });
     const notify = () => { for (const s of [...subs]) s(); };
@@ -5286,6 +5430,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     function write(p, body) {
       const prev = store[p];
       store[p] = body;
+      snap = null;
       try { save(); } catch (e) {
         if (prev === undefined) delete store[p]; else store[p] = prev;
         throw { code: "quota_exceeded", message: "storage full" };
@@ -5312,14 +5457,14 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       return {
         id: p.split("/").pop(), path: p,
         get: async () => snapDoc(p),
-        set: async (d) => { const body = clone(d); delete body._u; delete body._deleted; body._u = Date.now(); write(p, body); },
-        delete: async () => { if (store[p] !== undefined) write(p, { _deleted: true, _u: Date.now() }); },
+        set: async (d) => { const body = clone(d); delete body._u; delete body._deleted; body._u = Math.max(Date.now(), ((store[p] && store[p]._u) || 0) + 1); write(p, body); },
+        delete: async () => { if (store[p] !== undefined) write(p, { _deleted: true, _u: Math.max(Date.now(), ((store[p] && store[p]._u) || 0) + 1) }); },
         onSnapshot: (next) => { const s = () => next(snapDoc(p)); subs.add(s); setTimeout(s, 0); return () => subs.delete(s); },
       };
     }
     window.addEventListener("storage", (ev) => {
       if (ev.key !== STORE_KEY || !ev.newValue) return;
-      try { store = JSON.parse(ev.newValue); notify(); } catch (e) {}
+      try { store = JSON.parse(ev.newValue); snap = null; notify(); } catch (e) {}
     });
     return {
       ok: () => ok,
@@ -5327,6 +5472,8 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       collection: (c) => query(c, []),
       onLocalChange: (fn) => { changeHook = fn; },
       raw: () => clone(store),
+      // the same, shared and read-only: copied once after each change instead of on every read
+      view: () => snap || (snap = clone(store)),
       // live records under a path prefix, e.g. "log/" (each with its id in _id)
       scan: (pre) => Object.keys(store).filter((k) => k.startsWith(pre) && live(store[k])).map((k) => ({ ...clone(store[k]), _id: k.slice(pre.length) })),
       liveOnly: () => { const o = {}; for (const k in store) if (live(store[k])) { o[k] = clone(store[k]); delete o[k]._u; } return o; },
@@ -5337,18 +5484,20 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
           const a = store[k], b = obj[k];
           if (a === undefined || (b._u || 0) >= (a._u || 0)) { if (JSON.stringify(a) !== JSON.stringify(b)) { store[k] = clone(b); changed = true; } }
         }
-        if (changed) { save(); notify(); }
+        if (changed) { snap = null; save(); notify(); }
         return changed;
       },
       // A device that has never been used adopts the online register as it is.
-      adopt: (obj) => { store = clone(obj); save(); notify(); },
+      adopt: (obj) => { store = clone(obj); snap = null; save(); notify(); },
       // The user restored a file or an earlier version: it becomes the newest state everywhere.
       restoreAll: (obj) => {
         const now = Date.now(), next = {};
-        for (const k in obj) if (live(obj[k])) { const r = clone(obj[k]); delete r._u; delete r._r; r._u = now; if (k.startsWith("payments/")) r._r = now; next[k] = r; }
-        for (const k in store) if (!(k in next)) next[k] = { _deleted: true, _u: now };
+        const after = (k) => Math.max(now, ((store[k] && store[k]._u) || 0) + 1);   // later than any copy this phone has seen
+        for (const k in obj) if (live(obj[k])) { const r = clone(obj[k]); delete r._u; delete r._r; r._u = after(k); r._r = r._u; next[k] = r; }
+        for (const k in store) if (!(k in next)) { const u = after(k); next[k] = { _deleted: true, _u: u, _r: u }; }
         const before = store;
         store = next;
+        snap = null;
         try { save(); } catch (e) { store = before; throw e; }
         writeLS(CHG_KEY, new Date().toISOString());
         notify();
@@ -5366,7 +5515,10 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   let cfg = null;
   try { cfg = JSON.parse(readLS(SYNC_KEY) || "null"); } catch (e) { cfg = null; }
   if (cfg && !(cfg.owner && cfg.repo && cfg.token)) cfg = null;
-  const saveCfg = () => { if (cfg) writeLS(SYNC_KEY, JSON.stringify(cfg)); else delLS(SYNC_KEY); };
+  const saveCfg = () => { if (cfg) writeLS(SYNC_KEY, JSON.stringify(cfg)); else { delLS(SYNC_KEY); delLS(BASE_KEY); } };
+  // when each record last matched the online copy: tells "changed on this phone only" from "changed on both phones"
+  const readBase = () => { try { return JSON.parse(readLS(BASE_KEY) || "{}") || {}; } catch (e) { return {}; } };
+  const saveBase = (st) => { const o = {}; for (const k in st || {}) if (st[k] && st[k]._u && CONFLICT_RE.test(k)) o[k] = st[k]._u; writeLS(BASE_KEY, JSON.stringify(o)); };
   const SY = { state: cfg ? "busy" : "off", msg: "", running: false, again: false, timer: null };
 
   const b64e = (str) => { const bytes = new TextEncoder().encode(str); let bin = ""; for (let i = 0; i < bytes.length; i += 0x8000) bin += String.fromCharCode.apply(null, bytes.subarray(i, i + 0x8000)); return btoa(bin); };
@@ -5393,7 +5545,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   function ghErr(res) {
     if (res.status === 401) return new SyncError("auth", "GitHub didn't accept the access token. It may have expired or been copied wrongly. Replace it under “Replace the access token”.");
     if (res.status === 403 || res.status === 429) {
-      if (res.headers.get("x-ratelimit-remaining") === "0" || res.status === 429) return new SyncError("busy", "GitHub is limiting requests for a few minutes. Sync will try again by itself.");
+      if (res.headers.get("x-ratelimit-remaining") === "0" || res.headers.get("retry-after") || res.status === 429) return new SyncError("busy", "GitHub is limiting requests for a few minutes. Sync will try again by itself.");
       return new SyncError("auth", "The token isn't allowed to change this repository. Create it again with Contents set to “Read and write”.");
     }
     if (res.status === 404) return new SyncError("missing", "GitHub can't find that repository with this token. Check the username and repository name, and that the token was given access to it.");
@@ -5478,15 +5630,40 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     out._u = Math.max(a._u || 0, b._u || 0);
     return out;
   }
-  function mergeStores(local, remote) {
-    const out = {}, clashes = [];
+  // One year's electricity bills, as two phones see them, merged month by month: the later change of a month wins.
+  // A month only one phone has is kept (a month from before 1.15.1, with no change time, follows the newer copy).
+  function mergeElec(a, b) {
+    const newer = (b._u || 0) >= (a._u || 0) ? b : a, ma = a.m || {}, mb = b.m || {}, m = {};
+    for (const k of new Set([...Object.keys(ma), ...Object.keys(mb)])) {
+      const x = ma[k], z = mb[k];
+      if (x && z) m[k] = (z.u || 0) > (x.u || 0) ? z : (x.u || 0) > (z.u || 0) ? x : newer === b ? z : x;
+      else { const e = x || z; if (e && (e.u || (x ? a : b) === newer)) m[k] = e; }
+    }
+    return { ...newer, m, _u: Math.max(a._u || 0, b._u || 0) };
+  }
+  // records that two phones can change at the same time: when both changed one since they last synced, the newer
+  // change is used for now and both are kept (conflict/...) for someone to choose
+  const CONFLICT_RE = /^(members|expenses|income|events|birthdays|handover|settings)\//;
+  const canon = (d) => { if (!d || d._deleted) return "deleted"; const { _u, _r, ...b } = d; return JSON.stringify(b, (k, v) => (v && typeof v === "object" && !Array.isArray(v) ? Object.keys(v).sort().reduce((o, kk) => { o[kk] = v[kk]; return o; }, {}) : v)); };
+  function mergeStores(local, remote, base) {
+    const out = {}, clashes = [], both = [];
     let remoteChanged = false;
     for (const k of new Set([...Object.keys(local), ...Object.keys(remote)])) {
       const a = local[k], b = remote[k];
       let pick = a === undefined ? b : b === undefined ? a : (b._u || 0) >= (a._u || 0) ? b : a;
       if (a && b && k.startsWith("payments/") && live(a) && live(b) && JSON.stringify(a) !== JSON.stringify(b)) pick = mergePay(k, a, b, clashes);
+      else if (a && b && k.startsWith("electricity/") && live(a) && live(b) && JSON.stringify(a) !== JSON.stringify(b)) pick = mergeElec(a, b);
+      else if (a && b && base && base[k] != null && CONFLICT_RE.test(k) && !/^(expenses|income)\/ev/.test(k)
+        && (a._u || 0) > base[k] && (b._u || 0) > base[k] && !(a._r && a._r >= (b._u || 0)) && !(b._r && b._r >= (a._u || 0)) && canon(a) !== canon(b)) both.push({ path: k, a, b });
       out[k] = pick;
       if (JSON.stringify(pick) !== JSON.stringify(b)) remoteChanged = true;
+    }
+    for (const c of both) {
+      const [p, q] = (c.a._u || 0) <= (c.b._u || 0) ? [c.a, c.b] : [c.b, c.a];
+      const ck = ("conflict/" + `${c.path}-${p._u || 0}-${q._u || 0}`.replace(/[^A-Za-z0-9_.:@+~-]/g, "_")).slice(0, 160);
+      if (out[ck] !== undefined) continue;        // already raised, or already settled, on one of the phones
+      out[ck] = { path: c.path, a: p, b: q, t: new Date().toISOString(), _u: Date.now() };
+      remoteChanged = true;
     }
     for (const c of clashes) {
       const ck = ("clash/" + `${c.path.slice(9)}-${c.i}-${c.id}-${c.a.v || 1}`.replace(/[^A-Za-z0-9_.:@+~-]/g, "_")).slice(0, 120);
@@ -5510,18 +5687,20 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
         const firstTime = !cfg.joined;
         if (remote.store && firstTime && !readLS(CHG_KEY)) {
           LocalDB.adopt(remote.store);        // a new device takes the online register as it is
+          saveBase(remote.store);
           cfg.sha = remote.sha;
           done = true;
           break;
         }
         const local = LocalDB.raw();
-        const m = mergeStores(local, remote.store || {});
-        if (remote.store) LocalDB.mergeIn(m.out);
+        const m = mergeStores(local, remote.store || {}, readBase());
+        if (remote.store) { LocalDB.mergeIn(m.out); saveBase(remote.store); }
         if (!remote.store || m.remoteChanged) {
           const sha = await push(cfg, m.out, remote.sha);
           if (!sha) continue;
           cfg.sha = sha;
         } else cfg.sha = remote.sha;
+        saveBase(m.out);
         done = true;
       }
       if (!done) throw new SyncError("server", "Your devices kept saving at the same moment. Tap “Sync now” to try again.");
@@ -5612,7 +5791,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       const repo = await res.json();
       if (repo.private === false) throw new SyncError("public", `“${c.owner}/${c.repo}” is public, so anyone could read the members' payments. Make it private on GitHub (Settings → General → Change visibility), then connect again.`);
       cfg = { owner: c.owner, repo: c.repo, token: c.token, joined: false };
-      saveCfg();
+      saveCfg(); delLS(BASE_KEY);
       await syncNow();
       if (SY.state === "error") {
         const msg = SY.msg;
@@ -5719,6 +5898,26 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   });
 
   /* ---------- backup file and Excel export ---------- */
+  // a money field that isn't a whole number of rupees (e.g. "500" as text) would break every total: refuse such a file
+  function moneyProblem(st) {
+    const ok = (v) => Number.isInteger(v) && v >= 0;
+    for (const k in st) {
+      const d = st[k], col = k.split("/")[0];
+      if (!d || d._deleted) continue;
+      if ("year" in d && !Number.isInteger(d.year)) return k;
+      if ("month" in d && d.month != null && !Number.isInteger(d.month)) return k;
+      if (col === "payments") {
+        for (const i in d.m || {}) if (!ok(d.m[i])) return k;
+        for (const f of ["h", "x"]) for (const i in d[f] || {}) { if (!Array.isArray(d[f][i])) return k; for (const p of d[f][i]) if (!p || !ok(p.a)) return k; }
+      } else if (col === "electricity") { for (const i in d.m || {}) { const e = d.m[i]; if (!e || (e.amount != null && !ok(e.amount))) return k; } }
+      else if (col === "expenses" || col === "income" || col === "handover") { if (!ok(d.amount)) return k; if (d.items && (!Array.isArray(d.items) || d.items.some((it) => !it || !ok(it.a)))) return k; }
+      else if (col === "events" || col === "birthdays") {
+        for (const id in d.c || {}) if (d.c[id] && !ok(d.c[id].a)) return k;
+        for (const f of ["g", "x"]) if (d[f] && (!Array.isArray(d[f]) || d[f].some((x) => !x || !ok(x.a)))) return k;
+      }
+    }
+    return null;
+  }
   function countRecords(store) {
     let members = 0, pays = 0;
     for (const k in store) {
@@ -5756,8 +5955,9 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       let data = null;
       try { data = JSON.parse(fr.result); } catch (e) {}
       const st = data && data.app === "pirampady-sc" && data.store && typeof data.store === "object" ? data.store : null;
-      const valid = st && Object.keys(st).every((k) => /^(members|payments|electricity|settings|expenses|income|birthdays|events|log|cash|clash|approve|handover)\/[A-Za-z0-9_.:@+~-]+$/.test(k) && st[k] && typeof st[k] === "object");
+      const valid = st && Object.keys(st).every((k) => /^(members|payments|electricity|settings|expenses|income|birthdays|events|log|cash|clash|conflict|approve|handover)\/[A-Za-z0-9_.:@+~-]+$/.test(k) && st[k] && typeof st[k] === "object");
       if (!valid) { showErr("bakErr", "That file isn't a Pirampady SC backup. Choose the .json file made with “Save backup file”."); return; }
+      if (moneyProblem(st)) { showErr("bakErr", "That backup file has amounts that aren't whole rupees (it may have been edited by hand), so it wasn't restored. Use a backup made by the app."); return; }
       const c = countRecords(st);
       pendingRestore = st;
       $("bakConfirmTxt").textContent = `Replace the register with the backup from ${fmtWhen(data.savedAt)}? It has ${c.members} members and ${c.pays} monthly payments.${cfg ? " Your other device will change too." : ""}`;
@@ -5782,41 +5982,42 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     const st = LocalDB.liveOnly();
     const names = {};
     for (const k in st) if (k.startsWith("members/")) names[k.slice(8)] = st[k].name;
-    const q = (v) => { const t = String(v ?? ""); return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
-    const rows = [["Type", "Year", "Month", "Member", "Amount (Rs.)", "Paid on", "Note"]];
+    // text that starts like a formula is kept as text, so a spreadsheet never runs it
+    const q = (v) => { let t = String(v ?? ""); if (typeof v === "string" && /^[=+\-@\t\r]/.test(t)) t = "'" + t; return /[",\n]/.test(t) ? `"${t.replace(/"/g, '""')}"` : t; };
+    const rows = [["Type", "Year", "Month", "Member", "Amount (Rs.)", "Paid on", "Note", "Bill no.", "Account"]];
     const pays = Object.keys(st).filter((k) => k.startsWith("payments/")).map((k) => st[k]).sort((a, b) => a.year - b.year || String(names[a.member]).localeCompare(String(names[b.member])));
     for (const p of pays) for (let i = 0; i < 12; i++) {
       const tot = p.m && p.m[i];
       if (!(tot > 0)) continue;
       const parts = p.h && Array.isArray(p.h[i]) && p.h[i].length ? p.h[i] : [{ a: tot, t: "" }];
-      for (const part of parts) rows.push(["Subscription", p.year, MONTHS_FULL[i], names[p.member] || p.member, part.a, part.t || "", parts.length > 1 ? `Part payment (month total ${tot})` : ""]);
+      for (const part of parts) rows.push(["Subscription", p.year, MONTHS_FULL[i], names[p.member] || p.member, part.a, part.t || "", parts.length > 1 ? `Part payment (month total ${tot})` : "", part.r || "", "Club"]);
     }
     for (const k of Object.keys(st).filter((k) => k.startsWith("electricity/")).sort()) {
       const e = st[k];
-      for (let i = 0; i < 12; i++) { const x = e.m && e.m[i]; if (x && (x.amount > 0 || x.signed)) rows.push(["Electricity", e.year, MONTHS_FULL[i], "", x.amount || 0, "", x.signed ? "Signed by Selvarajah" : "Not signed"]); }
+      for (let i = 0; i < 12; i++) { const x = e.m && e.m[i]; if (x && (x.amount > 0 || x.signed)) rows.push(["Electricity", e.year, MONTHS_FULL[i], "", x.amount || 0, x.t || "", x.signed ? "Signed by Selvarajah" : "Not signed", "", "Club"]); }
     }
     for (const k of Object.keys(st).filter((k) => k.startsWith("expenses/")).sort((a, b) => (st[a].year - st[b].year) || (st[a].month - st[b].month))) {
       const x = st[k];
       const what = Array.isArray(x && x.items) && x.items.length > 1 ? x.items.map((it) => `${it.d} ${it.a}`).join(", ") : x && x.desc;
-      if (x && x.amount > 0) rows.push(["Expense", x.year, MONTHS_FULL[x.month] || "", "", x.amount, x.t || "", [what, x.to ? `paid to ${x.to}` : "", x.no].filter(Boolean).join(" · ")]);
+      if (x && x.amount > 0) rows.push(["Expense", x.year, MONTHS_FULL[x.month] || "", "", x.amount, x.t || "", [what, x.to ? `paid to ${x.to}` : "", x.no].filter(Boolean).join(" · "), x.no || "", x.ev ? "Club (event shortfall)" : "Club"]);
     }
     for (const k of Object.keys(st).filter((k) => k.startsWith("birthdays/"))) {
       const b = st[k];
       if (!b) continue;
-      for (const mid in b.c || {}) if (b.c[mid] && b.c[mid].a > 0) rows.push(["Birthday contribution", (b.date || "").slice(0, 4), b.date || "", names[mid] || mid, b.c[mid].a, b.c[mid].t || "", `For ${b.name || "birthday"} · ${b.no || ""}`]);
-      for (const g of b.g || []) if (g && g.a > 0) rows.push(["Birthday contribution", (b.date || "").slice(0, 4), b.date || "", g.n + " (guest)", g.a, g.t || "", `For ${b.name || "birthday"} · ${b.no || ""}`]);
-      for (const x of b.x || []) if (x && x.a > 0) rows.push(["Birthday cost", (b.date || "").slice(0, 4), b.date || "", "", x.a, x.t || "", `${x.d} · for ${b.name || "birthday"}`]);
+      for (const mid in b.c || {}) if (b.c[mid] && b.c[mid].a > 0) rows.push(["Birthday contribution", (b.date || "").slice(0, 4), b.date || "", names[mid] || mid, b.c[mid].a, b.c[mid].t || "", `For ${b.name || "birthday"} · ${b.no || ""}`, b.no || "", "Birthday fund (separate)"]);
+      for (const g of b.g || []) if (g && g.a > 0) rows.push(["Birthday contribution", (b.date || "").slice(0, 4), b.date || "", g.n + " (guest)", g.a, g.t || "", `For ${b.name || "birthday"} · ${b.no || ""}`, b.no || "", "Birthday fund (separate)"]);
+      for (const x of b.x || []) if (x && x.a > 0) rows.push(["Birthday cost", (b.date || "").slice(0, 4), b.date || "", "", x.a, x.t || "", `${x.d} · for ${b.name || "birthday"}`, b.no || "", "Birthday fund (separate)"]);
     }
     for (const k of Object.keys(st).filter((k) => k.startsWith("income/")).sort((a, b) => (st[a].year - st[b].year) || (st[a].month - st[b].month))) {
       const x = st[k];
-      if (x && x.amount > 0) rows.push(["Other income", x.year, MONTHS_FULL[x.month] || "", "", x.amount, x.t || "", [x.desc, x.no].filter(Boolean).join(" · ")]);
+      if (x && x.amount > 0) rows.push(["Other income", x.year, MONTHS_FULL[x.month] || "", "", x.amount, x.t || "", [x.desc, x.no].filter(Boolean).join(" · "), x.no || "", x.ev ? "Club (event money left over)" : "Club"]);
     }
     for (const k of Object.keys(st).filter((k) => k.startsWith("events/"))) {
       const e = st[k];
       if (!e) continue;
-      for (const mid in e.c || {}) if (e.c[mid] && e.c[mid].a > 0) rows.push(["Event contribution", (e.date || "").slice(0, 4), e.date || "", names[mid] || mid, e.c[mid].a, e.c[mid].t || "", `For ${e.name || "event"} · ${e.no || ""}`]);
-      for (const g of e.g || []) if (g && g.a > 0) rows.push(["Event contribution", (e.date || "").slice(0, 4), e.date || "", g.n + " (other)", g.a, g.t || "", `For ${e.name || "event"} · ${e.no || ""}`]);
-      for (const x of e.x || []) if (x && x.a > 0) rows.push(["Event cost", (e.date || "").slice(0, 4), e.date || "", "", x.a, x.t || "", `${x.d} · for ${e.name || "event"}`]);
+      for (const mid in e.c || {}) if (e.c[mid] && e.c[mid].a > 0) rows.push(["Event contribution", (e.date || "").slice(0, 4), e.date || "", names[mid] || mid, e.c[mid].a, e.c[mid].t || "", `For ${e.name || "event"} · ${e.no || ""}`, e.no || "", "Event (separate)"]);
+      for (const g of e.g || []) if (g && g.a > 0) rows.push(["Event contribution", (e.date || "").slice(0, 4), e.date || "", g.n + " (other)", g.a, g.t || "", `For ${e.name || "event"} · ${e.no || ""}`, e.no || "", "Event (separate)"]);
+      for (const x of e.x || []) if (x && x.a > 0) rows.push(["Event cost", (e.date || "").slice(0, 4), e.date || "", "", x.a, x.t || "", `${x.d} · for ${e.name || "event"}`, e.no || "", "Event (separate)"]);
     }
     const csv = "﻿" + rows.map((r) => r.map(q).join(",")).join("\r\n");
     const d = new Date();
@@ -5835,6 +6036,17 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   window.addEventListener("offline", () => { if (cfg && !SY.running) setSync("offline"); else renderSyncChip(); });
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible" && cfg) syncNow(); });
   setInterval(() => { if (cfg && document.visibilityState === "visible") syncNow(); }, 60000);
+  // The app can stay open for days. When the calendar month changes, it starts again, so "this month", "this year"
+  // and the months counted as due all move on (otherwise a January payment could go into last year's sheet).
+  function newMonthCheck() {
+    const d = new Date();
+    if (d.getFullYear() === CY && d.getMonth() === CM) return;
+    if ([...document.querySelectorAll("dialog")].some((x) => x.open)) { toast(`It's ${MONTHS_FULL[d.getMonth()]} ${d.getFullYear()} now. Tap Refresh when you've finished.`, () => location.reload(), "Refresh"); return; }
+    location.reload();
+  }
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") newMonthCheck(); });
+  window.addEventListener("focus", newMonthCheck);
+  setInterval(newMonthCheck, 60000);
   window.__pscSync = { syncNow, SY, get cfg() { return cfg; }, LocalDB };
 
   /* ---------- offline support and updates ---------- */
