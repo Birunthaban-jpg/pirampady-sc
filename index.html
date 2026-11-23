@@ -1038,6 +1038,42 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
 .stat.is-bal .sub { max-height: 3.9em; }
 .stat:not(.is-bal) strong { font-size: 18px; }
 .hm-big small.of { display: block; margin-top: 1px; }
+/* 1.14: tiles that open details, cash count, attention, clashes, history */
+.stat[role="button"] { cursor: pointer; transition: transform .12s var(--ease), box-shadow .2s; }
+.stat[role="button"]:focus-visible { outline: 2px solid var(--brand); outline-offset: 2px; }
+@media (prefers-reduced-motion: no-preference) { .stat[role="button"]:active { transform: scale(.985); } }
+.cash-cta { position: absolute; top: 16px; right: 16px; z-index: 1; display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 999px; font-size: 12.5px; font-weight: 700; letter-spacing: .01em; color: var(--hero-ink); background: rgba(255, 245, 225, .1); box-shadow: inset 0 0 0 1px rgba(255, 235, 190, .25); }
+.cash-cta .ic { width: 15px; height: 15px; }
+.stat .lc { display: block; margin-top: 4px; font-weight: 700; }
+.stat .lc.ok { color: var(--ok); } .stat .lc.due { color: var(--due); } .stat .lc.adv { color: var(--adv); }
+.cash-diff { margin: 0; padding: 11px 14px; border-radius: 12px; font-weight: 700; }
+.cash-diff.ok { background: var(--ok-bg); color: var(--ok); } .cash-diff.due { background: var(--due-bg); color: var(--due); } .cash-diff.adv { background: var(--adv-bg); color: var(--adv); }
+.cdiff { font-size: 12.5px; font-weight: 700; white-space: nowrap; }
+.cdiff.ok { color: var(--ok); } .cdiff.due { color: var(--due); } .cdiff.adv { color: var(--adv); }
+.hm-att { border: 1px solid var(--line-strong); }
+.att-list { list-style: none; margin: 8px 0 0; padding: 0; display: grid; gap: 10px; }
+.att-list li { display: grid; grid-template-columns: 36px minmax(0, 1fr); gap: 4px 12px; align-items: start; }
+.att-ic { width: 36px; height: 36px; border-radius: 12px; display: grid; place-items: center; }
+.att-ic.due { background: var(--due-bg); color: var(--due); } .att-ic.warn { background: var(--warn-bg); color: var(--warn); }
+.att-txt b { display: block; font-weight: 600; } .att-txt small { display: block; color: var(--muted); font-size: 12.5px; }
+.att-acts { grid-column: 2; display: flex; gap: 8px; flex-wrap: wrap; }
+.clash-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.clash-opt { display: grid; gap: 6px; align-content: start; padding: 12px; border: 1px solid var(--line); border-radius: 14px; }
+.clash-amt { margin: 0; font-size: 22px; font-weight: 700; }
+.clash-opt .hint { margin: 0; }
+@media (max-width: 420px) { .clash-grid { grid-template-columns: 1fr; } }
+.hist li.is-x { opacity: .75; }
+.hist li.is-x s, .hrow.is-x b { text-decoration-color: var(--due); }
+.row-ic.x { background: var(--due-bg); color: var(--due); }
+.hrow { cursor: default; grid-template-columns: 40px minmax(0, 1fr); }
+.hrow .row-main b { font-weight: 500; font-size: 15px; line-height: 1.35; }
+.hist-list { margin-bottom: 4px; }
+.chkrow { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; }
+.chkrow b .ic { width: 15px; height: 15px; vertical-align: -2px; margin-right: 3px; }
+.stat:not(.is-bal) strong.long { font-size: 15.5px; }
+@media (min-width: 640px) { .stat:not(.is-bal) strong.long { font-size: 21px; } }
+.chart .is-pre .bars { opacity: .35; border-bottom-style: dashed; }
+.chart .is-pre span { opacity: .5; }
 .msummary { grid-template-columns: minmax(0, .8fr) minmax(0, .8fr) minmax(0, 1.4fr); }
 .stat { align-content: start; }
 #mbrDlg { width: min(540px, calc(100vw - 32px)); }
@@ -1096,6 +1132,32 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   </main>
   </div>
 </div>
+
+<dialog class="dlg" id="attDlg">
+  <div class="inner" id="attBody"></div>
+</dialog>
+
+<dialog class="dlg" id="cashDlg" aria-labelledby="cashTitle">
+  <form id="cashForm" novalidate>
+    <div class="dlg-head">
+      <div><p class="eyebrow">Cash check</p><h3 id="cashTitle">Count the cash</h3></div>
+      <button type="button" class="close" data-close aria-label="Close">×</button>
+    </div>
+    <div class="state" id="cashApp"></div>
+    <div class="field">
+      <label for="cashAmt">Cash you counted (Rs.)</label>
+      <input id="cashAmt" inputmode="numeric" autocomplete="off" placeholder="e.g. 4400">
+    </div>
+    <p class="cash-diff" id="cashDiff" hidden></p>
+    <div class="field">
+      <label for="cashNote">Note (optional)</label>
+      <input id="cashNote" autocomplete="off" maxlength="80" placeholder="e.g. counted together at the ground">
+    </div>
+    <p class="err" id="cashErr" hidden></p>
+    <button type="submit" class="btn primary big">Save this count</button>
+    <div id="cashHist"></div>
+  </form>
+</dialog>
 
 <dialog class="dlg" id="mbrDlg" aria-labelledby="mbrName">
   <div class="inner" id="mbrBody"></div>
@@ -1187,6 +1249,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       <input id="expTo" autocomplete="off" placeholder="e.g. shop name or person">
     </div>
     <div class="state calc" id="expCalc"></div>
+    <div class="chkrow" id="expChkRow" hidden><span id="expChkTxt"></span><button type="button" class="btn sm" id="expCheck">Mark as checked ✓</button></div>
     <p class="err" id="expErr" hidden></p>
     <button type="submit" class="btn primary big" id="expBill">Save and share bill (PDF)</button>
     <div class="foot-row">
@@ -1315,6 +1378,11 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
         <select id="startY" aria-label="Start year"></select>
       </div>
       <p class="hint">Dues are counted from this month up to the current month. A member's own “pays from” month in Members overrides it.</p>
+    </div>
+    <div class="field">
+      <label for="myName">Your name on this phone</label>
+      <input id="myName" autocomplete="off" autocapitalize="words" placeholder="Your first name">
+      <p class="hint">Kept on this phone only. It goes on the payments you record, your receipts and the change history.</p>
     </div>
     <div class="field">
       <label for="sigText">Signature on receipts and slips</label>
@@ -1460,7 +1528,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   const rsH = (n) => `<span class="cur">Rs.</span> ${fmt(n)}`;   // same text as rs(), with a smaller "Rs." on screen
   const parseAmt = (v) => { const d = String(v ?? "").replace(/[^0-9]/g, ""); return d ? parseInt(d, 10) : NaN; };
 
-  const VIEWS = ["home", "members", "month", "year", "more", "bday", "expenses", "elec", "income"];
+  const VIEWS = ["home", "members", "month", "year", "more", "bday", "expenses", "elec", "income", "history"];
   let savedView = null;
   try { savedView = localStorage.getItem("psc.view13"); } catch (e) {}   // a new key, so everyone opens on Home once after the redesign
 
@@ -1560,17 +1628,43 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   // A member's payments for the viewed year: m = month total, h = the separate payments that make it up.
   function payDoc(mid) {
     const p = payPath(S.year, mid);
-    if (overlay.has(p)) { const b = overlay.get(p); return b ? { m: b.m || {}, h: b.h || {} } : { m: {}, h: {} }; }
-    return S.payServer[mid] || { m: {}, h: {} };
+    if (overlay.has(p)) { const b = overlay.get(p); return b ? { m: b.m || {}, h: b.h || {}, x: b.x || {} } : { m: {}, h: {}, x: {} }; }
+    return S.payServer[mid] || { m: {}, h: {}, x: {} };
   }
   const payMap = (mid) => payDoc(mid).m;
   // One payment: a = amount, t = date (YYYY-MM-DD), r = receipt number, c = who collected it.
-  const keepPart = (x) => { const o = { a: x.a, t: x.t || null }; if (x.r) o.r = x.r; if (x.c) o.c = x.c; return o; };
-  function partsOf(mid, i) {
-    const d = payDoc(mid), h = d.h[i], tot = d.m[i] > 0 ? d.m[i] : 0;
-    if (Array.isArray(h) && h.length) return h.filter((x) => x && x.a > 0).map(keepPart);
-    return tot ? [{ a: tot, t: null }] : [];
+  // id, v (version) and u (changed at) let two phones merge payments one by one; ok = "not a double entry";
+  // cancelled payments (x) keep xb (who), xt (date) and why ("undo" when it was undone straight away).
+  const keepPart = (x) => {
+    const o = { a: x.a, t: x.t || null };
+    if (x.r) o.r = x.r; if (x.c) o.c = x.c; if (x.id) o.id = x.id; if (x.v > 1) o.v = x.v; if (x.u) o.u = x.u;
+    if (x.ok) o.ok = 1; if (x.xb) o.xb = x.xb; if (x.xt) o.xt = x.xt; if (x.why) o.why = x.why;
+    return o;
+  };
+  // A payment's identity: its stored id, else its receipt number, else (older entries) what it contains.
+  function keyParts(list, i) {
+    const seen = {};
+    return list.map((p) => {
+      if (p.id) return p.id;
+      if (p.r) return "R" + p.r;
+      const base = `L${i}-${p.a}-${p.t || ""}-${p.c || ""}`;
+      seen[base] = (seen[base] || 0) + 1;
+      return `${base}#${seen[base]}`;
+    });
   }
+  // the payments that count for month i of a payments record (an older record may only have the month total)
+  function docParts(doc, i) {
+    const m = doc.m || {}, h = (doc.h || {})[i], tot = m[i] > 0 ? m[i] : 0;
+    const list = Array.isArray(h) && h.length ? h.filter((x) => x && x.a > 0).map(keepPart) : tot ? [{ a: tot, t: null }] : [];
+    const keys = keyParts(list, i);
+    return list.map((p, k) => ({ ...p, id: keys[k] }));
+  }
+  function docCancelled(doc, i) {
+    const x = (doc.x || {})[i];
+    return Array.isArray(x) ? x.filter((p) => p && p.a > 0).map((p) => ({ ...keepPart(p), id: p.id || (p.r ? "R" + p.r : `X${i}-${p.a}-${p.t || ""}`) })) : [];
+  }
+  const partsOf = (mid, i) => docParts(payDoc(mid), i);
+  const cancelledOf = (mid, i) => docCancelled(payDoc(mid), i);
   const RC_CHARS = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ";
   function newReceipt(year, i) {
     let s = "";
@@ -1786,7 +1880,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   /* ---------- rendering ---------- */
   // Sections: Home, Members, Payments (the month view), Reports (the whole-year sheet and documents) and More.
   // More opens further pages: events and birthdays, expenses, electricity and other income.
-  const TAB_OF = { bday: "more", expenses: "more", elec: "more", income: "more" };
+  const TAB_OF = { bday: "more", expenses: "more", elec: "more", income: "more", history: "more" };
   const NAV_TABS = [["tabHome", "home"], ["tabMembers", "members"], ["tabMonth", "month"], ["tabYear", "year"], ["tabMore", "more"]];
   let lastView = "", enterTimer = null;
   function render() {
@@ -1818,6 +1912,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     if (S.view === "expenses") { main.innerHTML = expensesPageHTML(); return; }
     if (S.view === "elec") { main.innerHTML = elecPageHTML(); return; }
     if (S.view === "income") { main.innerHTML = incomePageHTML(); return; }
+    if (S.view === "history") { main.innerHTML = historyPageHTML(); return; }
     if (S.view === "bday") {
       main.innerHTML = `${subHead("Events &amp; birthday fund", "Money for each event is kept separate")}<div style="display:grid;gap:22px">${eventsHTML()}${bdayHTML()}</div>`;
       if ($("evDlg").open && document.activeElement && !$("evDlg").contains(document.activeElement)) fillEv();
@@ -1878,23 +1973,27 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     for (let i = 0; i < 12; i++) incYear += incTotal(i);
     const thisMonth = (S.year === CY ? `Rs. ${fmt(monthTotal(CM))} in ${MONTHS_FULL[CM]}` : `in ${S.year}`) + (incYear ? ` · + ${rs(incYear)} other income` : "");
     const span = countedLabel(S.year);
+    const lng = (n) => (fmt(n).length >= 7 ? ' class="long"' : "");
     const dueSub = S.year > CY || !span ? "Nothing due yet" : behind ? `${behind} member${behind > 1 ? "s" : ""} behind · ${span}${fromBefore ? " + earlier" : ""} counted` : `Everyone is paid up · ${span}`;
     el.innerHTML = `
-      <div class="stat is-col"><span class="lbl">Collected</span><strong>${rsH(collected)}</strong><span class="sub">${thisMonth}</span></div>
-      <div class="stat is-spent"><span class="lbl">Spent</span><strong>${rsH(spent)}</strong><span class="sub">Electricity ${rs(elecSum)} · Other ${rs(expSum)}</span></div>
-      <div class="stat is-bal"><span class="lbl">Cash in hand</span><strong${bal < 0 ? ' style="color:var(--due)"' : ""}>${bal < 0 ? "−" : ""}${rsH(Math.abs(bal))}</strong><span class="sub">${[earlier ? `Incl. ${rsSigned(earlier)} from before ${S.year}` : "", ahead > 0 ? `Incl. ${rs(ahead)} paid in advance` : ""].filter(Boolean).join(" · ") || "Collected minus spending"}</span></div>
-      <div class="stat is-due"><span class="lbl">Still due</span><strong>${rsH(dueSum)}</strong><span class="sub">${dueSub}</span></div>`;
+      <div class="stat is-col" data-act="view" data-v="month" role="button" tabindex="0"><span class="lbl">Collected</span><strong${lng(collected)}>${rsH(collected)}</strong><span class="sub">${thisMonth}</span></div>
+      <div class="stat is-spent" data-act="view" data-v="expenses" role="button" tabindex="0"><span class="lbl">Spent</span><strong${lng(spent)}>${rsH(spent)}</strong><span class="sub">Electricity ${rs(elecSum)} · Other ${rs(expSum)}</span></div>
+      <div class="stat is-bal"${S.year === CY ? ' data-act="cash" role="button" tabindex="0"' : ""}><span class="lbl">Cash in hand</span>${S.year === CY ? `<span class="cash-cta">${icon("coins")}Count cash</span>` : ""}<strong${bal < 0 ? ' style="color:var(--due)"' : ""}>${bal < 0 ? "−" : ""}${rsH(Math.abs(bal))}</strong><span class="sub">${[earlier ? `Incl. ${rsSigned(earlier)} from before ${S.year}` : "", ahead > 0 ? `Incl. ${rs(ahead)} paid in advance` : ""].filter(Boolean).join(" · ") || "Collected minus spending"}</span></div>
+      <div class="stat is-due" data-act="owing" role="button" tabindex="0"><span class="lbl">Still due · ${S.year}</span><strong${lng(dueSum)}>${rsH(dueSum)}</strong><span class="sub">${dueSub}</span></div>`;
+    // the last cash count, under cash in hand
+    const lc = S.year === CY ? cashCounts()[0] : null;
+    if (lc) { const sub = el.querySelector(".is-bal .sub"); if (sub) sub.insertAdjacentHTML("beforeend", `<span class="lc ${lc.diff === 0 ? "ok" : lc.diff < 0 ? "due" : "adv"}">Counted ${esc(dayLabel(lc.d))}: ${lc.diff === 0 ? "matched ✓" : lc.diff < 0 ? `${rs(-lc.diff)} short` : `${rs(lc.diff)} over`}</span>`); }
   }
 
   /* ---------- icons ---------- */
-  const ICONS = {"home":"<path d=\"M3.5 10.2 12 3.5l8.5 6.7\"/><path d=\"M5.5 8.8V20h4.8v-5.6h3.4V20h4.8V8.8\"/>","members":"<circle cx=\"9\" cy=\"8.2\" r=\"3.4\"/><path d=\"M2.8 19.6c.7-3.4 3.2-5.2 6.2-5.2s5.5 1.8 6.2 5.2\"/><path d=\"M15.6 4.9a3.4 3.4 0 0 1 0 6.6\"/><path d=\"M17.6 14.7c1.8.7 3 2.3 3.4 4.9\"/>","pay":"<rect x=\"2.8\" y=\"5.4\" width=\"18.4\" height=\"13.6\" rx=\"3\"/><path d=\"M2.8 9.8h18.4\"/><path d=\"M15.6 15h2.6\"/>","reports":"<path d=\"M4.5 20.2V11\"/><path d=\"M10 20.2V4.2\"/><path d=\"M15.5 20.2v-6.6\"/><path d=\"M21 20.2v-9.4\"/>","more":"<rect x=\"3.6\" y=\"3.6\" width=\"7\" height=\"7\" rx=\"2.2\"/><rect x=\"13.4\" y=\"3.6\" width=\"7\" height=\"7\" rx=\"2.2\"/><rect x=\"3.6\" y=\"13.4\" width=\"7\" height=\"7\" rx=\"2.2\"/><rect x=\"13.4\" y=\"13.4\" width=\"7\" height=\"7\" rx=\"2.2\"/>","plus":"<path d=\"M12 5v14M5 12h14\"/>","chevron":"<path d=\"m9.5 5.5 6.5 6.5-6.5 6.5\"/>","back":"<path d=\"m14.5 5.5-6.5 6.5 6.5 6.5\"/>","search":"<circle cx=\"11\" cy=\"11\" r=\"6.4\"/><path d=\"m20 20-4.1-4.1\"/>","bolt":"<path d=\"M13.2 2.8 5.2 13.4h6.2l-.8 7.8 8.2-10.6h-6.2z\"/>","receipt":"<path d=\"M6 3.2h12v17.6l-2.4-1.5-2.4 1.5-2.4-1.5-2.4 1.5L6 19.3z\"/><path d=\"M9 8h6M9 11.5h6M9 15h3.5\"/>","trophy":"<path d=\"M8 4h8v5a4 4 0 0 1-8 0z\"/><path d=\"M8 5.6H5.4a2.6 2.6 0 0 0 2.9 4.1\"/><path d=\"M16 5.6h2.6a2.6 2.6 0 0 1-2.9 4.1\"/><path d=\"M12 13v3.6M8.6 20.2h6.8M10 16.6h4l.6 3.6H9.4z\"/>","coins":"<ellipse cx=\"12\" cy=\"6.4\" rx=\"7\" ry=\"2.9\"/><path d=\"M5 6.4v5.2c0 1.6 3.1 2.9 7 2.9s7-1.3 7-2.9V6.4\"/><path d=\"M5 11.6v5.6c0 1.6 3.1 2.9 7 2.9s7-1.3 7-2.9v-5.6\"/>","gear":"<circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7\"/>","sync":"<path d=\"M19.6 10.6A7.8 7.8 0 0 0 5.6 7.4\"/><path d=\"M4.6 3.8v4h4\"/><path d=\"M4.4 13.4a7.8 7.8 0 0 0 14 3.2\"/><path d=\"M19.4 20.2v-4h-4\"/>","table":"<rect x=\"3.5\" y=\"4.2\" width=\"17\" height=\"15.6\" rx=\"2.6\"/><path d=\"M3.5 9.4h17M3.5 14.6h17M9.4 9.4v10.4\"/>","doc":"<path d=\"M13.8 3.2H7.2a2 2 0 0 0-2 2v13.6a2 2 0 0 0 2 2h9.6a2 2 0 0 0 2-2V8.2z\"/><path d=\"M13.8 3.2v5h5\"/><path d=\"M9 13h6M9 16.4h4\"/>","send":"<path d=\"M20.8 3.2 10.4 13.6\"/><path d=\"m20.8 3.2-6.4 17.6-4-7.2-7.2-4z\"/>","statement":"<rect x=\"4.6\" y=\"3.2\" width=\"14.8\" height=\"17.6\" rx=\"2.2\"/><path d=\"M8.4 8h7.2M8.4 11.6h7.2M8.4 15.2h4.4\"/>","chat":"<path d=\"M20.4 11.6a8.4 8.4 0 0 1-12.5 7.3l-4.4 1.4 1.4-4.2a8.4 8.4 0 1 1 15.5-4.5z\"/>","check":"<path d=\"m5.2 12.6 4.4 4.4 9.2-9.6\"/>","download":"<path d=\"M12 3.6v11.6\"/><path d=\"m6.8 10.2 5.2 5.2 5.2-5.2\"/><path d=\"M4.6 20.2h14.8\"/>","cake":"<path d=\"M4.2 20.2h15.6v-6.4a2 2 0 0 0-2-2H6.2a2 2 0 0 0-2 2z\"/><path d=\"M4.2 15.6c1.3.9 2.6.9 3.9 0s2.6-.9 3.9 0 2.6.9 3.9 0 2.6-.9 3.9 0\"/><path d=\"M12 11.8V8.4\"/><path d=\"M12 6.2c.9-.8.9-1.7 0-2.6-.9.9-.9 1.8 0 2.6z\"/>","arrowin":"<path d=\"M12 4.4v12.4\"/><path d=\"m6.6 11.4 5.4 5.4 5.4-5.4\"/>","arrowout":"<path d=\"M12 19.6V7.2\"/><path d=\"m6.6 12.6 5.4-5.4 5.4 5.4\"/>"};
+  const ICONS = {"clock":"<circle cx=\"12\" cy=\"12\" r=\"8.4\"/><path d=\"M12 7.4V12l3.1 2\"/>","home":"<path d=\"M3.5 10.2 12 3.5l8.5 6.7\"/><path d=\"M5.5 8.8V20h4.8v-5.6h3.4V20h4.8V8.8\"/>","members":"<circle cx=\"9\" cy=\"8.2\" r=\"3.4\"/><path d=\"M2.8 19.6c.7-3.4 3.2-5.2 6.2-5.2s5.5 1.8 6.2 5.2\"/><path d=\"M15.6 4.9a3.4 3.4 0 0 1 0 6.6\"/><path d=\"M17.6 14.7c1.8.7 3 2.3 3.4 4.9\"/>","pay":"<rect x=\"2.8\" y=\"5.4\" width=\"18.4\" height=\"13.6\" rx=\"3\"/><path d=\"M2.8 9.8h18.4\"/><path d=\"M15.6 15h2.6\"/>","reports":"<path d=\"M4.5 20.2V11\"/><path d=\"M10 20.2V4.2\"/><path d=\"M15.5 20.2v-6.6\"/><path d=\"M21 20.2v-9.4\"/>","more":"<rect x=\"3.6\" y=\"3.6\" width=\"7\" height=\"7\" rx=\"2.2\"/><rect x=\"13.4\" y=\"3.6\" width=\"7\" height=\"7\" rx=\"2.2\"/><rect x=\"3.6\" y=\"13.4\" width=\"7\" height=\"7\" rx=\"2.2\"/><rect x=\"13.4\" y=\"13.4\" width=\"7\" height=\"7\" rx=\"2.2\"/>","plus":"<path d=\"M12 5v14M5 12h14\"/>","chevron":"<path d=\"m9.5 5.5 6.5 6.5-6.5 6.5\"/>","back":"<path d=\"m14.5 5.5-6.5 6.5 6.5 6.5\"/>","search":"<circle cx=\"11\" cy=\"11\" r=\"6.4\"/><path d=\"m20 20-4.1-4.1\"/>","bolt":"<path d=\"M13.2 2.8 5.2 13.4h6.2l-.8 7.8 8.2-10.6h-6.2z\"/>","receipt":"<path d=\"M6 3.2h12v17.6l-2.4-1.5-2.4 1.5-2.4-1.5-2.4 1.5L6 19.3z\"/><path d=\"M9 8h6M9 11.5h6M9 15h3.5\"/>","trophy":"<path d=\"M8 4h8v5a4 4 0 0 1-8 0z\"/><path d=\"M8 5.6H5.4a2.6 2.6 0 0 0 2.9 4.1\"/><path d=\"M16 5.6h2.6a2.6 2.6 0 0 1-2.9 4.1\"/><path d=\"M12 13v3.6M8.6 20.2h6.8M10 16.6h4l.6 3.6H9.4z\"/>","coins":"<ellipse cx=\"12\" cy=\"6.4\" rx=\"7\" ry=\"2.9\"/><path d=\"M5 6.4v5.2c0 1.6 3.1 2.9 7 2.9s7-1.3 7-2.9V6.4\"/><path d=\"M5 11.6v5.6c0 1.6 3.1 2.9 7 2.9s7-1.3 7-2.9v-5.6\"/>","gear":"<circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7\"/>","sync":"<path d=\"M19.6 10.6A7.8 7.8 0 0 0 5.6 7.4\"/><path d=\"M4.6 3.8v4h4\"/><path d=\"M4.4 13.4a7.8 7.8 0 0 0 14 3.2\"/><path d=\"M19.4 20.2v-4h-4\"/>","table":"<rect x=\"3.5\" y=\"4.2\" width=\"17\" height=\"15.6\" rx=\"2.6\"/><path d=\"M3.5 9.4h17M3.5 14.6h17M9.4 9.4v10.4\"/>","doc":"<path d=\"M13.8 3.2H7.2a2 2 0 0 0-2 2v13.6a2 2 0 0 0 2 2h9.6a2 2 0 0 0 2-2V8.2z\"/><path d=\"M13.8 3.2v5h5\"/><path d=\"M9 13h6M9 16.4h4\"/>","send":"<path d=\"M20.8 3.2 10.4 13.6\"/><path d=\"m20.8 3.2-6.4 17.6-4-7.2-7.2-4z\"/>","statement":"<rect x=\"4.6\" y=\"3.2\" width=\"14.8\" height=\"17.6\" rx=\"2.2\"/><path d=\"M8.4 8h7.2M8.4 11.6h7.2M8.4 15.2h4.4\"/>","chat":"<path d=\"M20.4 11.6a8.4 8.4 0 0 1-12.5 7.3l-4.4 1.4 1.4-4.2a8.4 8.4 0 1 1 15.5-4.5z\"/>","check":"<path d=\"m5.2 12.6 4.4 4.4 9.2-9.6\"/>","download":"<path d=\"M12 3.6v11.6\"/><path d=\"m6.8 10.2 5.2 5.2 5.2-5.2\"/><path d=\"M4.6 20.2h14.8\"/>","cake":"<path d=\"M4.2 20.2h15.6v-6.4a2 2 0 0 0-2-2H6.2a2 2 0 0 0-2 2z\"/><path d=\"M4.2 15.6c1.3.9 2.6.9 3.9 0s2.6-.9 3.9 0 2.6.9 3.9 0 2.6-.9 3.9 0\"/><path d=\"M12 11.8V8.4\"/><path d=\"M12 6.2c.9-.8.9-1.7 0-2.6-.9.9-.9 1.8 0 2.6z\"/>","arrowin":"<path d=\"M12 4.4v12.4\"/><path d=\"m6.6 11.4 5.4 5.4 5.4-5.4\"/>","arrowout":"<path d=\"M12 19.6V7.2\"/><path d=\"m6.6 12.6 5.4-5.4 5.4 5.4\"/>"};
   const icon = (n, cls) => `<svg class="ic${cls ? " " + cls : ""}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ""}</svg>`;
   const pageHead = (title, note, extra) => `<div class="page-head"><div><h2 class="page-title">${title}</h2>${note ? `<p class="page-note">${note}</p>` : ""}</div>${extra || ""}</div>`;
   const subHead = (title, note, extra) => `<div class="page-head sub"><button type="button" class="back" data-act="view" data-v="more">${icon("back")}<span>More</span></button><div class="ph-row"><div><h2 class="page-title">${title}</h2>${note ? `<p class="page-note">${note}</p>` : ""}</div>${extra || ""}</div></div>`;
   const initials = (name) => { const w = String(name || "?").trim().split(/\s+/).filter(Boolean); return esc(((w[0] || "?")[0] + (w.length > 1 ? w[w.length - 1][0] : (w[0] || "").slice(1, 2))).toUpperCase()); };
   const lockMark = (m) => m.private ? '<span class="lock" title="Name kept private">🔒</span>' : "";
   function expItemHTML(x) {
-    return `<li><button type="button" class="exp-item" data-act="exp-edit" data-id="${esc(x.id)}"${S.canWrite ? "" : " disabled"}><span class="exp-cat">${esc(catName(x.cat))}</span><span class="exp-desc">${esc(x.desc || catName(x.cat))}</span><b class="exp-amt">${rs(x.amount)}</b><small>${x.t ? esc(dayLabel(x.t)) : ""}${x.no ? ` · ${esc(x.no)}` : ""}${x.to ? ` · ${esc(x.to)}` : ""}</small></button></li>`;
+    return `<li><button type="button" class="exp-item" data-act="exp-edit" data-id="${esc(x.id)}"${S.canWrite ? "" : " disabled"}><span class="exp-cat">${esc(catName(x.cat))}</span><span class="exp-desc">${esc(x.desc || catName(x.cat))}</span><b class="exp-amt">${rs(x.amount)}</b><small>${x.t ? esc(dayLabel(x.t)) : ""}${x.no ? ` · ${esc(x.no)}` : ""}${x.to ? ` · ${esc(x.to)}` : ""}${x.chk ? ' · <b class="ok-t">✓ Checked</b>' : ""}</small></button></li>`;
   }
 
   /* ---------- Home ---------- */
@@ -1923,6 +2022,75 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     out.sort((a, b) => String(b.t).localeCompare(String(a.t)));
     return out.slice(0, limit);
   }
+  // the same member, month and amount recorded twice within three days (often two phones recording the same payment)
+  function doubleEntries(ms) {
+    const out = [];
+    for (const m of ms) for (let i = 0; i < 12; i++) {
+      const ps = partsOf(m.id, i);
+      for (let a = 0; a < ps.length; a++) for (let b = a + 1; b < ps.length; b++) {
+        const p = ps[a], q = ps[b];
+        if (p.a !== q.a || p.ok || q.ok || !p.t || !q.t || Math.abs(dayNum(p.t) - dayNum(q.t)) > 3) continue;
+        out.push({ m, i, p, q });
+      }
+    }
+    return out;
+  }
+  function clashesAll() { return scanDocs("clash/").filter((c) => c && c.path && c.a && c.b); }
+  function attentionHTML(ms) {
+    const items = [];
+    for (const c of clashesAll()) {
+      const mid = c.path.split("-").slice(1).join("-"), y = c.path.slice(9, 13);
+      items.push(`<li><span class="att-ic due">${icon("sync")}</span><span class="att-txt"><b>${esc(nameOf(mid))} · ${MONTHS_FULL[c.i]} ${y}</b><small>This payment was changed on two phones before they synced. Choose which is right.</small></span><span class="att-acts"><button type="button" class="btn sm primary" data-act="clash-open" data-id="${esc(c._id)}">Choose</button></span></li>`);
+    }
+    for (const d of doubleEntries(ms)) {
+      const who = (p) => `${dayLabel(p.t)}${p.c ? ` by ${p.c}` : ""}`;
+      items.push(`<li><span class="att-ic warn">${icon("receipt")}</span><span class="att-txt"><b>${esc(d.m.name)} · ${MONTHS_FULL[d.i]}: ${rs(d.p.a)} recorded twice?</b><small>${esc(who(d.p))} and ${esc(who(d.q))}${d.q.r ? ` · ${esc(d.q.r)}` : ""}</small></span><span class="att-acts"><button type="button" class="btn sm" data-act="dup-cancel" data-id="${esc(d.m.id)}" data-m="${d.i}" data-k="${esc(d.q.id)}"${S.canWrite ? "" : " disabled"}>Cancel the second</button><button type="button" class="btn sm" data-act="dup-ok" data-id="${esc(d.m.id)}" data-m="${d.i}" data-k="${esc(d.q.id)}"${S.canWrite ? "" : " disabled"}>Both are right</button></span></li>`);
+    }
+    if (!items.length) return "";
+    return `<section class="card hm-block hm-att"><p class="eyebrow">Needs your attention</p><ul class="att-list">${items.join("")}</ul></section>`;
+  }
+  function openClash(cid) {
+    const c = clashesAll().find((x) => x._id === cid);
+    if (!c) return;
+    const mid = c.path.split("-").slice(1).join("-"), y = c.path.slice(9, 13);
+    const card = (p, side) => `<section class="clash-opt"><p class="lbl2">${side === "a" ? "One version" : "The other version"}</p>
+        <p class="clash-amt num">${p.on === false ? `<s>${rs(p.a)}</s> <span class="tag">Cancelled</span>` : rs(p.a)}</p>
+        <p class="hint">${p.t ? `Paid ${esc(longDate(p.t))}` : "No date"}${p.c ? ` · collected by ${esc(p.c)}` : ""}${p.r ? ` · ${esc(p.r)}` : ""}${p.on === false && p.xb ? ` · cancelled by ${esc(p.xb)}` : ""}</p>
+        <button type="button" class="btn${side === "a" ? " primary" : ""}" data-act="clash-pick" data-id="${esc(cid)}" data-side="${side}"${S.canWrite ? "" : " disabled"}>Keep this one</button></section>`;
+    $("attBody").innerHTML = `<div class="dlg-head"><div><p class="eyebrow">Payment clash</p><h3>${esc(nameOf(mid))} · ${MONTHS_FULL[c.i]} ${y}</h3></div><button type="button" class="close" data-close aria-label="Close">×</button></div>
+      <p class="hint">Two phones changed this payment before they synced. The app is using the newer change for now. Choose the right one; the other is kept in the change history.</p>
+      <div class="clash-grid">${card(c.a, "a")}${card(c.b, "b")}</div>`;
+    if (!$("attDlg").open) $("attDlg").showModal();
+  }
+  // keep the chosen version of a clashed payment: it becomes the newest version on every phone
+  function resolveClash(cid, side) {
+    const c = clashesAll().find((x) => x._id === cid);
+    if (!c) return;
+    const doc = scanDocs("payments/").find((d) => "payments/" + d._id === c.path);
+    const chosen = { ...(side === "b" ? c.b : c.a) }, i = c.i;
+    if (doc) {
+      const { _id, _u, _r, ...body } = doc;
+      const act = docParts(body, i).filter((p) => p.id !== c.id), gone = docCancelled(body, i).filter((p) => p.id !== c.id);
+      const on = chosen.on !== false;
+      const p = { ...keepPart(chosen), id: c.id, v: Math.max(c.a.v || 1, c.b.v || 1) + 1, u: Date.now() };
+      if (p.r && p.id === "R" + p.r) delete p.id;
+      if (on) { delete p.xb; delete p.xt; delete p.why; act.push(p); } else gone.push(p);
+      const m = { ...(body.m || {}) }, h = { ...(body.h || {}) }, x = { ...(body.x || {}) };
+      const strip = (q) => { const o = keepPart(q); if (q.id && !(o.r && q.id === "R" + o.r)) o.id = q.id; return o; };
+      const tot = act.reduce((t, q) => t + q.a, 0);
+      if (tot > 0) { m[i] = tot; h[i] = act.map(strip); } else { delete m[i]; delete h[i]; }
+      if (gone.length) x[i] = gone.map(strip); else delete x[i];
+      const out = { year: body.year, member: body.member, m, h };
+      if (Object.keys(x).length) out.x = x;
+      writeDoc(c.path, out);
+      const mid = c.path.split("-").slice(1).join("-");
+      logChange({ k: "pay", act: "choose", y: body.year, i, mid, name: nameOf(mid), a: chosen.a, r: chosen.r });
+    }
+    writeDoc("clash/" + cid, null);
+    $("attDlg").close();
+    render();
+    toast("Saved. Both phones will use this version.");
+  }
   function homeSkeleton() {
     return `<div class="home"><div class="card hm-block skel-card"><i class="skel" style="width:40%"></i><i class="skel" style="width:70%;height:26px"></i><i class="skel" style="width:55%"></i></div><div class="card hm-block skel-card"><i class="skel" style="width:30%"></i><i class="skel" style="width:100%;height:110px"></i></div></div>`;
   }
@@ -1939,13 +2107,14 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
         <div class="hm-m-txt">
           <p class="eyebrow">${nowLbl} · ${MONTHS_FULL[i]} ${y}</p>
           <p class="hm-big num">${rsH(mc.collected)}<small class="of">of ${rs(mc.expected)} expected</small></p>
-          <p class="hm-sub">${mc.paidFull} of ${mc.owedCount} members paid in full${mc.left ? ` · <b class="due-t">${rs(mc.left)}</b> still to collect` : mc.expected ? " · all collected" : ""}</p>
+          <p class="hm-sub">${mc.paidFull} of ${mc.owedCount} members paid in full${mc.left ? ` · <b class="due-t">${rs(mc.left)}</b> still to collect for ${MONTHS_FULL[i]}` : mc.expected ? " · all collected" : ""}</p>
           <div class="prog-line" aria-hidden="true"><i style="--w:${pct}%"></i></div>
           <button type="button" class="btn primary" data-act="view" data-v="month">${icon("pay")}Collect payments</button>
         </div>
       </section>`;
     // money in (subscriptions counted for the month + other income) and money out (electricity + expenses), month by month
-    const rows = MONTHS.map((mn, k) => ({ k, mn, inn: monthTotal(k) + incTotal(k), out: elec(k).amount + expTotal(k) }));
+    const st0 = settings().start;
+    const rows = MONTHS.map((mn, k) => ({ k, mn, pre: y < st0.y || (y === st0.y && k < st0.m), inn: monthTotal(k) + incTotal(k), out: elec(k).amount + expTotal(k) }));
     const max = Math.max(1, ...rows.map((r) => Math.max(r.inn, r.out)));
     const totIn = rows.reduce((t, r) => t + r.inn, 0), totOut = rows.reduce((t, r) => t + r.out, 0);
     const h = (v) => (v > 0 ? Math.max(3, Math.round((v / max) * 100)) : 0);
@@ -1953,7 +2122,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
         <div class="hm-head"><div><p class="eyebrow">Money in and out · ${y}</p><p class="hm-big num">${totIn - totOut < 0 ? "−" : ""}${rsH(Math.abs(totIn - totOut))}<small> net</small></p></div>
           <div class="legend2"><span><i class="lg-in"></i>In ${rs(totIn)}</span><span><i class="lg-out"></i>Out ${rs(totOut)}</span></div></div>
         <div class="chart" role="img" aria-label="Money in and out for each month of ${y}">
-          ${rows.map((r) => `<div class="col${y === CY && r.k === CM ? " is-now" : ""}" title="${MONTHS_FULL[r.k]}: in ${rs(r.inn)}, out ${rs(r.out)}"><div class="bars"><i class="b-in" style="--h:${h(r.inn)}%"></i><i class="b-out" style="--h:${h(r.out)}%"></i></div><span>${r.mn}</span></div>`).join("")}
+          ${rows.map((r) => `<div class="col${y === CY && r.k === CM ? " is-now" : ""}${r.pre ? " is-pre" : ""}" title="${MONTHS_FULL[r.k]}: ${r.pre ? "before the club started recording" : `in ${rs(r.inn)}, out ${rs(r.out)}`}"><div class="bars"><i class="b-in" style="--h:${h(r.inn)}%"></i><i class="b-out" style="--h:${h(r.out)}%"></i></div><span>${r.mn}</span></div>`).join("")}
         </div>
       </section>`;
     const acts = recentActivity(7);
@@ -1967,7 +2136,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
         <button type="button" data-act="slips"><span>${icon("send")}</span>Slips</button>
         <button type="button" data-act="pdf"><span>${icon("download")}</span>Register</button>
       </div>`;
-    return `<div class="home">${quick}${month}${chart}${activity}</div>`;
+    return `${attentionHTML(ms)}<div class="home">${quick}${month}${chart}${activity}</div>`;
   }
 
   /* ---------- Members ---------- */
@@ -2036,7 +2205,10 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     ];
     const cells = MONTHS.map((mn, k) => { const s2 = statusFor(m, k); return `<button type="button" class="mcell ${s2.cls}${y === CY && k === CM ? " is-now" : ""}" data-act="mbr-pay" data-id="${esc(m.id)}" data-m="${k}" title="${MONTHS_FULL[k]}: ${esc(s2.pill)}" aria-label="${MONTHS_FULL[k]}: ${esc(s2.pill)}"${canPay ? "" : " disabled"}><small>${mn}</small><b>${s2.cell || "&nbsp;"}</b></button>`; }).join("");
     const hist = [];
-    for (let k = 0; k < 12; k++) partsOf(m.id, k).forEach((p, idx) => hist.push({ k, idx, ...p }));
+    for (let k = 0; k < 12; k++) {
+      partsOf(m.id, k).forEach((p, idx) => hist.push({ k, idx, ...p }));
+      cancelledOf(m.id, k).filter((p) => p.why !== "undo").forEach((p) => hist.push({ k, idx: -1, gone: true, ...p }));
+    }
     hist.sort((a, b) => String(b.t || "").localeCompare(String(a.t || "")) || b.k - a.k);
     $("mbrBody").innerHTML = `
       <div class="dlg-head">
@@ -2051,7 +2223,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
         <div class="inrow"><button type="button" class="btn" data-act="mbr-slip" data-id="${esc(m.id)}">${icon("doc")}PDF slip</button><button type="button" class="btn" data-act="mbr-wa" data-id="${esc(m.id)}">${icon("chat")}WhatsApp slip</button></div>
       </div>
       <div class="mb-hist"><p class="lbl2">Payments in ${y}</p>
-        ${hist.length ? `<ul class="hist">${hist.map((p) => `<li><span class="h-main"><b class="num">${rs(p.a)}</b><small>For ${MONTHS_FULL[p.k]}${p.t ? ` · paid ${esc(longDate(p.t))}` : ""}${p.r ? ` · ${esc(p.r)}` : ""}</small></span><button type="button" class="btn sm" data-act="mbr-rc" data-id="${esc(m.id)}" data-m="${p.k}" data-k="${p.idx}"${S.canWrite ? "" : " disabled"}>Receipt</button></li>`).join("")}</ul>` : `<p class="hint">No payments recorded in ${y} yet.</p>`}
+        ${hist.length ? `<ul class="hist">${hist.map((p) => p.gone ? `<li class="is-x"><span class="h-main"><b class="num"><s>${rs(p.a)}</s></b><small>For ${MONTHS_FULL[p.k]} · cancelled${p.xb ? ` by ${esc(p.xb)}` : ""}${p.xt ? ` on ${esc(longDate(p.xt))}` : ""}${p.r ? ` · ${esc(p.r)}` : ""}</small></span><span class="tag">Cancelled</span></li>` : `<li><span class="h-main"><b class="num">${rs(p.a)}</b><small>For ${MONTHS_FULL[p.k]}${p.t ? ` · paid ${esc(longDate(p.t))}` : ""}${p.r ? ` · ${esc(p.r)}` : ""}</small></span><button type="button" class="btn sm" data-act="mbr-rc" data-id="${esc(m.id)}" data-m="${p.k}" data-k="${p.idx}"${S.canWrite ? "" : " disabled"}>Receipt</button></li>`).join("")}</ul>` : `<p class="hint">No payments recorded in ${y} yet.</p>`}
       </div>`;
   }
 
@@ -2091,6 +2263,10 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
         rowHTML("members", "Members list", `${memN} members · add, edit, inactive`, 'data-act="members"'),
         rowHTML("gear", "Settings &amp; app style", "Monthly fee, signatures and the look of the app", 'data-act="settings"'),
       ]],
+      ["Checks", [
+        rowHTML("coins", "Count the cash", (() => { const c = cashCounts()[0]; return c ? `Last counted ${esc(dayLabel(c.d))}: ${c.diff === 0 ? "matched" : c.diff < 0 ? `${rs(-c.diff)} short` : `${rs(c.diff)} over`}` : "Compare the cash you hold with the app"; })(), 'data-act="cash"'),
+        rowHTML("clock", "Change history", "Who recorded, changed or cancelled what", 'data-act="view" data-v="history"'),
+      ]],
       ["Your data", [
         ...(typeof openSync === "function" ? [rowHTML("sync", "Sync &amp; backup", esc(syncTxt) || "Phone and Mac, backup file", 'data-act="sync"')] : []),
         rowHTML("table", "Export for Excel", "Every payment as a .csv file", 'data-act="csv"'),
@@ -2119,6 +2295,43 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       return rowHTML("bolt", `${mn} ${y}`, e.amount ? `${rs(e.amount)}${e.t ? ` · paid ${esc(dayLabel(e.t))}` : ""}` : "Not paid yet", `data-act="elec" data-m="${k}"${S.canWrite ? "" : " disabled"}`, right);
     });
     return `${subHead("Electricity bills", `${rs(total)} paid in ${y} · Selvarajah signs each bill`)}<ul class="rows card">${rows.join("")}</ul>`;
+  }
+  function logText(l) {
+    const who = l.by || l.dev || "Someone", mon = Number.isInteger(l.i) ? `${MONTHS_FULL[l.i]} ${l.y}` : String(l.y || "");
+    const nm = l.name || "a member", what = `“${l.desc || "expense"}”`;
+    const T = {
+      pay: { add: `${who} recorded ${rs(l.a)} from ${nm} for ${mon}`, edit: `${who} changed ${nm}'s ${mon} payment from ${rs(l.old)} to ${rs(l.a)}`,
+        cancel: `${who} cancelled ${rs(l.a)} from ${nm} for ${mon}`, undo: `${who} undid ${rs(l.a)} from ${nm} for ${mon}`,
+        restore: `${who} brought back ${rs(l.a)} from ${nm} for ${mon}`, choose: `${who} settled a clash: kept ${rs(l.a)} from ${nm} for ${mon}` },
+      exp: { add: `${who} added the expense ${what} (${rs(l.a)})`, edit: l.old !== l.a ? `${who} changed the expense ${what} from ${rs(l.old)} to ${rs(l.a)}` : `${who} edited the expense ${what}`,
+        cancel: `${who} cancelled the expense ${what} (${rs(l.a)})`, restore: `${who} brought back the expense ${what} (${rs(l.a)})`,
+        check: `${who} checked the expense ${what} ✓`, uncheck: `${who} took the check off ${what}` },
+      elec: { add: `${who} recorded the ${mon} electricity bill (${rs(l.a)})`, edit: `${who} changed the ${mon} electricity bill from ${rs(l.old)} to ${rs(l.a)}`,
+        cancel: `${who} cleared the ${mon} electricity bill (${rs(l.a)})`, signed: `${who} marked the ${mon} electricity bill as signed by Selvarajah`,
+        unsigned: `${who} marked the ${mon} electricity bill as not signed` },
+      cash: { count: `${who} counted ${rs(l.a)} in cash (${l.a === l.old ? "matched the app" : l.a < l.old ? `${rs(l.old - l.a)} short` : `${rs(l.a - l.old)} over`})` },
+    };
+    return (T[l.k] && T[l.k][l.act]) || `${who} made a change`;
+  }
+  function historyPageHTML() {
+    const all = scanDocs("log/").filter((l) => l && l.t).sort((a, b) => String(b.t).localeCompare(String(a.t)));
+    const f = S.hf || "all";
+    const keep = (l) => f === "all" || (f === "pay" && l.k === "pay") || (f === "exp" && (l.k === "exp" || l.k === "elec")) || (f === "cash" && l.k === "cash") || (f === "cancel" && (l.act === "cancel" || l.act === "undo" || l.act === "choose"));
+    const list = all.filter(keep).slice(0, 300);
+    const chips = [["all", "All"], ["pay", "Payments"], ["exp", "Bills"], ["cancel", "Cancelled"], ["cash", "Cash counts"]];
+    const dayOf = (t) => { const d = new Date(t); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
+    const hm = (t) => { const d = new Date(t); return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`; };
+    let html = "", last = "";
+    for (const l of list) {
+      const day = dayOf(l.t);
+      if (day !== last) { if (last) html += "</ul>"; html += `<p class="grp-h">${esc(longDate(day))}</p><ul class="rows card hist-list">`; last = day; }
+      const bad = l.act === "cancel" || l.act === "undo", ic = l.k === "pay" ? "pay" : l.k === "elec" ? "bolt" : l.k === "cash" ? "coins" : "receipt";
+      html += `<li><div class="row hrow${bad ? " is-x" : ""}"><span class="row-ic${bad ? " x" : ""}">${icon(ic)}</span><span class="row-main"><b>${esc(logText(l))}</b><small>${hm(l.t)}${l.r || l.no ? ` · ${esc(l.r || l.no)}` : ""}${l.dev && l.by ? ` · ${esc(l.dev)}` : ""}</small></span></div></li>`;
+    }
+    if (last) html += "</ul>";
+    return `${subHead("Change history", "Every payment, bill and cash count: who did it and when")}
+      <div class="filter" role="group" aria-label="Show">${chips.map(([k, l]) => `<button type="button" data-act="hf" data-f="${k}" aria-pressed="${f === k}">${l}</button>`).join("")}</div>
+      ${list.length ? `<div class="stack">${html}</div>` : `<div class="card notice"><h2>Nothing here yet</h2><p>From now on, every payment, bill and cash count recorded on any of your phones is listed here with who did it and when.</p></div>`}`;
   }
   function incomePageHTML() {
     const y = S.year, list = incomeAll().slice().sort((a, b) => b.month - a.month || String(b.t || "").localeCompare(String(a.t || "")));
@@ -2460,15 +2673,70 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   function markSent(mid) { const s = sentMap(); s[`${S.year}:${mid}`] = new Date().toISOString(); try { localStorage.setItem(SENT_KEY, JSON.stringify(s)); } catch (e) {} }
 
   /* ---------- payment editing ---------- */
-  // Replace the list of payments for one member and month; the month total is their sum.
-  function setParts(mid, i, list) {
-    const d = payDoc(mid), m = { ...d.m }, h = { ...d.h };
-    const clean = list.filter((x) => x && x.a > 0).map(keepPart);
-    const tot = clean.reduce((s, x) => s + x.a, 0);
-    if (tot > 0) { m[i] = tot; h[i] = clean; } else { delete m[i]; delete h[i]; }
-    writeDoc(payPath(S.year, mid), Object.keys(m).length ? { year: S.year, member: mid, m, h } : null);
+  // Replace the payments for one member and month; the month total is their sum.
+  // A payment taken out is kept as cancelled (never deleted), every change gets a new version so two phones
+  // can merge payment by payment, and each change goes into the change history.
+  function setParts(mid, i, list, why) {
+    const d = payDoc(mid), m = { ...d.m }, h = { ...d.h }, x = { ...(d.x || {}) };
+    const before = docParts(d, i), cancelled = docCancelled(d, i);
+    const now = Date.now(), by = whoAmI(), today = todayStr();
+    const was = new Map(before.map((p) => [p.id, p])), wasX = new Map(cancelled.map((p) => [p.id, p]));
+    const incoming = list.filter((p) => p && p.a > 0), keys = keyParts(incoming.map(keepPart), i);
+    const next = [], kept = new Set(), logs = [];
+    incoming.forEach((p0, k) => {
+      const p = keepPart(p0), id = p0.id || keys[k], old = was.get(id), gone = wasX.get(id);
+      let out = { ...p };
+      if (old) {
+        const changed = old.a !== p.a || (old.t || null) !== (p.t || null) || (old.r || "") !== (p.r || "") || (old.c || "") !== (p.c || "") || !!old.ok !== !!p.ok;
+        if (changed) { out.v = (old.v || 1) + 1; out.u = now; if (old.a !== p.a) logs.push({ act: "edit", a: p.a, old: old.a, r: p.r || old.r }); }
+        else { out.v = old.v; out.u = old.u; }
+      } else if (gone) {
+        out = { ...gone, ...p }; out.v = Math.max(gone.v || 1, p.v || 1) + 1; out.u = now;
+        logs.push({ act: "restore", a: p.a, r: p.r });
+      } else {
+        out.u = p.u || now; delete out.v;
+        logs.push({ act: "add", a: p.a, r: p.r });
+      }
+      delete out.xb; delete out.xt; delete out.why;
+      if (!(out.v > 1)) delete out.v;
+      if (!out.u) delete out.u;
+      if (out.r && id === "R" + out.r) delete out.id; else out.id = id;
+      next.push(out); kept.add(id);
+    });
+    const nowX = cancelled.filter((p) => !kept.has(p.id)).map((p) => ({ ...keepPart(p), id: p.id }));
+    for (const p of before) if (!kept.has(p.id)) {
+      const o = { ...keepPart(p), id: p.id, v: (p.v || 1) + 1, u: now, xt: today };
+      if (by) o.xb = by;
+      if (why) o.why = why;
+      nowX.push(o);
+      logs.push({ act: why === "undo" ? "undo" : "cancel", a: p.a, r: p.r });
+    }
+    const tot = next.reduce((t, p) => t + p.a, 0);
+    if (tot > 0) { m[i] = tot; h[i] = next; } else { delete m[i]; delete h[i]; }
+    if (nowX.length) x[i] = nowX; else delete x[i];
+    let body = null;
+    if (Object.keys(m).length || Object.keys(x).length) { body = { year: S.year, member: mid, m, h }; if (Object.keys(x).length) body.x = x; }
+    writeDoc(payPath(S.year, mid), body);
+    for (const l of logs) logChange({ k: "pay", y: S.year, i, mid, name: nameOf(mid), ...l });
     render();
   }
+  // who is using this phone (typed once in Settings or the payment form)
+  const whoAmI = () => getCollector().trim();
+  const dayNum = (t) => { const [y, mo, d] = String(t || "").split("-").map(Number); return y ? Date.UTC(y, mo - 1, d) / 864e5 : NaN; };
+  // every change to money goes into the change history: log/<id>
+  function logChange(rec) {
+    if (!S.db || !S.canWrite) return;
+    const body = { t: new Date().toISOString(), ...rec };
+    for (const k of Object.keys(body)) if (body[k] === undefined || body[k] === "") delete body[k];
+    const by = whoAmI();
+    let dev = "";
+    try { dev = typeof deviceName === "function" ? deviceName() : ""; } catch (e) {}
+    if (by) body.by = by;
+    if (dev) body.dev = dev;
+    writeDoc("log/" + Date.now().toString(36) + Math.random().toString(36).slice(2, 7), body);
+  }
+  // records kept on this device: the change history, cash counts and clashes
+  function scanDocs(pre) { try { return LocalDB.scan(pre); } catch (e) { return []; } }
   const nameOf = (mid) => { const m = allMembers().find((x) => x.id === mid); return m ? m.name : "Member"; };
   // Records a payment with today's date, a new receipt number and the collector; returns an undo.
   function addPart(mid, i, a) {
@@ -2477,7 +2745,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     const by = getCollector().trim();
     if (by) part.c = by;
     setParts(mid, i, [...before, part]);
-    return () => setParts(mid, i, before);
+    return () => setParts(mid, i, before, "undo");
   }
   function paidToast(mid, i, undo) {
     toast(afterAddMsg(mid, i), undo, "Undo", { label: "Send receipt", fn: () => sendReceipt(mid, i) });
@@ -2557,6 +2825,14 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     if (!(v > 0)) { $("payErr").textContent = "Enter the amount in rupees, for example 325."; $("payErr").hidden = false; $("payAmt").focus(); return; }
     if (v > 100000) { $("payErr").textContent = "That amount looks too large. Check the number and try again."; $("payErr").hidden = false; return; }
     const { mid, i } = payCtx;
+    // the same amount for the same member and month within three days is probably entered twice
+    const dupe = partsOf(mid, i).find((p) => p.a === v && p.t && Math.abs(dayNum(p.t) - dayNum(todayStr())) <= 3);
+    if (dupe && payCtx.dupOk !== v) {
+      payCtx.dupOk = v;
+      $("payErr").textContent = `Rs. ${fmt(v)} was already recorded for ${MONTHS_FULL[i]} on ${dayLabel(dupe.t)}${dupe.c ? ` by ${dupe.c}` : ""}. If this really is a second payment, tap Save again.`;
+      $("payErr").hidden = false;
+      return;
+    }
     setCollector($("payBy").value.trim());
     const undo = addPart(mid, i, v);
     $("payDlg").close();
@@ -2595,6 +2871,41 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     paidToast(mid, i, undo);
   }
 
+  /* ---------- cash count: the cash counted by hand against what the app works out ---------- */
+  const cashNow = () => cashBalanceBefore(CY, 12);
+  function cashCounts() { return scanDocs("cash/").filter((c) => c && typeof c.counted === "number").sort((a, b) => String(b.t).localeCompare(String(a.t))); }
+  function openCash() {
+    if (!S.canWrite) { toast("You can view this register, but you can't change it."); return; }
+    $("cashAmt").value = ""; $("cashNote").value = ""; $("cashErr").hidden = true;
+    fillCash();
+    $("cashDlg").showModal();
+  }
+  const cashDiffTxt = (diff) => diff === 0 ? "Matches the app ✓" : diff < 0 ? `${rs(-diff)} short of what the app expects` : `${rs(diff)} more than the app expects`;
+  function fillCash() {
+    const exp = cashNow();
+    $("cashApp").innerHTML = `The app says the club should have <b>${rs(exp)}</b> in cash now: all the money collected, minus all the money spent, up to today.`;
+    const raw = $("cashAmt").value.trim(), v = raw ? parseAmt(raw) : NaN, d = $("cashDiff");
+    if (raw && v >= 0) { const diff = v - exp; d.hidden = false; d.className = "cash-diff " + (diff === 0 ? "ok" : diff < 0 ? "due" : "adv"); d.textContent = cashDiffTxt(diff); }
+    else d.hidden = true;
+    const hist = cashCounts().slice(0, 6);
+    $("cashHist").innerHTML = hist.length ? `<p class="lbl2">Earlier counts</p><ul class="hist">${hist.map((c) => `<li><span class="h-main"><b class="num">${rs(c.counted)}</b><small>${esc(longDate(c.d))}${c.by ? ` · ${esc(c.by)}` : ""}${c.note ? ` · ${esc(c.note)}` : ""}</small></span><span class="cdiff ${c.diff === 0 ? "ok" : c.diff < 0 ? "due" : "adv"}">${c.diff === 0 ? "Matched" : c.diff < 0 ? `${rs(-c.diff)} short` : `${rs(c.diff)} over`}</span></li>`).join("")}</ul>` : "";
+  }
+  $("cashAmt").addEventListener("input", fillCash);
+  $("cashForm").addEventListener("submit", (ev) => {
+    ev.preventDefault();
+    const raw = $("cashAmt").value.trim(), v = parseAmt(raw);
+    if (!raw || !(v >= 0)) { $("cashErr").textContent = "Enter the cash you counted in rupees, for example 4400."; $("cashErr").hidden = false; return; }
+    const exp = cashNow(), rec = { t: new Date().toISOString(), d: todayStr(), y: CY, counted: v, expected: exp, diff: v - exp };
+    const by = whoAmI(), note = $("cashNote").value.trim().slice(0, 80);
+    if (by) rec.by = by;
+    if (note) rec.note = note;
+    writeDoc("cash/" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6), rec);
+    logChange({ k: "cash", act: "count", y: CY, a: v, old: exp });
+    $("cashDlg").close();
+    render();
+    toast(`Cash count saved: ${cashDiffTxt(v - exp).replace(" ✓", "")}.`);
+  });
+
   /* ---------- electricity ---------- */
   let elecCtx = null;
   function openElec(i) {
@@ -2612,7 +2923,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     $("elecDlg").showModal();
   }
   function setElec(i, amount, signed, t, note) {
-    const mp = { ...elecMap() };
+    const mp = { ...elecMap() }, old = mp[i] || null;
     if (amount > 0 || signed) {
       const rec = { amount: amount > 0 ? amount : 0, signed: !!signed };
       if (t) rec.t = t;
@@ -2620,6 +2931,9 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       mp[i] = rec;
     } else delete mp[i];
     writeDoc("electricity/" + S.year, { year: S.year, m: mp });
+    const oa = old ? old.amount || 0 : 0, na = mp[i] ? mp[i].amount || 0 : 0, os = !!(old && old.signed), ns = !!(mp[i] && mp[i].signed);
+    if (oa !== na) logChange({ k: "elec", act: !oa ? "add" : na ? "edit" : "cancel", y: S.year, i, a: na || oa, old: oa && na ? oa : undefined });
+    if (os !== ns) logChange({ k: "elec", act: ns ? "signed" : "unsigned", y: S.year, i, a: na || oa });
     render();
   }
   // reads the bill form; returns false (and shows why) if the amount isn't valid
@@ -2699,10 +3013,28 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     $("expTo").value = x ? x.to || "" : "";
     $("expDel").hidden = !x;
     $("expErr").hidden = true;
-    drawExpCats(); drawExpItems(); drawExpCalc();
+    drawExpCats(); drawExpItems(); drawExpCalc(); fillExpCheck();
     $("expDlg").showModal();
   }
   $("expCats").addEventListener("click", (ev) => { const b = ev.target.closest("[data-cat]"); if (!b) return; expCat = b.dataset.cat; drawExpCats(); });
+  // the account checker marks a saved bill as checked; changing the bill later takes the mark off
+  function fillExpCheck() {
+    const x = expCtx && expCtx.id ? expensesAll().find((e) => e.id === expCtx.id) : null;
+    $("expChkRow").hidden = !x;
+    if (!x) return;
+    $("expChkTxt").innerHTML = x.chk ? `<b class="ok-t">${icon("check")}Checked</b>${x.chk.by ? ` by ${esc(x.chk.by)}` : ""}${x.chk.t ? ` · ${esc(longDate(x.chk.t))}` : ""}` : "Not checked yet";
+    $("expCheck").textContent = x.chk ? "Remove check" : "Mark as checked ✓";
+  }
+  $("expCheck").addEventListener("click", () => {
+    const x = expCtx && expCtx.id ? expensesAll().find((e) => e.id === expCtx.id) : null;
+    if (!x) return;
+    const { id, ...body } = x;
+    if (body.chk) delete body.chk; else { body.chk = { t: todayStr() }; const by = whoAmI(); if (by) body.chk.by = by; }
+    writeDoc("expenses/" + id, body);
+    logChange({ k: "exp", act: body.chk ? "check" : "uncheck", y: S.year, i: x.month, a: x.amount, no: x.no, desc: x.desc });
+    fillExpCheck();
+    render();
+  });
   // a quick pick fills the first empty line, or adds a new line
   $("expSugs").addEventListener("click", (ev) => {
     const b = ev.target.closest("[data-sug]"); if (!b) return;
@@ -2750,7 +3082,12 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     if (to) rec.to = to;
     const by = getCollector().trim();
     if (by) rec.by = by;
+    const prevX = expCtx.id ? expensesAll().find((e) => e.id === expCtx.id) : null;
+    const same = prevX && prevX.amount === rec.amount && prevX.desc === rec.desc && prevX.t === rec.t && (prevX.to || "") === (rec.to || "") && prevX.month === rec.month && prevX.cat === rec.cat;
+    if (prevX && prevX.chk && same) rec.chk = prevX.chk;      // a check stays only while the bill is unchanged
     writeDoc("expenses/" + id, rec);
+    if (!prevX) logChange({ k: "exp", act: "add", y: S.year, i: month, a: v, no, desc });
+    else if (!same) logChange({ k: "exp", act: "edit", y: S.year, i: month, a: v, old: prevX.amount, no, desc, un: prevX.chk ? 1 : undefined });
     render();
     return { ...rec, id };
   }
@@ -2774,9 +3111,10 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     if (!x) return;
     const { id, ...body } = x;
     writeDoc("expenses/" + id, null);
+    logChange({ k: "exp", act: "cancel", y: S.year, i: x.month, a: x.amount, no: x.no, desc: x.desc });
     $("expDlg").close();
     render();
-    toast(`Deleted the expense “${x.desc}”.`, () => { writeDoc("expenses/" + id, body); render(); });
+    toast(`Cancelled the expense “${x.desc}”. It stays in the change history.`, () => { writeDoc("expenses/" + id, body); logChange({ k: "exp", act: "restore", y: S.year, i: x.month, a: x.amount, no: x.no, desc: x.desc }); render(); });
   });
 
   /* ======================================================================
@@ -3469,6 +3807,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     $("startY").innerHTML = ys;
     $("setErr").hidden = true;
     $("sigText").value = st.sig.text;
+    $("myName").value = getCollector();
     sigStyleSel = st.sig.style;
     $("sig2Text").value = st.sig2.text;
     sig2StyleSel = st.sig2.style;
@@ -3609,8 +3948,16 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     doc.text(caption, x + w / 2, y + 3.6, { align: "center" });
   }
   const checker = () => (settings().sig2.text || "").trim();
+  // whose signature goes on a receipt or bill: the accounts checker's if they made it, otherwise the collector's
+  const normName = (v) => String(v || "").toLowerCase().replace(/[^a-z]/g, "");
+  function signerFor(name) {
+    const n = normName(name), s1 = normName(settings().sig.text), s2 = normName(checker());
+    const hit = (t) => !!t && !!n && (t.includes(n) || n.includes(t));
+    return hit(s2) && !hit(s1) ? 2 : 1;
+  }
   $("setForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
+    setCollector($("myName").value.trim().replace(/\s+/g, " ").slice(0, 40));
     const fr = feesFromRows(+$("startY").value);
     if (fr.err) { $("setErr").textContent = fr.err; $("setErr").hidden = false; return; }
     const fees = fr.fees;
@@ -4020,13 +4367,14 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     if (rc.cout > 0) line("Extra carried to", `${i < 11 ? MONTHS_FULL[i + 1] : "next year"} · Rs. ${fmt(rc.cout)}`, { size: 8.5, color: C.BLUE });
     const d = dueOf(m, y), om = owedMonths(m, y);
     if (om.length || d.due !== 0) line(d.due > 0 ? (om.length ? `Still to pay (to ${MONTHS[om[om.length - 1]]})` : "Still to pay") : "Balance", d.due > 0 ? `Rs. ${fmt(d.due)}` : d.due < 0 ? `Rs. ${fmt(-d.due)} ahead` : "All paid up", { size: 8.5, color: d.due > 0 ? C.RED : C.GREEN });
-    if (p.c && !sigImg.url) line("Collected by", p.c, { size: 9 });
-    // signature
+    const sw = signerFor(p.c), swImg = sw === 2 ? sigImg2 : sigImg;
+    if (p.c && !swImg.url) line("Collected by", p.c, { size: 9 });
+    // signature of whoever collected this payment
     yy = Math.max(yy + 15, H - 22);
-    drawSignature(doc, W - M - 46, yy, 46, 13);
+    drawSignature(doc, W - M - 46, yy, 46, 13, sw);
     doc.setDrawColor(...C.GREY); doc.setLineWidth(0.25); doc.setLineDashPattern([0.8, 0.8], 0); doc.line(W - M - 46, yy, W - M, yy); doc.setLineDashPattern([], 0);
     doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...C.GREY);
-    doc.text(sigImg.url && p.c ? `Collected by ${p.c}` : "Collector's signature", W - M - 23, yy + 3.8, { align: "center" });
+    doc.text(swImg.url && p.c ? `Collected by ${p.c}` : "Collector's signature", W - M - 23, yy + 3.8, { align: "center" });
     doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...C.BROWN);
     doc.text("Thank you!", M + 1, yy + 3.8);
     return doc.output("blob");
@@ -4263,9 +4611,13 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     }
     // signatures
     yy = Math.max(yy + 13, H - 17);
-    sigBlock(doc, W - M - 41, yy, 41, 11, 1, x.by ? `Paid by ${x.by}` : "Paid by the collector");
+    sigBlock(doc, W - M - 41, yy, 41, 11, signerFor(x.by), x.by ? `Paid by ${x.by}` : "Paid by the collector");
     if (checker()) sigBlock(doc, M, yy, 41, 11, 2, "Accounts checked by");
     else { doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(...C.BROWN); doc.text("Club expense", M + 1, yy + 3.8); }
+    if (x.chk) {
+      doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(...C.GREEN);
+      doc.text(`CHECKED${x.chk.t ? ` · ${longDate(x.chk.t).toUpperCase()}` : ""}`, M + 20.5, yy + 7.4, { align: "center" });
+    }
     return doc.output("blob");
   }
   function shareAccountSlip(i) {
@@ -4315,6 +4667,17 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       if (changed) window.scrollTo(0, 0);
     }
     else if (act === "mf") { S.mf = b.dataset.f; render(); }
+    else if (act === "hf") { S.hf = b.dataset.f; render(); }
+    else if (act === "owing") { S.mf = "owing"; S.q = ""; S.view = "members"; try { localStorage.setItem("psc.view13", S.view); } catch (e) {} render(); window.scrollTo(0, 0); }
+    else if (act === "cash") openCash();
+    else if (act === "clash-open") openClash(b.dataset.id);
+    else if (act === "clash-pick") resolveClash(b.dataset.id, b.dataset.side);
+    else if (act === "dup-cancel" || act === "dup-ok") {
+      const mid = b.dataset.id, i = +b.dataset.m, k = b.dataset.k, before = partsOf(mid, i);
+      if (!before.some((p) => p.id === k)) return;
+      if (act === "dup-ok") setParts(mid, i, before.map((p) => (p.id === k ? { ...p, ok: 1 } : p)));
+      else { setParts(mid, i, before.filter((p) => p.id !== k), "double"); toast("Cancelled the second entry. It stays in the change history.", () => setParts(mid, i, before)); }
+    }
     else if (act === "mbr-open") openMbr(b.dataset.id);
     else if (act === "mbr-pay") openPay(b.dataset.id, +b.dataset.m);
     else if (act === "mbr-slip" || act === "mbr-wa") {
@@ -4347,6 +4710,10 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   for (const d of document.querySelectorAll("dialog.dlg")) {
     d.addEventListener("click", (ev) => { if (ev.target === d) d.close(); });
   }
+  // tiles that open their details work with the keyboard too
+  document.addEventListener("keydown", (ev) => {
+    if ((ev.key === "Enter" || ev.key === " ") && ev.target && ev.target.matches && ev.target.matches('[role="button"][data-act]')) { ev.preventDefault(); ev.target.click(); }
+  });
   $("main").addEventListener("input", (ev) => {
     if (ev.target.id !== "mSearch") return;
     S.q = ev.target.value;
@@ -4372,7 +4739,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     unsubPay = S.db.collection("payments").where("year", "==", y).onSnapshot((snap) => {
       if (y !== S.year) return;
       const o = {};
-      for (const d of snap.docs) { const x = d.data(); if (x && x.member) o[x.member] = { m: x.m || {}, h: x.h || {} }; }
+      for (const d of snap.docs) { const x = d.data(); if (x && x.member) o[x.member] = { m: x.m || {}, h: x.h || {}, x: x.x || {} }; }
       S.payServer = o; S.payLoaded = true; render();
     }, onSubErr);
     unsubElec = S.db.doc("electricity/" + y).onSnapshot((d) => {
@@ -4410,7 +4777,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.13.0";
+  const APP_VERSION = "1.14.0";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty";
   const SEED = {};
@@ -4477,6 +4844,8 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       collection: (c) => query(c, []),
       onLocalChange: (fn) => { changeHook = fn; },
       raw: () => clone(store),
+      // live records under a path prefix, e.g. "log/" (each with its id in _id)
+      scan: (pre) => Object.keys(store).filter((k) => k.startsWith(pre) && live(store[k])).map((k) => ({ ...clone(store[k]), _id: k.slice(pre.length) })),
       liveOnly: () => { const o = {}; for (const k in store) if (live(store[k])) { o[k] = clone(store[k]); delete o[k]._u; } return o; },
       // Take records from the online copy that are newer than ours. Our own newer edits stay.
       mergeIn: (obj) => {
@@ -4493,7 +4862,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       // The user restored a file or an earlier version: it becomes the newest state everywhere.
       restoreAll: (obj) => {
         const now = Date.now(), next = {};
-        for (const k in obj) if (live(obj[k])) { const r = clone(obj[k]); delete r._u; r._u = now; next[k] = r; }
+        for (const k in obj) if (live(obj[k])) { const r = clone(obj[k]); delete r._u; delete r._r; r._u = now; if (k.startsWith("payments/")) r._r = now; next[k] = r; }
         for (const k in store) if (!(k in next)) next[k] = { _deleted: true, _u: now };
         const before = store;
         store = next;
@@ -4570,14 +4939,77 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     const j = await res.json();
     return (j.content && j.content.sha) || "saved";
   }
+  // One member's payments for a year, as two phones see them, merged payment by payment: a payment only one
+  // phone has is kept; the higher version of a payment wins; the same version changed differently on both phones
+  // is a clash (the newer change is used for now and both are kept for someone to choose).
+  function mergePay(path, a, b, clashes) {
+    if (a._r && a._r >= (b._u || 0)) return a;       // a restored backup or version wins over copies older than it
+    if (b._r && b._r >= (a._u || 0)) return b;
+    const newer = (b._u || 0) >= (a._u || 0) ? b : a;
+    const out = { year: newer.year, member: newer.member, m: {}, h: {} }, x = {};
+    const months = new Set();
+    for (const d of [a, b]) for (const f of ["m", "h", "x"]) for (const k of Object.keys(d[f] || {})) months.add(k);
+    const slice = (d, i) => JSON.stringify([(d.m || {})[i], (d.h || {})[i], (d.x || {})[i]]);
+    const hasIds = (d, i) => [...((d.h || {})[i] || []), ...((d.x || {})[i] || [])].some((p) => p && (p.id || p.r));
+    const strip = (q) => { const o = keepPart(q); delete o.id; if (!(o.r && q.id === "R" + o.r)) o.id = q.id; return o; };
+    for (const ik of months) {
+      const i = +ik;
+      let src = null;
+      if (slice(a, ik) === slice(b, ik)) src = a;
+      else if (!hasIds(a, ik) && !hasIds(b, ik)) src = newer;   // older entries with no receipt numbers: the newer copy decides
+      if (src) {
+        if ((src.m || {})[ik] != null) out.m[ik] = src.m[ik];
+        if ((src.h || {})[ik]) out.h[ik] = src.h[ik];
+        if ((src.x || {})[ik]) x[ik] = src.x[ik];
+        continue;
+      }
+      const all = new Map();
+      for (const [side, d] of [["a", a], ["b", b]]) {
+        for (const p of docParts(d, i)) { const e = all.get(p.id) || {}; e[side] = { ...p, on: true }; all.set(p.id, e); }
+        for (const p of docCancelled(d, i)) { const e = all.get(p.id) || {}; e[side] = { ...p, on: false }; all.set(p.id, e); }
+      }
+      const act = [], gone = [];
+      for (const [id, e] of all) {
+        let pick = e.a || e.b;
+        if (e.a && e.b) {
+          const ca = JSON.stringify({ ...e.a, u: 0 }), cb = JSON.stringify({ ...e.b, u: 0 });
+          if (ca !== cb) {
+            const va = e.a.v || 1, vb = e.b.v || 1;
+            if (va !== vb) pick = va > vb ? e.a : e.b;
+            else {
+              pick = (e.b.u || 0) >= (e.a.u || 0) ? e.b : e.a;
+              const real = e.a.on !== e.b.on || e.a.a !== e.b.a || (e.a.t || null) !== (e.b.t || null);
+              if (real) clashes.push({ path, i, id, a: e.a, b: e.b });
+            }
+          }
+        }
+        (pick.on ? act : gone).push(pick);
+      }
+      const byTime = (p, q) => String(p.t || "").localeCompare(String(q.t || "")) || (p.u || 0) - (q.u || 0);
+      act.sort(byTime); gone.sort(byTime);
+      const tot = act.reduce((t, p) => t + p.a, 0);
+      if (tot > 0) { out.m[ik] = tot; out.h[ik] = act.map(strip); }
+      if (gone.length) x[ik] = gone.map(strip);
+    }
+    if (Object.keys(x).length) out.x = x;
+    out._u = Math.max(a._u || 0, b._u || 0);
+    return out;
+  }
   function mergeStores(local, remote) {
-    const out = {};
+    const out = {}, clashes = [];
     let remoteChanged = false;
     for (const k of new Set([...Object.keys(local), ...Object.keys(remote)])) {
       const a = local[k], b = remote[k];
-      const pick = a === undefined ? b : b === undefined ? a : (b._u || 0) >= (a._u || 0) ? b : a;
+      let pick = a === undefined ? b : b === undefined ? a : (b._u || 0) >= (a._u || 0) ? b : a;
+      if (a && b && k.startsWith("payments/") && live(a) && live(b) && JSON.stringify(a) !== JSON.stringify(b)) pick = mergePay(k, a, b, clashes);
       out[k] = pick;
       if (JSON.stringify(pick) !== JSON.stringify(b)) remoteChanged = true;
+    }
+    for (const c of clashes) {
+      const ck = ("clash/" + `${c.path.slice(9)}-${c.i}-${c.id}-${c.a.v || 1}`.replace(/[^A-Za-z0-9_.:@+~-]/g, "_")).slice(0, 120);
+      if (out[ck] !== undefined) continue;        // already raised, or already settled, on one of the phones
+      out[ck] = { path: c.path, i: c.i, id: c.id, a: c.a, b: c.b, t: new Date().toISOString(), _u: Date.now() };
+      remoteChanged = true;
     }
     return { out, remoteChanged };
   }
@@ -4601,7 +5033,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
         }
         const local = LocalDB.raw();
         const m = mergeStores(local, remote.store || {});
-        if (remote.store) LocalDB.mergeIn(remote.store);
+        if (remote.store) LocalDB.mergeIn(m.out);
         if (!remote.store || m.remoteChanged) {
           const sha = await push(cfg, m.out, remote.sha);
           if (!sha) continue;
@@ -4841,7 +5273,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       let data = null;
       try { data = JSON.parse(fr.result); } catch (e) {}
       const st = data && data.app === "pirampady-sc" && data.store && typeof data.store === "object" ? data.store : null;
-      const valid = st && Object.keys(st).every((k) => /^(members|payments|electricity|settings|expenses|income|birthdays|events)\/[A-Za-z0-9_.:@+~-]+$/.test(k) && st[k] && typeof st[k] === "object");
+      const valid = st && Object.keys(st).every((k) => /^(members|payments|electricity|settings|expenses|income|birthdays|events|log|cash|clash)\/[A-Za-z0-9_.:@+~-]+$/.test(k) && st[k] && typeof st[k] === "object");
       if (!valid) { showErr("bakErr", "That file isn't a Pirampady SC backup. Choose the .json file made with “Save backup file”."); return; }
       const c = countRecords(st);
       pendingRestore = st;

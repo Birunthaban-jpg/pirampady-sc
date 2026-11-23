@@ -25,6 +25,11 @@ Members pay a monthly fee (Rs. 650 at the start; it can change from any month). 
 - **Across years:** money paid ahead carries into the next year, and anything still owed from an earlier year is brought forward into "Still due". A "Before <year>" column shows it on the sheet and the register when anyone has it.
 - **Backup and restore** with a single JSON file, plus a CSV export for Excel.
 - **Phone and Mac share one register**, synced through a private GitHub repository, and every change is kept as a version you can restore.
+- **Two people, one register:** the collector and the accounts checker can both record on their own phones with their own access keys. Payments are merged one at a time (by receipt number), so separate payments recorded before a sync are never lost. If the same payment was changed differently on two phones, Home asks someone to choose the right version.
+- **Change history:** every payment, expense, electricity bill and cash count is logged with who did it, when and the old amount. Deleting a payment cancels it instead: it stops counting but stays visible as cancelled.
+- **Cash count:** enter the cash counted by hand and the app compares it with cash in hand, saving the result with the date and who counted.
+- **Double-entry warnings:** typing the same amount again for the same member and month asks first, and the same payment recorded on two phones is flagged on Home ("Cancel the second" or "Both are right").
+- **Each person's own signature:** receipts and expense bills carry the signature of whoever collected or paid, and the accounts checker can mark an expense **Checked** (any later change to the bill removes the mark).
 - **App styles:** Elite (obsidian black, champagne gold and off-white; the main style), Classic (follows the phone's light or dark mode), Floodlight (a night stadium in club gold), Scoreboard (match-day kit) and Pearl (light frosted glass). Chosen in Settings for each device. PDFs use an obsidian header band with champagne-gold accents on white paper, so they print cleanly; the TO PAY and PAID UP stamps stay red and green.
 - **Works fully offline.** Changes are saved on the device first and synced once it's back online.
 
@@ -36,7 +41,8 @@ Members pay a monthly fee (Rs. 650 at the start; it can change from any month). 
 | Offline | Service worker (`sw.js`) caches the app, fonts and libraries on first visit |
 | Install | Web app manifest and icons, so it can be added to the iPhone home screen or the Mac Dock |
 | Storage | `localStorage`, with each record stored under a path like `payments/2026-m01` and stamped with its last-change time |
-| Sync | GitHub Contents API on a **private** data repo (`register.json`). Each sync reads the file, merges record by record (newest change wins, deletions travel as tombstones), and writes back with the file's `sha`, so a clash is detected and merged again |
+| Sync | GitHub Contents API on a **private** data repo (`register.json`). Each sync reads the file, merges record by record (newest change wins, deletions travel as tombstones), and writes back with the file's `sha`, so a clash is detected and merged again. Payment records are merged payment by payment: each payment is identified by its receipt number (older entries by their contents) and carries a version; a higher version wins, and the same version changed differently on two phones is saved under `clash/` for someone to choose. A restored backup wins over older copies |
+| History | `log/<id>` records (who, device, what, old and new amount); cancelled payments stay in the payment record under `x`; cash counts in `cash/<id>` |
 | Version history | Every sync is a commit; the app lists them and can restore any version |
 | Access | A fine-grained personal access token limited to the data repo (Contents: read and write), kept only on the user's devices |
 | Part payments | Each month keeps a list of payments (amount, date, receipt number, collector); the month total is their sum |
