@@ -2571,12 +2571,14 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
       if (it.draw) it.draw(yy);
       yy += it.h;
     }
-    // footer: the date and the signature of whoever made it
-    const fy = H - 24;
-    doc.setDrawColor(...C.LINE); doc.setLineWidth(0.3); doc.line(M, fy - 6, W - M, fy - 6);
-    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...C.BROWN); doc.text("Pirampady Sports Club", M, fy + 1);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(7.8); doc.setTextColor(...C.GREY); doc.text(`Issued ${n.t ? longDate(n.t) : issuedToday()}`, M, fy + 5.5);
-    sigBlock(doc, W - M - 46, fy + 3, 46, 11, signerFor(n.by), n.by ? `${n.by}, for the club` : "For the club");
+    // footer: both signatures (whoever made it on the right, the other one on the left), then the club and the date
+    const st = settings(), mine = signerFor(n.by), other = mine === 1 ? 2 : 1;
+    const nameOfSig = (w) => ((w === 1 ? st.sig.text : st.sig2.text) || "").trim();
+    doc.setDrawColor(...C.LINE); doc.setLineWidth(0.3); doc.line(M, H - 32, W - M, H - 32);
+    sigBlock(doc, W - M - 46, H - 16, 46, 11, mine, nameOfSig(mine) || (n.by ? n.by : "For the club"));
+    if (nameOfSig(other)) sigBlock(doc, M, H - 16, 46, 11, other, nameOfSig(other));
+    doc.setFont("helvetica", "bold"); doc.setFontSize(8.6); doc.setTextColor(...C.BROWN);
+    doc.text(`For Pirampady Sports Club  ·  Issued ${n.t ? longDate(n.t) : issuedToday()}`, W / 2, H - 6.5, { align: "center" });
     return doc.output("blob");
   }
   function homeSkeleton() {
@@ -5912,7 +5914,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.16.0";
+  const APP_VERSION = "1.16.1";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty", BASE_KEY = "psc.syncbase.v1";
   const SEED = {};
