@@ -1127,7 +1127,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
 .styleopt[aria-pressed="true"] { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
 textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil", "Tamil Sangam MN", sans-serif; }
 #ntcDlg textarea { width: 100%; min-height: 150px; resize: vertical; font: inherit; line-height: 1.45; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); }
-#ntcDlg .mt { display: block; margin-top: 10px; }
+#ntcDlg .mt, #setDlg .mt { display: block; margin-top: 10px; }
 .ntc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .ntc-grid .field { margin: 0; }
 .ntc-quick { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px; }
@@ -1523,6 +1523,14 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
       <div class="sigstyles" id="sig2Styles" role="group" aria-label="Second signature style"></div>
       <p class="hint">The person who checks the accounts. Printed next to yours on the monthly account, expense bills and the register PDF.</p>
     </div>
+    <div class="field">
+      <label for="sig3Text">Third signature</label>
+      <input id="sig3Text" autocomplete="off" placeholder="Name · leave empty for no third signature">
+      <label for="sig3Role" class="mt">Written under it</label>
+      <input id="sig3Role" autocomplete="off" maxlength="30" placeholder="Approved by">
+      <div class="sigstyles" id="sig3Styles" role="group" aria-label="Third signature style"></div>
+      <p class="hint">Printed on every receipt, bill, slip, account, register and announcement, next to the other signatures. Shared with the other phone.</p>
+    </div>
     <p class="err" id="setErr" hidden></p>
     <div class="foot-row"><span></span><button type="submit" class="btn primary">Save</button></div>
   </form>
@@ -1765,7 +1773,10 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     const s = o || S.settingsServer || {};
     const sig = s.sig && typeof s.sig === "object" ? { text: typeof s.sig.text === "string" ? s.sig.text : DEFAULT_SIG, style: s.sig.style >= 1 && s.sig.style <= 5 ? s.sig.style : 1 } : { text: DEFAULT_SIG, style: 1 };
     const sig2 = s.sig2 && typeof s.sig2 === "object" ? { text: typeof s.sig2.text === "string" ? s.sig2.text : DEFAULT_SIG2, style: s.sig2.style >= 1 && s.sig2.style <= 5 ? s.sig2.style : 2 } : { text: DEFAULT_SIG2, style: 2 };
-    return { fees: s.fees || {}, start: s.start && Number.isInteger(s.start.y) ? s.start : { y: CY, m: 0 }, sig, sig2, billStyle: s.billStyle === "classic" ? "classic" : "elite" };
+    // a third signature (e.g. the president's): empty until a name is set in Settings
+    const s3 = s.sig3 && typeof s.sig3 === "object" ? s.sig3 : {};
+    const sig3 = { text: typeof s3.text === "string" ? s3.text : "", style: s3.style >= 1 && s3.style <= 5 ? s3.style : 3, role: typeof s3.role === "string" && s3.role.trim() ? s3.role.trim() : "Approved by" };
+    return { fees: s.fees || {}, start: s.start && Number.isInteger(s.start.y) ? s.start : { y: CY, m: 0 }, sig, sig2, sig3, billStyle: s.billStyle === "classic" ? "classic" : "elite" };
   }
   /* ---------- the monthly fee ---------- */
   // settings.fees maps where a fee starts to the fee: "2026" = from January 2026, "2026-11" = from November 2026.
@@ -2337,7 +2348,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     }
     if (col === "members") return { main: d.name || "", more: [d.removed ? "left the club" : "", Array.isArray(d.off) && d.off.some((p) => p && !p.b) ? "inactive" : "", d.phone || "", d.private ? "name private" : ""].filter(Boolean).join(" · ") };
     if (col === "notice") { const p = d.en || d.ta || {}; return { main: p.title || "", more: String(p.body || "").replace(/\s+/g, " ").slice(0, 90) }; }
-    if (col === "settings") return { main: `Fees: ${Object.entries(d.fees || {}).map(([k, v]) => `${k} ${rs(v)}`).join(", ") || "-"}`, more: [d.sig && d.sig.text, d.sig2 && d.sig2.text].filter(Boolean).join(" · ") };
+    if (col === "settings") return { main: `Fees: ${Object.entries(d.fees || {}).map(([k, v]) => `${k} ${rs(v)}`).join(", ") || "-"}`, more: [d.sig && d.sig.text, d.sig2 && d.sig2.text, d.sig3 && d.sig3.text].filter(Boolean).join(" · ") };
     return { main: "", more: "" };
   }
   function openConflict(cid) {
@@ -2545,7 +2556,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     if (!im) { im = new Image(); im.src = url; imgCache.set(url, im); }
     return im.complete && im.naturalWidth ? im : null;
   }
-  const noticeImagesReady = () => { imgOf(pdfLogo()); imgOf(sigImg.url); imgOf(sigImg2.url); };
+  const noticeImagesReady = () => { imgOf(pdfLogo()); imgOf(sigImg.url); imgOf(sigImg2.url); imgOf(sigImg3.url); };
   // The same announcement as the PDF, drawn as a picture (A5 shape, about 1,240 px wide) in the chosen bill style.
   // A long announcement makes a taller picture instead of a second page.
   function buildNoticeImage(n) {
@@ -2610,17 +2621,17 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
       yy += it.h;
     }
     // footer: both signatures, the club and the date
-    const st = settings(), mine = signerFor(n.by), other = mine === 1 ? 2 : 1;
-    const nameOfSig = (w) => ((w === 1 ? st.sig.text : st.sig2.text) || "").trim();
+    const st = settings(), mine = signerFor(n.by);
+    const nameOfSig = (w) => ((w === 1 ? st.sig.text : w === 2 ? st.sig2.text : st.sig3.text) || "").trim();
     g.fillStyle = rgb(C.LINE); g.fillRect(mm(M), mm(H - 32), mm(wMm), mm(0.3));
-    const sig = (x, which, caption) => {
-      const y = H - 16, w = 46, sg = which === 2 ? sigImg2 : sigImg, im = imgOf(sg.url);
+    const sig = (x, which, caption, w) => {
+      const y = H - 16, sg = sigOf(which), im = imgOf(sg.url);
       if (im && sg.ratio) { let iw = w * 0.92, ih = iw * sg.ratio; if (ih > 11) { ih = 11; iw = ih / sg.ratio; } g.drawImage(im, mm(x + (w - iw) / 2), mm(y - ih + 1.2), mm(iw), mm(ih)); }
       g.strokeStyle = rgb(C.GREY); g.lineWidth = mm(0.25); g.setLineDash([mm(0.8), mm(0.8)]); g.beginPath(); g.moveTo(mm(x), mm(y)); g.lineTo(mm(x + w), mm(y)); g.stroke(); g.setLineDash([]);
-      text(caption, x + w / 2, y + 3.6, 7.2, false, C.GREY, "center");
+      text(caption, x + w / 2, y + 3.6, w < 36 ? 6.4 : 7.2, false, C.GREY, "center");
     };
-    sig(W - M - 46, mine, nameOfSig(mine) || n.by || "For the club");
-    if (nameOfSig(other)) sig(M, other, nameOfSig(other));
+    const order = [2, 3, 1].filter((w) => w !== mine && nameOfSig(w)).concat([mine]);
+    sigRow(M, W - M, 46, order.map((w) => (x, ww) => sig(x, w, nameOfSig(w) || n.by || "For the club", ww)));
     text(`For Pirampady Sports Club  ·  Issued ${n.t ? longDate(n.t) : issuedToday()}`, W / 2, H - 6.5, 8.6, true, C.BROWN, "center");
     return cv;
   }
@@ -2686,11 +2697,11 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
       yy += it.h;
     }
     // footer: both signatures (whoever made it on the right, the other one on the left), then the club and the date
-    const st = settings(), mine = signerFor(n.by), other = mine === 1 ? 2 : 1;
-    const nameOfSig = (w) => ((w === 1 ? st.sig.text : st.sig2.text) || "").trim();
+    const st = settings(), mine = signerFor(n.by);
+    const nameOfSig = (w) => ((w === 1 ? st.sig.text : w === 2 ? st.sig2.text : st.sig3.text) || "").trim();
     doc.setDrawColor(...C.LINE); doc.setLineWidth(0.3); doc.line(M, H - 32, W - M, H - 32);
-    sigBlock(doc, W - M - 46, H - 16, 46, 11, mine, nameOfSig(mine) || (n.by ? n.by : "For the club"));
-    if (nameOfSig(other)) sigBlock(doc, M, H - 16, 46, 11, other, nameOfSig(other));
+    const order = [2, 3, 1].filter((w) => w !== mine && nameOfSig(w)).concat([mine]);
+    sigRow(M, W - M, 46, order.map((w) => (x, ww) => sigBlock(doc, x, H - 16, ww, 11, w, nameOfSig(w) || (n.by ? n.by : "For the club"))));
     doc.setFont("helvetica", "bold"); doc.setFontSize(8.6); doc.setTextColor(...C.BROWN);
     doc.text(`For Pirampady Sports Club  ·  Issued ${n.t ? longDate(n.t) : issuedToday()}`, W / 2, H - 6.5, { align: "center" });
     return doc.output("blob");
@@ -3178,7 +3189,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...C.INK);
     doc.text(doc.splitTextToSize("Added to the club's funds. Thank you for supporting Pirampady Sports Club!", W - 2 * M - 2), M + 1, yy);
     yy = Math.max(yy + 18, H - 22);
-    sigBlock(doc, W - M - 46, yy, 46, 13, signerFor(d.by), d.by ? `Received by ${d.by}` : "Received for the club");
+    sigRow(M, W - M, 46, [approverBlock(doc, yy, 13), (x, w) => sigBlock(doc, x, yy, w, 13, signerFor(d.by), d.by ? `Received by ${d.by}` : "Received for the club")]);
     return doc.output("blob");
   }
 
@@ -3196,7 +3207,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     $("hoDate").value = h && h.t ? h.t : todayStr();
     $("hoNote").value = h ? h.note || "" : "";
     $("hoTo").setAttribute("list", "hoPeople");
-    $("hoPeople").innerHTML = [settings().sig.text, checker(), "Bank deposit"].filter(Boolean).map((n) => `<option value="${esc(n)}">`).join("");
+    $("hoPeople").innerHTML = [settings().sig.text, checker(), approver(), "Bank deposit"].filter(Boolean).map((n) => `<option value="${esc(n)}">`).join("");
     for (const f of ["hoFrom", "hoTo", "hoAmt", "hoDate", "hoNote"]) $(f).disabled = !!h;
     $("hoSave").hidden = !!h;
     $("hoShare").hidden = !h;
@@ -3223,8 +3234,8 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
   }
   // a signature line with a caption, and the signature itself when the name is one of the two set in Settings
   function sigFor(doc, x, y, w, maxH, name, caption) {
-    const n = normName(name), s1 = normName(settings().sig.text), s2 = normName(checker());
-    const known = n && ((s1 && (s1.includes(n) || n.includes(s1))) || (s2 && (s2.includes(n) || n.includes(s2))));
+    const n = normName(name), s1 = normName(settings().sig.text), s2 = normName(checker()), s3 = normName(approver());
+    const known = n && [s1, s2, s3].some((s) => s && (s.includes(n) || n.includes(s)));
     if (known) { sigBlock(doc, x, y, w, maxH, signerFor(name), caption); return; }
     const C = PDF_C;
     doc.setDrawColor(...C.GREY); doc.setLineWidth(0.25); doc.setLineDashPattern([0.8, 0.8], 0); doc.line(x, y, x + w, y); doc.setLineDashPattern([], 0);
@@ -3249,8 +3260,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...C.GREY);
     doc.text(doc.splitTextToSize("The money stays the club's: this voucher records who holds it from this date.", W - 2 * M - 2), M + 1, yy);
     yy = Math.max(yy + 20, H - 18);
-    sigFor(doc, W - M - 41, yy, 41, 11, h.from, `Handed over by ${h.from}`);
-    sigFor(doc, M, yy, 41, 11, h.to, `Received by ${h.to}`);
+    sigRow(M, W - M, 41, [(x, w) => sigFor(doc, x, yy, w, 11, h.to, `Received by ${h.to}`), approverBlock(doc, yy, 11), (x, w) => sigFor(doc, x, yy, w, 11, h.from, `Handed over by ${h.from}`)]);
     return doc.output("blob");
   }
   function historyPageHTML() {
@@ -4472,8 +4482,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     if (room < 10) { compact = true; footTop = H - 10; room = footTop - 4.5 - (ty + 3); }
     if (room < 7) { doc.addPage("a5", "portrait"); slipHeader(doc, W, M, `Event  ·  ${ev.name || ""} (signatures)`); ty = 45; compact = false; footTop = H - 19; room = 14; }
     const sh = Math.min(13, room), sy = Math.min(footTop - 4.5, ty + 3 + sh);
-    sigBlock(doc, W - M - 52, sy, 52, sh, 1, "Collected by the club collector");
-    if (checker()) sigBlock(doc, M, sy, 52, sh, 2, `Checked by ${checker()}`);
+    sigRow(M, W - M, 52, [checker() ? (x, w) => sigBlock(doc, x, sy, w, sh, 2, `Checked by ${checker()}`) : null, approverBlock(doc, sy, sh), (x, w) => sigBlock(doc, x, sy, w, sh, 1, "Collected by the club collector")]);
     doc.setDrawColor(...C.LINE); doc.setLineWidth(0.3); doc.line(M, footTop, W - M, footTop);
     doc.setFont("helvetica", compact ? "normal" : "bold"); doc.setFontSize(compact ? 7 : 8.6); doc.setTextColor(...(compact ? C.GREY : C.BROWN));
     doc.text(t.fromClub ? "Event money is kept separate; the shortfall was paid from the club balance." : t.toClub ? "Event money is kept separate; the money left over was added to the club balance." : "Event money is kept separate from the club's subscription account.", W / 2, compact ? H - 6 : H - 12, { align: "center" });
@@ -4706,8 +4715,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     if (room < 10) { compact = true; footTop = H - 10; room = footTop - 4.5 - (ty + 3); }
     if (room < 7) { doc.addPage("a5", "portrait"); slipHeader(doc, W, M, `Birthday celebration  ·  ${ev.name || ""} (signatures)`); ty = 45; compact = false; footTop = H - 19; room = 14; }
     const sh = Math.min(13, room), sy = Math.min(footTop - 4.5, ty + 3 + sh);
-    sigBlock(doc, W - M - 52, sy, 52, sh, 1, "Collected by the club collector");
-    if (checker()) sigBlock(doc, M, sy, 52, sh, 2, `Checked by ${checker()}`);
+    sigRow(M, W - M, 52, [checker() ? (x, w) => sigBlock(doc, x, sy, w, sh, 2, `Checked by ${checker()}`) : null, approverBlock(doc, sy, sh), (x, w) => sigBlock(doc, x, sy, w, sh, 1, "Collected by the club collector")]);
     doc.setDrawColor(...C.LINE); doc.setLineWidth(0.3); doc.line(M, footTop, W - M, footTop);
     doc.setFont("helvetica", compact ? "normal" : "bold"); doc.setFontSize(compact ? 7 : 8.6); doc.setTextColor(...(compact ? C.GREY : C.BROWN));
     doc.text("The birthday fund is kept separate from the club's subscription account.", W / 2, compact ? H - 6 : H - 12, { align: "center" });
@@ -4919,6 +4927,9 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     sigStyleSel = st.sig.style;
     $("sig2Text").value = st.sig2.text;
     sig2StyleSel = st.sig2.style;
+    $("sig3Text").value = st.sig3.text;
+    $("sig3Role").value = st.sig3.role === "Approved by" ? "" : st.sig3.role;     // empty shows "Approved by" as the hint
+    sig3StyleSel = st.sig3.style;
     drawSigChoices();
     billStyleSel = st.billStyle; drawBillPick(); drawSendAs();
     $("setDlg").showModal();
@@ -5014,20 +5025,24 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     for (const c of changes) { if (c.fee === prev) continue; fees[`${c.y}-${String(c.m + 1).padStart(2, "0")}`] = c.fee; prev = c.fee; }
     return { fees };
   }
-  let sigStyleSel = 1, sig2StyleSel = 2;
+  let sigStyleSel = 1, sig2StyleSel = 2, sig3StyleSel = 3;
   const SIG_NAMES = ["Pen", "Flowing", "Elegant", "Brush", "Neat"];
   function drawSigChoices() {
     const opts = (t, sel) => SIG_NAMES.map((n, k) => `<button type="button" class="sigopt" data-sig="${k + 1}" aria-pressed="${sel === k + 1}" aria-label="${n} style"><span style="font-family:'PSC Sig ${k + 1}', cursive">${esc(t)}</span><small>${n}</small></button>`).join("");
     $("sigStyles").innerHTML = opts($("sigText").value.trim() || "Your signature", sigStyleSel);
     $("sig2Styles").innerHTML = opts($("sig2Text").value.trim() || "Checker's signature", sig2StyleSel);
+    $("sig3Styles").innerHTML = opts($("sig3Text").value.trim() || "Third signature", sig3StyleSel);
   }
+  $("sig3Text").addEventListener("input", drawSigChoices);
+  $("sig3Styles").addEventListener("click", (ev) => { const b = ev.target.closest("[data-sig]"); if (!b) return; sig3StyleSel = +b.dataset.sig; drawSigChoices(); });
   $("sigText").addEventListener("input", drawSigChoices);
   $("sig2Text").addEventListener("input", drawSigChoices);
   $("sigStyles").addEventListener("click", (ev) => { const b = ev.target.closest("[data-sig]"); if (!b) return; sigStyleSel = +b.dataset.sig; drawSigChoices(); });
   $("sig2Styles").addEventListener("click", (ev) => { const b = ev.target.closest("[data-sig]"); if (!b) return; sig2StyleSel = +b.dataset.sig; drawSigChoices(); });
 
   /* ---------- signature image for PDFs (drawn from the chosen script font) ---------- */
-  let sigImg = { key: "", url: null, ratio: 0 }, sigImg2 = { key: "", url: null, ratio: 0 };
+  let sigImg = { key: "", url: null, ratio: 0 }, sigImg2 = { key: "", url: null, ratio: 0 }, sigImg3 = { key: "", url: null, ratio: 0 };
+  const sigOf = (which) => (which === 3 ? sigImg3 : which === 2 ? sigImg2 : sigImg);
   async function makeSigImage(sg, prev) {
     const text = (sg.text || "").trim(), key = `${sg.style}|${text}`;
     if (key === prev.key) return prev;
@@ -5054,10 +5069,11 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     const st = settings();
     sigImg = await makeSigImage(st.sig, sigImg);
     sigImg2 = await makeSigImage(st.sig2, sigImg2);
+    sigImg3 = await makeSigImage(st.sig3, sigImg3);
   }
   // draws a signature centred above a line from x to x+w at baseline y; returns true if drawn
   function drawSignature(doc, x, y, w, maxH, which) {
-    const sg = which === 2 ? sigImg2 : sigImg;
+    const sg = sigOf(which);
     if (!sg.url) return false;
     let iw = w * 0.92, ih = iw * sg.ratio;
     if (ih > maxH) { ih = maxH; iw = ih / sg.ratio; }
@@ -5069,16 +5085,32 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     const C = PDF_C;
     drawSignature(doc, x, y, w, maxH, which);
     doc.setDrawColor(...C.GREY); doc.setLineWidth(0.25); doc.setLineDashPattern([0.8, 0.8], 0); doc.line(x, y, x + w, y); doc.setLineDashPattern([], 0);
-    doc.setFont("helvetica", "normal"); doc.setFontSize(7.2); doc.setTextColor(...C.GREY);
+    // the words under it get smaller when three signatures share the width
+    let fs = w < 36 ? 6.4 : 7.2;
+    doc.setFont("helvetica", "normal"); doc.setFontSize(fs);
+    while (fs > 5.2 && doc.getTextWidth(caption) > w + 5) { fs -= 0.3; doc.setFontSize(fs); }
+    doc.setTextColor(...C.GREY);
     doc.text(caption, x + w / 2, y + 3.6, { align: "center" });
   }
   const checker = () => (settings().sig2.text || "").trim();
+  const approver = () => (settings().sig3.text || "").trim();
+  // the words under the third signature: "Approved by <name>", or "<name> · President" for a title
+  const approverCap = (short) => { const s3 = settings().sig3, r = s3.role; return short ? r : /\bby$/i.test(r) ? `${r} ${approver()}` : `${approver()} · ${r}`; };
+  // signature blocks side by side between x0 and x1 (the first at the left edge, the last at the right edge)
+  function sigRow(x0, x1, maxW, blocks) {
+    const list = blocks.filter(Boolean), n = list.length;
+    if (!n) return;
+    const gap = 5, w = Math.min(maxW, (x1 - x0 - gap * (n - 1)) / n);
+    list.forEach((b, k) => b(n === 1 ? x1 - w : x0 + (k * (x1 - x0 - w)) / (n - 1), w));
+  }
+  const approverBlock = (doc, y, maxH, short) => (approver() ? (x, w) => sigBlock(doc, x, y, w, maxH, 3, approverCap(short)) : null);
   // whose signature goes on a receipt or bill: the accounts checker's if they made it, otherwise the collector's
   const normName = (v) => String(v || "").toLowerCase().replace(/[^a-z]/g, "");
   function signerFor(name) {
-    const n = normName(name), s1 = normName(settings().sig.text), s2 = normName(checker());
+    const n = normName(name), s1 = normName(settings().sig.text), s2 = normName(checker()), s3 = normName(approver());
     const hit = (t) => !!t && !!n && (t.includes(n) || n.includes(t));
-    return hit(s2) && !hit(s1) ? 2 : 1;
+    if (hit(s1)) return 1;
+    return hit(s2) ? 2 : hit(s3) ? 3 : 1;
   }
   $("setForm").addEventListener("submit", (ev) => {
     ev.preventDefault();
@@ -5087,7 +5119,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     if (fr.err) { $("setErr").textContent = fr.err; $("setErr").hidden = false; return; }
     const fees = fr.fees;
     const before = JSON.stringify(feeSchedule()), after = JSON.stringify(feeSchedule(fees));
-    writeDoc("settings/club", { fees, start: { y: +$("startY").value, m: +$("startM").value }, sig: { text: $("sigText").value.trim().replace(/\s+/g, " "), style: sigStyleSel }, sig2: { text: $("sig2Text").value.trim().replace(/\s+/g, " "), style: sig2StyleSel }, billStyle: billStyleSel });
+    writeDoc("settings/club", { fees, start: { y: +$("startY").value, m: +$("startM").value }, sig: { text: $("sigText").value.trim().replace(/\s+/g, " "), style: sigStyleSel }, sig2: { text: $("sig2Text").value.trim().replace(/\s+/g, " "), style: sig2StyleSel }, sig3: { text: $("sig3Text").value.trim().replace(/\s+/g, " "), style: sig3StyleSel, role: $("sig3Role").value.trim().replace(/\s+/g, " ").slice(0, 30) || "Approved by" }, billStyle: billStyleSel });
     renderSignature();
     $("setDlg").close();
     render();
@@ -5174,9 +5206,19 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
 
     // rows
     const nm = ms.length;
-    const signing = !!(sigImg.url || sigImg2.url);
-    const avail = H - 37 - (signing ? 24 : 13);
-    const rowH = Math.max(4.6, Math.min(7.5, avail / (nm + 5 + (priv.length ? 1 : 0) + 1.6)));
+    const signing = !!(sigImg.url || sigImg2.url || sigImg3.url);
+    const nSig = signing ? 1 + (checker() ? 1 : 0) + (approver() ? 1 : 0) : 0, sigLeft = W - 10 - nSig * 46 - Math.max(0, nSig - 1) * 8;
+    // the notes under the legend are worked out first, so the table leaves room for all their lines
+    const yIn0 = everyone.reduce((t, m) => t + coverage(m, y).carryIn, 0), yOut0 = everyone.reduce((t, m) => t + coverage(m, y).carryOut, 0);
+    const notes = [`Month totals count money in the month it is used for: extra paid above the monthly fee moves to the next month.${yIn0 ? ` Includes Rs. ${fmt(yIn0)} paid extra before ${y}.` : ""}${yOut0 ? ` Rs. ${fmt(yOut0)} paid in ${y} is extra for ${y + 1}.` : ""}`];
+    if (everyone.some((m) => dueOf(m, y).bf !== 0)) notes.push(`Before ${y}: + = paid ahead in earlier years, red = still to pay from earlier years. "Due" includes it.`);
+    if (priv.length) notes.push("Private contributions = payments by members who asked not to be named. They are included in the totals.");
+    doc.setFont("helvetica", "normal"); doc.setFontSize(8);
+    const noteLines = notes.flatMap((t) => doc.splitTextToSize(t, (signing ? sigLeft - 6 : W - 10) - 10));
+    let yi0 = 0;
+    for (let k = 0; k < 12; k++) yi0 += incTotal(k);
+    const nSum = (priv.length ? 1 : 0) + (yi0 ? 1 : 0) + 5, below = Math.max(signing ? 24 : 10, 10 + 4.5 * noteLines.length);
+    const rowH = Math.max(4, Math.min(7.5, (H - 37 - 8 - below) / (nm + nSum))), tight = rowH < 4.7;
     const body = [];
     let dueTotal = 0, anyOff = false;
     // a "Before <year>" column appears only when someone brings money (or dues) from earlier years
@@ -5254,7 +5296,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
       theme: "grid",
       head: [["No.", "Member Name", ...(anyBf ? [`Before ${y}`] : []), ...MONTHS, "Total Paid", y === CY ? `Due to ${MONTHS[CM]}` : "Due"]],
       body,
-      styles: { font: "helvetica", fontSize: 8.5, textColor: [30, 26, 22], lineColor: [160, 132, 100], lineWidth: 0.15, halign: "center", valign: "middle", cellPadding: { top: 0.6, bottom: 0.6, left: 1.5, right: 1.5 }, minCellHeight: rowH, fillColor: false },
+      styles: { font: "helvetica", fontSize: tight ? 7.8 : 8.5, textColor: [30, 26, 22], lineColor: [160, 132, 100], lineWidth: 0.15, halign: "center", valign: "middle", cellPadding: { top: tight ? 0.35 : 0.6, bottom: tight ? 0.35 : 0.6, left: 1.5, right: 1.5 }, minCellHeight: rowH, fillColor: false },
       headStyles: { fillColor: BROWN, textColor: CHAMP, fontStyle: "bold", fontSize: 8.5, minCellHeight: 8, halign: "center" },
       columnStyles: colStyles,
       willDrawPage: () => {
@@ -5278,7 +5320,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
 
     // legend
     let ly = doc.lastAutoTable.finalY + 5.5;
-    if (ly > H - 5) { doc.addPage(); ly = 14; }
+    if (ly > H - Math.max(signing ? 16 : 5, 2.5 + 4.5 * noteLines.length)) { doc.addPage(); ly = 14; }
     doc.setFontSize(8); doc.setFont("helvetica", "normal"); doc.setTextColor(...GREY);
     let lx = 10;
     drawTick(doc, lx + 1.6, ly - 1.1, 3, GREEN); lx += 4.5;
@@ -5291,16 +5333,10 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     doc.setFont("helvetica", "normal"); doc.setTextColor(...GREY);
     if (signing && ly + 14 <= H - 2) {
       const sgy = ly + 10.5;
-      sigBlock(doc, W - 10 - 46, sgy, 46, 9.5, 1, "Collector");
-      if (checker()) sigBlock(doc, W - 10 - 46 - 54, sgy, 46, 9.5, 2, "Accounts checked by");
+      sigRow(sigLeft, W - 10, 46, [checker() ? (x, w) => sigBlock(doc, x, sgy, w, 9.5, 2, "Accounts checked by") : null, approverBlock(doc, sgy, 9.5, true), (x, w) => sigBlock(doc, x, sgy, w, 9.5, 1, "Collector")]);
     } else doc.text("Pirampady Sports Club", W - 10, ly, { align: "right" });
-    const notes = [];
-    const yIn = everyone.reduce((t, m) => t + coverage(m, y).carryIn, 0), yOut = everyone.reduce((t, m) => t + coverage(m, y).carryOut, 0);
-    notes.push(`Month totals count money in the month it is used for: extra paid above the monthly fee moves to the next month.${yIn ? ` Includes Rs. ${fmt(yIn)} paid extra before ${y}.` : ""}${yOut ? ` Rs. ${fmt(yOut)} paid in ${y} is extra for ${y + 1}.` : ""}`);
-    if (anyBf) notes.push(`Before ${y}: + = paid ahead in earlier years, red = still to pay from earlier years. "Due" includes it.`);
-    if (priv.length) notes.push("Private contributions = payments by members who asked not to be named. They are included in the totals.");
-    doc.setFont("helvetica", "normal"); doc.setTextColor(...GREY);
-    notes.forEach((t, n) => { if (ly + 4.5 * (n + 1) < H - 3) doc.text(t, 10, ly + 4.5 * (n + 1)); });
+    doc.setFont("helvetica", "normal"); doc.setTextColor(...GREY); doc.setFontSize(8);
+    noteLines.forEach((t, n) => { if (ly + 4.5 * (n + 1) < H - 2) doc.text(t, 10, ly + 4.5 * (n + 1)); });
     return doc.output("blob");
   }
   /* ---------- PDF slips (one member) and PDF receipts (one payment) ---------- */
@@ -5508,6 +5544,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     // signature block, bottom right above the footer
     const sy = Math.max(ty + 15, H - 27);
     if (sy <= H - 23 && sigImg.url) {
+      if (approver()) sigBlock(doc, M, sy, 50, 13, 3, approverCap());
       drawSignature(doc, W - M - 50, sy, 50, 13);
       doc.setDrawColor(...C.GREY); doc.setLineWidth(0.25); doc.setLineDashPattern([0.8, 0.8], 0); doc.line(W - M - 50, sy, W - M, sy); doc.setLineDashPattern([], 0);
       doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...C.GREY);
@@ -5562,16 +5599,20 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     if (rc.cout > 0) line("Extra carried to", `${i < 11 ? MONTHS_FULL[i + 1] : "next year"} · Rs. ${fmt(rc.cout)}`, { size: 8.5, color: C.BLUE });
     const d = dueOf(m, y), om = owedMonths(m, y);
     if (om.length || d.due !== 0) line(d.due > 0 ? (om.length ? `Still to pay (to ${MONTHS[om[om.length - 1]]})` : "Still to pay") : "Balance", d.due > 0 ? `Rs. ${fmt(d.due)}` : d.due < 0 ? `Rs. ${fmt(-d.due)} ahead` : "All paid up", { size: 8.5, color: d.due > 0 ? C.RED : C.GREEN });
-    const sw = signerFor(p.c), swImg = sw === 2 ? sigImg2 : sigImg;
+    const sw = signerFor(p.c), swImg = sigOf(sw);
     if (p.c && !swImg.url) line("Collected by", p.c, { size: 9 });
     // signature of whoever collected this payment
     yy = Math.max(yy + 15, H - 22);
-    drawSignature(doc, W - M - 46, yy, 46, 13, sw);
-    doc.setDrawColor(...C.GREY); doc.setLineWidth(0.25); doc.setLineDashPattern([0.8, 0.8], 0); doc.line(W - M - 46, yy, W - M, yy); doc.setLineDashPattern([], 0);
+    const rw = approver() && sw !== 3 ? 40 : 46;
+    if (rw === 40) sigBlock(doc, M, yy, 40, 13, 3, approverCap());
+    drawSignature(doc, W - M - rw, yy, rw, 13, sw);
+    doc.setDrawColor(...C.GREY); doc.setLineWidth(0.25); doc.setLineDashPattern([0.8, 0.8], 0); doc.line(W - M - rw, yy, W - M, yy); doc.setLineDashPattern([], 0);
     doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...C.GREY);
-    doc.text(swImg.url && p.c ? `Collected by ${p.c}` : "Collector's signature", W - M - 23, yy + 3.8, { align: "center" });
+    doc.text(swImg.url && p.c ? `Collected by ${p.c}` : "Collector's signature", W - M - rw / 2, yy + 3.8, { align: "center" });
     doc.setFont("helvetica", "bold"); doc.setFontSize(8.5); doc.setTextColor(...C.BROWN);
-    doc.text("Thank you!", M + 1, yy + 3.8);
+    // with the third signature at the left, "Thank you!" goes under the signatures
+    if (rw === 40) doc.text("Thank you!", W / 2, yy + 11, { align: "center" });
+    else doc.text("Thank you!", M + 1, yy + 3.8);
     return doc.output("blob");
   }
   // Money in the club before a month: everything collected minus every bill, across all years kept on this device.
@@ -5723,8 +5764,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     if (room < 10) { compact = true; footTop = H - 10; room = footTop - 4.5 - (ty + 3); }
     if (room < 7) { doc.addPage("a5", "portrait"); slipHeader(doc, W, M, `Monthly account  \u00B7  ${mName} (signatures)`); ty = 45; compact = false; footTop = H - 19; room = 14; }
     const sh = Math.min(13, room), sy = Math.min(footTop - 4.5, ty + 3 + sh);
-    sigBlock(doc, W - M - 52, sy, 52, sh, 1, "Prepared by the club collector");
-    if (checker()) sigBlock(doc, M, sy, 52, sh, 2, `Accounts checked by ${checker()}`);
+    sigRow(M, W - M, 52, [checker() ? (x, w) => sigBlock(doc, x, sy, w, sh, 2, `Accounts checked by ${checker()}`) : null, approverBlock(doc, sy, sh), (x, w) => sigBlock(doc, x, sy, w, sh, 1, "Prepared by the club collector")]);
     const apv = approvalOf(y, i);
     if (apv) {
       const changed = approvalDiff(apv, i).length;
@@ -5819,12 +5859,13 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     }
     // signatures
     yy = Math.max(yy + 13, H - 17);
-    sigBlock(doc, W - M - 41, yy, 41, 11, signerFor(x.by), x.by ? `Paid by ${x.by}` : "Paid by the collector");
-    if (checker()) sigBlock(doc, M, yy, 41, 11, 2, "Accounts checked by");
-    else { doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(...C.BROWN); doc.text("Club expense", M + 1, yy + 3.8); }
+    let chkX = M + 20.5;
+    sigRow(M, W - M, 41, [checker() ? (x0, w) => { sigBlock(doc, x0, yy, w, 11, 2, "Accounts checked by"); chkX = x0 + w / 2; } : null, approverBlock(doc, yy, 11, true),
+      (x0, w) => sigBlock(doc, x0, yy, w, 11, signerFor(x.by), x.by ? `Paid by ${x.by}` : "Paid by the collector")]);
+    if (!checker() && !approver()) { doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(...C.BROWN); doc.text("Club expense", M + 1, yy + 3.8); }
     if (x.chk) {
-      doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(...C.GREEN);
-      doc.text(`CHECKED${x.chk.t ? ` · ${longDate(x.chk.t).toUpperCase()}` : ""}`, M + 20.5, yy + 7.4, { align: "center" });
+      doc.setFont("helvetica", "bold"); doc.setFontSize(approver() ? 6 : 7); doc.setTextColor(...C.GREEN);
+      doc.text(`CHECKED${x.chk.t ? ` · ${longDate(x.chk.t).toUpperCase()}` : ""}`, chkX, yy + 7.4, { align: "center" });
     }
     addBillPhotos(doc, x);
     return doc.output("blob");
@@ -6096,7 +6137,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.17.1";
+  const APP_VERSION = "1.18.0";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty", BASE_KEY = "psc.syncbase.v1";
   const SEED = {};
