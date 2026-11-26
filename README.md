@@ -38,6 +38,10 @@ Members pay a monthly fee (Rs. 650 at the start; it can change from any month). 
 - **Works fully offline.** Changes are saved on the device first and synced once it's back online.
 - **Safe amounts:** amounts are whole rupees. "1,500", "Rs. 1500", "1500/-" and "1500.00" all mean Rs. 1,500; an amount with cents is refused with a clear message, never read as a different amount.
 - **Changed on two phones:** if both phones change the same expense, event, birthday, donation, member or the settings before they sync, the newer change is used and Home asks which one is right (both are kept until someone chooses). Electricity bills for different months, and separate payments, are always both kept.
+- **Bill & PDF style:** Elite (black band and champagne gold) or Classic (white with club brown, like the earlier bills), chosen in Settings and shared by both phones. Every receipt, bill, slip, account, register and announcement follows it.
+- **Photo of the shop bill:** an expense can carry up to four photos of the shop's bill. They are made small on the phone, kept on the phone, uploaded to the private data repo (`photos/<id>.jpg`) when it syncs, and printed after the expense bill in its PDF.
+- **Announcements:** fee changes, payment reminders, meetings, invitations and other notices, filled in from the register in English and Tamil (or one of them), editable, saved for both phones, shared as an A5 PDF in the bill style or copied as WhatsApp text.
+- **Members who leave:** removing a member saves the month they left. Months before it never change (approved months stay approved); money they paid ahead is used from that month.
 - **A new month while the app is open:** the app starts again by itself when the month changes, so "this month", "this year" and the dues move on.
 
 ## How it works
@@ -60,6 +64,8 @@ Members pay a monthly fee (Rs. 650 at the start; it can change from any month). 
 | Monthly fee | A list of fees, each starting from a month (`settings.fees`: `"2026"` = from January 2026, `"2026-11"` = from November 2026). Every month uses the fee in force that month, so a new fee never changes earlier months or payments already made |
 | Dues | The unpaid part of every month owed so far, plus fees left unpaid in earlier years. A member who owes nothing and has money in later months shows as paid ahead |
 | Inactive months | Each member keeps a list of inactive periods (`from` month, `back` month or open). Those months are left out of the months owed; money paid in them is carried forward like any extra |
+| Bill photos | Resized on the phone (longest side 1,600 px, JPEG) and kept in IndexedDB; uploaded with the GitHub Contents API to `photos/<id>.jpg` in the private data repo after each sync; fetched when another phone needs one. Not part of the backup file |
+| Tamil text in PDFs | jsPDF can't join Tamil letters, so Tamil text is drawn by the phone's own text engine on a canvas with [Noto Sans Tamil](https://github.com/notofonts/tamil) (SIL Open Font License, bundled in `fonts/`) and placed in the PDF as an image |
 | QR codes | [qrcode-generator](https://github.com/kazuhikoarase/qrcode-generator) (MIT) draws the codes on PDFs; [jsQR](https://github.com/cozmo/jsQR) (Apache-2.0) reads them from a photo, loaded only when scanning. Both in `vendor/` |
 | PDF | [jsPDF](https://github.com/parallax/jsPDF) and [jsPDF-AutoTable](https://github.com/simonbengtsson/jsPDF-AutoTable), bundled in `vendor/` |
 | Fonts | Barlow and Barlow Condensed, plus five script fonts for the signature (Herr Von Muellerhoff, Mrs Saint Delafield, Great Vibes, Alex Brush, Allura), all SIL Open Font License, bundled in `fonts/` |

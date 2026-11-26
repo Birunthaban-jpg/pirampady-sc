@@ -15,6 +15,8 @@
 <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
 <style>
 @font-face { font-family: "Barlow"; font-weight: 400; font-style: normal; font-display: swap; src: url("fonts/barlow-latin-400-normal.woff2") format("woff2"); }
+@font-face { font-family: "Noto Sans Tamil"; font-weight: 400; font-style: normal; font-display: swap; src: url("fonts/noto-sans-tamil-400.woff2") format("woff2"); unicode-range: U+0B80-0BFF, U+200C-200D, U+25CC; }
+@font-face { font-family: "Noto Sans Tamil"; font-weight: 700; font-style: normal; font-display: swap; src: url("fonts/noto-sans-tamil-700.woff2") format("woff2"); unicode-range: U+0B80-0BFF, U+200C-200D, U+25CC; }
 @font-face { font-family: "Barlow"; font-weight: 500; font-style: normal; font-display: swap; src: url("fonts/barlow-latin-500-normal.woff2") format("woff2"); }
 @font-face { font-family: "Barlow"; font-weight: 600; font-style: normal; font-display: swap; src: url("fonts/barlow-latin-600-normal.woff2") format("woff2"); }
 @font-face { font-family: "Barlow"; font-weight: 700; font-style: normal; font-display: swap; src: url("fonts/barlow-latin-700-normal.woff2") format("woff2"); }
@@ -1108,6 +1110,27 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
 .stat { align-content: start; }
 #mbrDlg { width: min(540px, calc(100vw - 32px)); }
 @media (min-width: 640px) { .stat:not(.is-bal) strong { font-size: 24px; } }
+/* 1.16: bill photos, bill style, announcements */
+.phot-row { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.phot { position: relative; width: 64px; height: 64px; border-radius: 10px; overflow: hidden; border: 1px solid var(--line); background: var(--surface-2); padding: 0; }
+.phot img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.phot .ld { display: grid; place-items: center; width: 100%; height: 100%; font-size: 11px; color: var(--muted); }
+.phot-x { position: absolute; top: -6px; right: -6px; width: 22px; height: 22px; border-radius: 50%; border: 0; background: var(--due); color: #fff; font-size: 14px; line-height: 22px; padding: 0; }
+.phot-wrap { position: relative; }
+.phot-view { width: 100%; border-radius: 12px; display: block; background: var(--surface-2); }
+.exp-ph { display: inline-flex; vertical-align: -2px; margin-left: 4px; color: var(--muted); }
+.exp-ph .ic { width: 14px; height: 14px; }
+.sw-billc { background: linear-gradient(135deg, #FFFFFF 50%, #FFF7DA 50%); box-shadow: inset 0 0 0 1px #E6DED4; }
+.sw-billc i:nth-child(1) { background: #FFFFFF; box-shadow: 0 0 0 1.5px #6B3A00; }
+.sw-billc i:nth-child(2) { background: #6B3A00; }
+.billpick { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.styleopt[aria-pressed="true"] { border-color: var(--brand); box-shadow: 0 0 0 1px var(--brand); }
+textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil", "Tamil Sangam MN", sans-serif; }
+#ntcDlg textarea { width: 100%; min-height: 150px; resize: vertical; font: inherit; line-height: 1.45; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line-strong); background: var(--surface); color: var(--ink); }
+#ntcDlg .mt { display: block; margin-top: 10px; }
+.ntc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.ntc-grid .field { margin: 0; }
+.ntc-quick { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px; }
 </style>
 </head>
 <body>
@@ -1335,6 +1358,12 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       <label for="expTo">Paid to (optional)</label>
       <input id="expTo" autocomplete="off" placeholder="e.g. shop name or person">
     </div>
+    <div class="field">
+      <span class="lbl2">Photo of the shop bill <small>optional, up to 4</small></span>
+      <div class="phot-row" id="expPhotos"></div>
+      <input type="file" id="expPhotoIn" accept="image/*" hidden>
+      <p class="hint">Printed on the expense bill PDF, after the bill. Kept in the club's private online register when sync is on.</p>
+    </div>
     <div class="state calc" id="expCalc"></div>
     <div class="chkrow" id="expChkRow" hidden><span id="expChkTxt"></span><button type="button" class="btn sm" id="expCheck">Mark as checked ✓</button></div>
     <p class="err" id="expErr" hidden></p>
@@ -1450,7 +1479,12 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     <div class="field">
       <span class="lbl2">App style</span>
       <div class="stylepick" id="stylePick"></div>
-      <p class="hint">Changes how the app looks on this device only. PDFs always use the club's black and gold.</p>
+      <p class="hint">Changes how the app looks on this device only. Bills and PDFs use the bill style below.</p>
+    </div>
+    <div class="field">
+      <span class="lbl2">Bill &amp; PDF style</span>
+      <div class="billpick" id="billPick" role="group" aria-label="Bill and PDF style"></div>
+      <p class="hint">For every receipt, bill, slip, account and announcement. Shared with the other phones.</p>
     </div>
     <div class="field">
       <span class="lbl2">Monthly fee (Rs.)</span>
@@ -1485,6 +1519,42 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     </div>
     <p class="err" id="setErr" hidden></p>
     <div class="foot-row"><span></span><button type="submit" class="btn primary">Save</button></div>
+  </form>
+</dialog>
+
+<dialog class="dlg" id="phDlg" aria-labelledby="phTitle">
+  <div class="inner">
+    <div class="dlg-head"><div><p class="eyebrow" id="phWhen">Expense</p><h3 id="phTitle">Bill photo</h3></div><button type="button" class="close" data-close aria-label="Close">×</button></div>
+    <img class="phot-view" id="phImg" alt="Photo of the shop bill">
+  </div>
+</dialog>
+
+<dialog class="dlg" id="ntcDlg" aria-labelledby="ntcTitle">
+  <form id="ntcForm" novalidate>
+    <div class="dlg-head">
+      <div><p class="eyebrow">Announcement</p><h3 id="ntcTitle">New announcement</h3></div>
+      <button type="button" class="close" data-close aria-label="Close">×</button>
+    </div>
+    <div class="field"><span class="lbl2">What is it about?</span><div class="filter" id="ntcTypes" role="group" aria-label="Kind of announcement"></div></div>
+    <div class="field"><span class="lbl2">Language</span><div class="filter" id="ntcLangs" role="group" aria-label="Language"></div></div>
+    <div id="ntcFields"></div>
+    <div class="field" id="ntcEnBox">
+      <label for="ntcEnT">Title (English)</label><input id="ntcEnT" maxlength="90" autocomplete="off">
+      <label for="ntcEnB" class="mt">Message (English)</label><textarea id="ntcEnB" rows="8" maxlength="2000"></textarea>
+    </div>
+    <div class="field" id="ntcTaBox">
+      <label for="ntcTaT">தலைப்பு · Title (Tamil)</label><input id="ntcTaT" maxlength="90" autocomplete="off" lang="ta">
+      <label for="ntcTaB" class="mt">செய்தி · Message (Tamil)</label><textarea id="ntcTaB" rows="8" maxlength="2000" lang="ta"></textarea>
+    </div>
+    <p class="hint" id="ntcHint">The wording is filled in for you. Change anything you like before you share it.</p>
+    <button type="button" class="btn sm" id="ntcReset">Fill in the wording again</button>
+    <p class="err" id="ntcErr" hidden></p>
+    <button type="submit" class="btn primary big" id="ntcShare">Save and share PDF</button>
+    <div class="foot-row">
+      <button type="button" class="btn danger" id="ntcDel" hidden>Delete</button>
+      <button type="button" class="btn" id="ntcCopy">Copy for WhatsApp</button>
+      <button type="button" class="btn" id="ntcSave">Save only</button>
+    </div>
   </form>
 </dialog>
 
@@ -1628,7 +1698,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   // the calendar day of a saved time, in this phone's time zone (Sri Lanka), e.g. "2026-11-24"
   const localDay = (iso) => { const d = new Date(iso); return isNaN(d) ? String(iso || "").slice(0, 10) : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`; };
 
-  const VIEWS = ["home", "members", "month", "year", "more", "bday", "expenses", "elec", "income", "history", "bills"];
+  const VIEWS = ["home", "members", "month", "year", "more", "bday", "expenses", "elec", "income", "history", "bills", "notices"];
   let savedView = null;
   try { savedView = localStorage.getItem("psc.view13"); } catch (e) {}   // a new key, so everyone opens on Home once after the redesign
 
@@ -1686,7 +1756,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     const s = o || S.settingsServer || {};
     const sig = s.sig && typeof s.sig === "object" ? { text: typeof s.sig.text === "string" ? s.sig.text : DEFAULT_SIG, style: s.sig.style >= 1 && s.sig.style <= 5 ? s.sig.style : 1 } : { text: DEFAULT_SIG, style: 1 };
     const sig2 = s.sig2 && typeof s.sig2 === "object" ? { text: typeof s.sig2.text === "string" ? s.sig2.text : DEFAULT_SIG2, style: s.sig2.style >= 1 && s.sig2.style <= 5 ? s.sig2.style : 2 } : { text: DEFAULT_SIG2, style: 2 };
-    return { fees: s.fees || {}, start: s.start && Number.isInteger(s.start.y) ? s.start : { y: CY, m: 0 }, sig, sig2 };
+    return { fees: s.fees || {}, start: s.start && Number.isInteger(s.start.y) ? s.start : { y: CY, m: 0 }, sig, sig2, billStyle: s.billStyle === "classic" ? "classic" : "elite" };
   }
   /* ---------- the monthly fee ---------- */
   // settings.fees maps where a fee starts to the fee: "2026" = from January 2026, "2026-11" = from November 2026.
@@ -1880,7 +1950,13 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   // the first year anything can apply to a member: their start, or an earlier payment
   function firstYear(m) { let f = startOf(m).y; const r = payIndex()[m.id]; if (r) for (const yy in r) if (+yy < f) f = +yy; return f; }
   // a month is charged once the member has joined, unless they are inactive; members who left keep what they paid
-  const charged = (m, y, k) => m.removed || (y * 12 + k >= ymOf(startOf(m)) && !isOff(m, y, k));
+  // A member who left: every month from the month they left counts (so money they paid ahead is used up from then).
+  // Months before it stay exactly as they were. Members removed before 1.16 have no leaving month: every month counts.
+  const leftOf = (m) => (m && m.removed && m.left && Number.isInteger(m.left.y) && Number.isInteger(m.left.m) ? m.left : null);
+  const charged = (m, y, k) => {
+    if (m.removed) { const L = leftOf(m); if (!L || y * 12 + k >= L.y * 12 + L.m) return true; }
+    return y * 12 + k >= ymOf(startOf(m)) && !isOff(m, y, k);
+  };
   // For each month: cash = paid for it, cin = extra brought in from earlier, covered = used for this month (≤ fee),
   // cout = extra moving on after it, src = month the extra came from, skip = not charged, off = inactive.
   function coverage(m, y) {
@@ -1893,7 +1969,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       const cash = cashOf(m.id, y, k);
       if (!charged(m, y, k)) {
         carry += cash;
-        out.push({ cash, cin: 0, covered: 0, cout: carry, src: -1, skip: true, off: !m.removed && isOff(m, y, k) });
+        out.push({ cash, cin: 0, covered: 0, cout: carry, src: -1, skip: true, off: (!m.removed || !!leftOf(m)) && isOff(m, y, k) });
         if (cash > 0) src = k;
         continue;
       }
@@ -1989,7 +2065,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   /* ---------- rendering ---------- */
   // Sections: Home, Members, Payments (the month view), Reports (the whole-year sheet and documents) and More.
   // More opens further pages: events and birthdays, expenses, electricity and other income.
-  const TAB_OF = { bday: "more", expenses: "more", elec: "more", income: "more", history: "more", bills: "more" };
+  const TAB_OF = { bday: "more", expenses: "more", elec: "more", income: "more", history: "more", bills: "more", notices: "more" };
   const NAV_TABS = [["tabHome", "home"], ["tabMembers", "members"], ["tabMonth", "month"], ["tabYear", "year"], ["tabMore", "more"]];
   let lastView = "", enterTimer = null;
   function render() {
@@ -2002,6 +2078,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     app.dataset.view = S.view;
     for (const [id, v] of NAV_TABS) $(id).setAttribute("aria-current", tab === v ? "page" : "false");
     $("stats").hidden = S.view !== "home";
+    pdfStyleNow = settings().billStyle;
     renderStats();
     if (!linkDone && S.membersLoaded && S.payLoaded) { linkDone = true; setTimeout(checkFromLink, 0); }
     const main = $("main");
@@ -2019,11 +2096,12 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     }
     // pages that don't need the member list (so a new device can still reach Sync and Members)
     if (S.view === "more") { main.innerHTML = moreHTML(); return; }
-    if (S.view === "expenses") { main.innerHTML = expensesPageHTML(); return; }
+    if (S.view === "expenses") { main.innerHTML = expensesPageHTML(); prefetchPhotos(); return; }
     if (S.view === "elec") { main.innerHTML = elecPageHTML(); return; }
     if (S.view === "income") { main.innerHTML = incomePageHTML(); return; }
     if (S.view === "history") { main.innerHTML = historyPageHTML(); return; }
-    if (S.view === "bills") { const keepQ = document.activeElement && document.activeElement.id === "bSearch"; main.innerHTML = billsPageHTML(); if (keepQ) { const q = $("bSearch"); q.focus(); q.setSelectionRange(q.value.length, q.value.length); } return; }
+    if (S.view === "notices") { main.innerHTML = noticesPageHTML(); return; }
+    if (S.view === "bills") { prefetchPhotos(); const keepQ = document.activeElement && document.activeElement.id === "bSearch"; main.innerHTML = billsPageHTML(); if (keepQ) { const q = $("bSearch"); q.focus(); q.setSelectionRange(q.value.length, q.value.length); } return; }
     if (S.view === "bday") {
       main.innerHTML = `${subHead("Events &amp; birthday fund", "Money for each event is kept separate")}<div style="display:grid;gap:22px">${eventsHTML()}${bdayHTML()}</div>`;
       if ($("evDlg").open && document.activeElement && !$("evDlg").contains(document.activeElement)) fillEv();
@@ -2061,6 +2139,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     if (target && bar.scrollWidth > bar.clientWidth) bar.scrollLeft = Math.max(0, target.offsetLeft - (bar.clientWidth - target.offsetWidth) / 2);
   }
   let lastCentered = "";
+  let pdfStyleNow = "elite";      // the bill style chosen in Settings (kept up to date by render)
   let linkDone = false;
   function checkFromLink() {
     const hash = location.hash || "";
@@ -2113,13 +2192,17 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
 
   /* ---------- icons ---------- */
   const ICONS = {"clock":"<circle cx=\"12\" cy=\"12\" r=\"8.4\"/><path d=\"M12 7.4V12l3.1 2\"/>","home":"<path d=\"M3.5 10.2 12 3.5l8.5 6.7\"/><path d=\"M5.5 8.8V20h4.8v-5.6h3.4V20h4.8V8.8\"/>","members":"<circle cx=\"9\" cy=\"8.2\" r=\"3.4\"/><path d=\"M2.8 19.6c.7-3.4 3.2-5.2 6.2-5.2s5.5 1.8 6.2 5.2\"/><path d=\"M15.6 4.9a3.4 3.4 0 0 1 0 6.6\"/><path d=\"M17.6 14.7c1.8.7 3 2.3 3.4 4.9\"/>","pay":"<rect x=\"2.8\" y=\"5.4\" width=\"18.4\" height=\"13.6\" rx=\"3\"/><path d=\"M2.8 9.8h18.4\"/><path d=\"M15.6 15h2.6\"/>","reports":"<path d=\"M4.5 20.2V11\"/><path d=\"M10 20.2V4.2\"/><path d=\"M15.5 20.2v-6.6\"/><path d=\"M21 20.2v-9.4\"/>","more":"<rect x=\"3.6\" y=\"3.6\" width=\"7\" height=\"7\" rx=\"2.2\"/><rect x=\"13.4\" y=\"3.6\" width=\"7\" height=\"7\" rx=\"2.2\"/><rect x=\"3.6\" y=\"13.4\" width=\"7\" height=\"7\" rx=\"2.2\"/><rect x=\"13.4\" y=\"13.4\" width=\"7\" height=\"7\" rx=\"2.2\"/>","plus":"<path d=\"M12 5v14M5 12h14\"/>","chevron":"<path d=\"m9.5 5.5 6.5 6.5-6.5 6.5\"/>","back":"<path d=\"m14.5 5.5-6.5 6.5 6.5 6.5\"/>","search":"<circle cx=\"11\" cy=\"11\" r=\"6.4\"/><path d=\"m20 20-4.1-4.1\"/>","bolt":"<path d=\"M13.2 2.8 5.2 13.4h6.2l-.8 7.8 8.2-10.6h-6.2z\"/>","receipt":"<path d=\"M6 3.2h12v17.6l-2.4-1.5-2.4 1.5-2.4-1.5-2.4 1.5L6 19.3z\"/><path d=\"M9 8h6M9 11.5h6M9 15h3.5\"/>","trophy":"<path d=\"M8 4h8v5a4 4 0 0 1-8 0z\"/><path d=\"M8 5.6H5.4a2.6 2.6 0 0 0 2.9 4.1\"/><path d=\"M16 5.6h2.6a2.6 2.6 0 0 1-2.9 4.1\"/><path d=\"M12 13v3.6M8.6 20.2h6.8M10 16.6h4l.6 3.6H9.4z\"/>","coins":"<ellipse cx=\"12\" cy=\"6.4\" rx=\"7\" ry=\"2.9\"/><path d=\"M5 6.4v5.2c0 1.6 3.1 2.9 7 2.9s7-1.3 7-2.9V6.4\"/><path d=\"M5 11.6v5.6c0 1.6 3.1 2.9 7 2.9s7-1.3 7-2.9v-5.6\"/>","gear":"<circle cx=\"12\" cy=\"12\" r=\"3\"/><path d=\"M12 2.8v2.4M12 18.8v2.4M2.8 12h2.4M18.8 12h2.4M5.5 5.5l1.7 1.7M16.8 16.8l1.7 1.7M5.5 18.5l1.7-1.7M16.8 7.2l1.7-1.7\"/>","sync":"<path d=\"M19.6 10.6A7.8 7.8 0 0 0 5.6 7.4\"/><path d=\"M4.6 3.8v4h4\"/><path d=\"M4.4 13.4a7.8 7.8 0 0 0 14 3.2\"/><path d=\"M19.4 20.2v-4h-4\"/>","table":"<rect x=\"3.5\" y=\"4.2\" width=\"17\" height=\"15.6\" rx=\"2.6\"/><path d=\"M3.5 9.4h17M3.5 14.6h17M9.4 9.4v10.4\"/>","doc":"<path d=\"M13.8 3.2H7.2a2 2 0 0 0-2 2v13.6a2 2 0 0 0 2 2h9.6a2 2 0 0 0 2-2V8.2z\"/><path d=\"M13.8 3.2v5h5\"/><path d=\"M9 13h6M9 16.4h4\"/>","send":"<path d=\"M20.8 3.2 10.4 13.6\"/><path d=\"m20.8 3.2-6.4 17.6-4-7.2-7.2-4z\"/>","statement":"<rect x=\"4.6\" y=\"3.2\" width=\"14.8\" height=\"17.6\" rx=\"2.2\"/><path d=\"M8.4 8h7.2M8.4 11.6h7.2M8.4 15.2h4.4\"/>","chat":"<path d=\"M20.4 11.6a8.4 8.4 0 0 1-12.5 7.3l-4.4 1.4 1.4-4.2a8.4 8.4 0 1 1 15.5-4.5z\"/>","check":"<path d=\"m5.2 12.6 4.4 4.4 9.2-9.6\"/>","download":"<path d=\"M12 3.6v11.6\"/><path d=\"m6.8 10.2 5.2 5.2 5.2-5.2\"/><path d=\"M4.6 20.2h14.8\"/>","cake":"<path d=\"M4.2 20.2h15.6v-6.4a2 2 0 0 0-2-2H6.2a2 2 0 0 0-2 2z\"/><path d=\"M4.2 15.6c1.3.9 2.6.9 3.9 0s2.6-.9 3.9 0 2.6.9 3.9 0 2.6-.9 3.9 0\"/><path d=\"M12 11.8V8.4\"/><path d=\"M12 6.2c.9-.8.9-1.7 0-2.6-.9.9-.9 1.8 0 2.6z\"/>","arrowin":"<path d=\"M12 4.4v12.4\"/><path d=\"m6.6 11.4 5.4 5.4 5.4-5.4\"/>","arrowout":"<path d=\"M12 19.6V7.2\"/><path d=\"m6.6 12.6 5.4-5.4 5.4 5.4\"/>"};
+  Object.assign(ICONS, {
+    camera: '<path d="M4 8.2h3l1.6-2.4h6.8L17 8.2h3a1 1 0 0 1 1 1v9.6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9.2a1 1 0 0 1 1-1z"/><circle cx="12" cy="13.6" r="3.6"/>',
+    megaphone: '<path d="M3.6 10v4h3l7.4 4.6V5.4L7 10z"/><path d="M17.4 9a4.2 4.2 0 0 1 0 6"/><path d="M6.6 14l1.2 5.4h2.6L9.6 14"/>',
+  });
   const icon = (n, cls) => `<svg class="ic${cls ? " " + cls : ""}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ""}</svg>`;
   const pageHead = (title, note, extra) => `<div class="page-head"><div><h2 class="page-title">${title}</h2>${note ? `<p class="page-note">${note}</p>` : ""}</div>${extra || ""}</div>`;
   const subHead = (title, note, extra) => `<div class="page-head sub"><button type="button" class="back" data-act="view" data-v="more">${icon("back")}<span>More</span></button><div class="ph-row"><div><h2 class="page-title">${title}</h2>${note ? `<p class="page-note">${note}</p>` : ""}</div>${extra || ""}</div></div>`;
   const initials = (name) => { const w = String(name || "?").trim().split(/\s+/).filter(Boolean); return esc(((w[0] || "?")[0] + (w.length > 1 ? w[w.length - 1][0] : (w[0] || "").slice(1, 2))).toUpperCase()); };
   const lockMark = (m) => m.private ? '<span class="lock" title="Name kept private">🔒</span>' : "";
   function expItemHTML(x) {
-    return `<li><button type="button" class="exp-item" data-act="exp-edit" data-id="${esc(x.id)}"${S.canWrite ? "" : " disabled"}><span class="exp-cat">${esc(catName(x.cat))}</span><span class="exp-desc">${esc(x.desc || catName(x.cat))}</span><b class="exp-amt">${rs(x.amount)}</b><small>${x.t ? esc(dayLabel(x.t)) : ""}${x.no ? ` · ${esc(x.no)}` : ""}${x.to ? ` · ${esc(x.to)}` : ""}${x.chk ? ' · <b class="ok-t">✓ Checked</b>' : ""}</small></button></li>`;
+    return `<li><button type="button" class="exp-item" data-act="exp-edit" data-id="${esc(x.id)}"${S.canWrite ? "" : " disabled"}><span class="exp-cat">${esc(catName(x.cat))}</span><span class="exp-desc">${esc(x.desc || catName(x.cat))}</span><b class="exp-amt">${rs(x.amount)}</b>${Array.isArray(x.ph) && x.ph.length ? `<span class="exp-ph" title="Bill photo attached">${icon("camera")}</span>` : ""}<small>${x.t ? esc(dayLabel(x.t)) : ""}${x.no ? ` · ${esc(x.no)}` : ""}${x.to ? ` · ${esc(x.to)}` : ""}${x.chk ? ' · <b class="ok-t">✓ Checked</b>' : ""}</small></button></li>`;
   }
 
   /* ---------- Home ---------- */
@@ -2228,13 +2311,14 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     if (col === "birthdays") return `The birthday${x && x.name ? ` “${x.name}”` : ""}`;
     if (col === "members") return x && x.name ? x.name : "A member";
     if (col === "handover") return "A cash handover";
+    if (col === "notice") return `The announcement${x && ((x.en && x.en.title) || (x.ta && x.ta.title)) ? ` “${(x.en && x.en.title) || x.ta.title}”` : ""}`;
     return "The club settings";
   }
   const confTitle = (c) => confWhat(c.path, c.b && !c.b._deleted ? c.b : c.a);
   function confCard(path, d) {
     if (!d || d._deleted) return { main: "Cancelled / deleted", more: "" };
     const col = path.split("/")[0], when = (t) => (t ? ` · ${longDate(t)}` : "");
-    if (col === "expenses") return { main: `${rs(d.amount)}${when(d.t)}${d.chk ? " · ✓ checked" : ""}`, more: expItemsOf(d).map((it) => `${it.d} ${rs(it.a)}`).join(", ") };
+    if (col === "expenses") return { main: `${rs(d.amount)}${when(d.t)}${d.chk ? " · ✓ checked" : ""}${Array.isArray(d.ph) && d.ph.length ? ` · ${d.ph.length} photo${d.ph.length === 1 ? "" : "s"}` : ""}`, more: expItemsOf(d).map((it) => `${it.d} ${rs(it.a)}`).join(", ") };
     if (col === "income" || col === "handover") return { main: `${rs(d.amount)}${when(d.t)}`, more: [d.from, d.to ? `to ${d.to}` : "", d.what].filter(Boolean).join(" · ") };
     if (col === "events" || col === "birthdays") {
       const t = col === "events" ? evTotals(d) : bdTotals(d), names = [];
@@ -2243,6 +2327,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       return { main: `Collected ${rs(t.collected)} · spent ${rs(t.spent)}${when(d.date)}`, more: [names.length ? `Gave: ${names.join(", ")}` : "", (d.x || []).length ? `Costs: ${(d.x || []).map((x) => `${x.d} ${fmt(x.a)}`).join(", ")}` : ""].filter(Boolean).join(" · ") };
     }
     if (col === "members") return { main: d.name || "", more: [d.removed ? "left the club" : "", Array.isArray(d.off) && d.off.some((p) => p && !p.b) ? "inactive" : "", d.phone || "", d.private ? "name private" : ""].filter(Boolean).join(" · ") };
+    if (col === "notice") { const p = d.en || d.ta || {}; return { main: p.title || "", more: String(p.body || "").replace(/\s+/g, " ").slice(0, 90) }; }
     if (col === "settings") return { main: `Fees: ${Object.entries(d.fees || {}).map(([k, v]) => `${k} ${rs(v)}`).join(", ") || "-"}`, more: [d.sig && d.sig.text, d.sig2 && d.sig2.text].filter(Boolean).join(" · ") };
     return { main: "", more: "" };
   }
@@ -2270,6 +2355,229 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     $("attDlg").close();
     render();
     toast("Saved. Both phones will use this version.");
+  }
+  /* ---------- announcements: notice/<id> = { type, lang, f: {fields}, en: {title, body}, ta: {title, body}, t, by } ---------- */
+  const TA_MONTHS = ["ஜனவரி", "பெப்ரவரி", "மார்ச்", "ஏப்ரல்", "மே", "ஜூன்", "ஜூலை", "ஓகஸ்ட்", "செப்டெம்பர்", "ஒக்டோபர்", "நவம்பர்", "டிசெம்பர்"];
+  const TA_DAYS = ["ஞாயிற்றுக்கிழமை", "திங்கட்கிழமை", "செவ்வாய்க்கிழமை", "புதன்கிழமை", "வியாழக்கிழமை", "வெள்ளிக்கிழமை", "சனிக்கிழமை"];
+  const NTC_TYPES = [["fee", "Fee change"], ["remind", "Pay this month"], ["meeting", "Meeting"], ["event", "Invitation"], ["general", "Other notice"]];
+  const NTC_LANGS = [["both", "English + தமிழ்"], ["en", "English"], ["ta", "தமிழ்"]];
+  const NTC_HEAD = { fee: "Notice", remind: "Reminder", meeting: "Meeting notice", event: "Invitation", general: "Notice" };
+  const isoDay = (iso) => (/^\d{4}-\d{2}-\d{2}$/.test(iso || "") ? new Date(+iso.slice(0, 4), +iso.slice(5, 7) - 1, +iso.slice(8, 10)) : null);
+  const enDay = (iso) => { const d = isoDay(iso); return d ? d.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long", year: "numeric" }) : "…"; };
+  const taDay = (iso) => { const d = isoDay(iso); return d ? `${d.getDate()} ${TA_MONTHS[d.getMonth()]} ${d.getFullYear()} (${TA_DAYS[d.getDay()]})` : "…"; };
+  function noticesAll() { return scanDocs("notice/").filter((n) => n && (n.en || n.ta)).sort((a, b) => String(b.t || "").localeCompare(String(a.t || "")) || String(b._id).localeCompare(String(a._id))); }
+  // the wording for each kind of announcement, filled in from the details (every word can be changed before sharing)
+  function ntcWording(type, f) {
+    const mo = Number.isInteger(+f.m) ? +f.m : CM, yr = +f.y || CY, fee = (v) => (v ? fmt(v) : "…");
+    const W = {
+      fee: {
+        en: ["Monthly subscription fee change", `Dear members,\n\nFrom ${MONTHS_FULL[mo]} ${yr}, the monthly subscription fee will be Rs. ${fee(f.fee)} (it is Rs. ${fee(f.old)} now).\n\nPlease pay the new amount from that month onwards. Months before ${MONTHS_FULL[mo]} ${yr} stay at the old fee.\n\nThank you for your continued support.`],
+        ta: ["மாதாந்த சந்தாக் கட்டண மாற்றம்", `அன்பான உறுப்பினர்களே,\n\n${yr} ${TA_MONTHS[mo]} மாதம் முதல் மாதாந்த சந்தாக் கட்டணம் ரூ. ${fee(f.fee)} ஆக மாற்றப்படுகிறது (தற்போது ரூ. ${fee(f.old)}).\n\nஅம்மாதம் முதல் புதிய கட்டணத்தைச் செலுத்துமாறு அன்புடன் கேட்டுக்கொள்கிறோம். ${yr} ${TA_MONTHS[mo]} மாதத்துக்கு முந்தைய மாதங்களுக்குப் பழைய கட்டணமே பொருந்தும்.\n\nஉங்கள் தொடர்ந்த ஒத்துழைப்புக்கு நன்றி.`],
+      },
+      remind: {
+        en: [`${MONTHS_FULL[mo]} subscription reminder`, `Dear members,\n\nThis is a kind reminder to pay your ${MONTHS_FULL[mo]} ${yr} subscription of Rs. ${fee(f.fee)}${f.by ? ` by ${enDay(f.by)}` : ""}.\n\nIf any earlier months are still unpaid, please settle them too.${f.to ? ` You can pay it to ${f.to}.` : ""}\n\nThank you.`],
+        ta: [`${TA_MONTHS[mo]} மாதச் சந்தா நினைவூட்டல்`, `அன்பான உறுப்பினர்களே,\n\n${yr} ${TA_MONTHS[mo]} மாதத்துக்கான சந்தாப் பணம் ரூ. ${fee(f.fee)} ஐ${f.by ? ` ${taDay(f.by)} இற்கு முன்னர்` : ""} செலுத்துமாறு அன்புடன் நினைவூட்டுகிறோம்.\n\nமுந்தைய மாதங்களுக்கான நிலுவை ஏதும் இருப்பின், அதனையும் செலுத்தி உதவுமாறு கேட்டுக்கொள்கிறோம்.${f.to ? ` பணத்தை ${f.to} அவர்களிடம் செலுத்தலாம்.` : ""}\n\nநன்றி.`],
+      },
+      meeting: {
+        en: ["General meeting", `Dear members,\n\nYou are warmly invited to the general meeting of Pirampady Sports Club.\n\nDate: ${enDay(f.date)}\nTime: ${f.time || "…"}\nPlace: ${f.place || "…"}\n\nYour presence is important. Thank you.`],
+        ta: ["பொதுக் கூட்டம்", `அன்பான உறுப்பினர்களே,\n\nபிரம்படி விளையாட்டுக் கழகத்தின் பொதுக் கூட்டத்துக்கு உங்களை அன்புடன் அழைக்கிறோம்.\n\nதிகதி: ${taDay(f.date)}\nநேரம்: ${f.time || "…"}\nஇடம்: ${f.place || "…"}\n\nஉங்கள் வருகை முக்கியமானது. நன்றி.`],
+      },
+      event: {
+        en: [`Invitation: ${f.event || "…"}`, `Dear members and well-wishers,\n\nPirampady Sports Club warmly invites you to ${f.event || "…"}.\n\nDate: ${enDay(f.date)}\nTime: ${f.time || "…"}\nPlace: ${f.place || "…"}\n\nPlease come and make it a success.`],
+        ta: [`அழைப்பிதழ்: ${f.event || "…"}`, `அன்பான உறுப்பினர்களே, நலன்விரும்பிகளே,\n\nபிரம்படி விளையாட்டுக் கழகம் நடாத்தும் ${f.event || "…"} நிகழ்வுக்கு உங்களை அன்புடன் அழைக்கிறோம்.\n\nதிகதி: ${taDay(f.date)}\nநேரம்: ${f.time || "…"}\nஇடம்: ${f.place || "…"}\n\nதவறாது கலந்துகொண்டு சிறப்பிக்குமாறு கேட்டுக்கொள்கிறோம்.`],
+      },
+      general: { en: ["Notice", "Dear members,\n\n"], ta: ["அறிவித்தல்", "அன்பான உறுப்பினர்களே,\n\n"] },
+    };
+    const w = W[type] || W.general;
+    return { en: { title: w.en[0], body: w.en[1] }, ta: { title: w.ta[0], body: w.ta[1] } };
+  }
+  function noticesPageHTML() {
+    const list = noticesAll();
+    const add = `<button type="button" class="btn primary" data-act="ntc-new" data-type="general"${S.canWrite ? "" : " disabled"}>${icon("plus")}New</button>`;
+    const quick = NTC_TYPES.map(([t, n]) => `<button type="button" class="btn sm" data-act="ntc-new" data-type="${t}"${S.canWrite ? "" : " disabled"}>${esc(n)}</button>`).join("");
+    const lname = (l) => (NTC_LANGS.find((x) => x[0] === l) || NTC_LANGS[0])[1];
+    return `${subHead("Announcements", "Notices and invitations in English and Tamil, as a PDF to send", add)}
+      <section class="grp-sec"><p class="grp-h">Start from</p><div class="card ntc-quick">${quick}</div></section>
+      ${list.length ? `<section class="grp-sec"><p class="grp-h">Made before</p><ul class="rows card">${list.map((n) => rowHTML("megaphone", esc((n.lang === "ta" ? n.ta && n.ta.title : n.en && n.en.title) || (n.ta && n.ta.title) || "Announcement"), `${esc((NTC_TYPES.find((x) => x[0] === n.type) || NTC_TYPES[4])[1])} · ${esc(lname(n.lang))}${n.t ? ` · ${esc(longDate(n.t))}` : ""}${n.by ? ` · ${esc(n.by)}` : ""}`, `data-act="ntc-open" data-id="${esc(n._id)}"`)).join("")}</ul></section>`
+        : `<div class="card notice"><h2>No announcements yet</h2><p>Choose what it is about above. The wording is filled in, in English and Tamil, and you can change it before you share the PDF.</p></div>`}`;
+  }
+  let ntcCtx = null;
+  function ntcDefaults(type) {
+    const sch = feeSchedule(), nx = sch.find((e) => e.y * 12 + e.m > CY * 12 + CM);
+    const next = CM === 11 ? { y: CY + 1, m: 0 } : { y: CY, m: CM + 1 };
+    const last = new Date(CY, CM + 1, 0), sunday = new Date(CY, CM, NOW.getDate() + ((7 - NOW.getDay()) % 7 || 7));
+    const iso = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    const me = (settings().sig.text || whoAmI() || "").trim();
+    if (type === "fee") { const at = nx || next; return { m: at.m, y: at.y, fee: nx ? nx.fee : 0, old: feeAt(at.m === 0 ? at.y - 1 : at.y, at.m === 0 ? 11 : at.m - 1) }; }
+    if (type === "remind") return { m: CM, y: CY, fee: feeAt(CY, CM), by: iso(last), to: me };
+    if (type === "meeting") return { date: iso(sunday), time: "4.00 p.m.", place: "Club ground" };
+    if (type === "event") return { event: "", date: iso(sunday), time: "3.00 p.m.", place: "Club ground" };
+    return {};
+  }
+  function drawNtcFields() {
+    const c = ntcCtx, f = c.f, t = c.type;
+    $("ntcTypes").innerHTML = NTC_TYPES.map(([id, n]) => `<button type="button" data-ntype="${id}" aria-pressed="${id === t}">${esc(n)}</button>`).join("");
+    $("ntcLangs").innerHTML = NTC_LANGS.map(([id, n]) => `<button type="button" data-nlang="${id}" aria-pressed="${id === c.lang}">${esc(n)}</button>`).join("");
+    const mOpts = (sel) => MONTHS_FULL.map((n, k) => `<option value="${k}"${k === +sel ? " selected" : ""}>${n}</option>`).join("");
+    const yOpts = (sel) => { let o = ""; for (let y = CY - 1; y <= CY + 2; y++) o += `<option value="${y}"${y === +sel ? " selected" : ""}>${y}</option>`; return o; };
+    const inp = (k, label, type, ph) => `<div class="field"><label for="nf-${k}">${label}</label><input id="nf-${k}" data-nf="${k}" type="${type || "text"}" autocomplete="off" value="${esc(f[k] == null || f[k] === 0 ? "" : String(f[k]))}"${ph ? ` placeholder="${esc(ph)}"` : ""}${type === "text" || !type ? ' maxlength="80"' : ""}></div>`;
+    const month = `<div class="field"><label for="nf-m">Month</label><div class="inrow"><select id="nf-m" data-nf="m">${mOpts(f.m)}</select><select id="nf-y" data-nf="y" aria-label="Year">${yOpts(f.y)}</select></div></div>`;
+    let html = "";
+    if (t === "fee") html = `${month}${inp("fee", "New fee (Rs.)", "text", "e.g. 600")}<p class="hint">Now Rs. ${fmt(f.old || 0)}. This only makes the announcement: change the fee itself in Settings.</p>`;
+    if (t === "remind") html = `${month}<div class="ntc-grid">${inp("fee", "Fee (Rs.)", "text")}${inp("by", "Pay by", "date")}${inp("to", "Pay to (name)", "text", "e.g. Y.Birunthaban")}</div>`;
+    if (t === "meeting") html = `<div class="ntc-grid">${inp("date", "Date", "date")}${inp("time", "Time", "text", "e.g. 4.00 p.m.")}</div>${inp("place", "Place", "text", "e.g. Club ground")}`;
+    if (t === "event") html = `${inp("event", "Event", "text", "e.g. Annual cricket tournament")}<div class="ntc-grid">${inp("date", "Date", "date")}${inp("time", "Time", "text", "e.g. 3.00 p.m.")}</div>${inp("place", "Place", "text", "e.g. Club ground")}`;
+    $("ntcFields").innerHTML = html;
+    $("ntcEnBox").hidden = c.lang === "ta";
+    $("ntcTaBox").hidden = c.lang === "en";
+  }
+  function fillNtcText(force) {
+    const w = ntcWording(ntcCtx.type, ntcCtx.f);
+    if (force || !ntcCtx.edited.en) { $("ntcEnT").value = w.en.title; $("ntcEnB").value = w.en.body; }
+    if (force || !ntcCtx.edited.ta) { $("ntcTaT").value = w.ta.title; $("ntcTaB").value = w.ta.body; }
+    if (force) ntcCtx.edited = { en: false, ta: false };
+  }
+  function openNotice(id, type) {
+    const n = id ? noticesAll().find((x) => x._id === id) : null;
+    if (id && !n) return;
+    const t = n ? n.type || "general" : type || "general";
+    ntcCtx = { id: n ? n._id : null, type: t, lang: n ? n.lang || "both" : "both", f: n ? { ...(n.f || {}) } : ntcDefaults(t), edited: { en: !!n, ta: !!n } };
+    $("ntcTitle").textContent = n ? "Announcement" : "New announcement";
+    $("ntcDel").hidden = !n || !S.canWrite;
+    $("ntcErr").hidden = true;
+    drawNtcFields();
+    if (n) { $("ntcEnT").value = (n.en && n.en.title) || ""; $("ntcEnB").value = (n.en && n.en.body) || ""; $("ntcTaT").value = (n.ta && n.ta.title) || ""; $("ntcTaB").value = (n.ta && n.ta.body) || ""; }
+    else fillNtcText(true);
+    tamilFontReady();
+    $("ntcDlg").showModal();
+  }
+  $("ntcTypes").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-ntype]"); if (!b || !ntcCtx || b.dataset.ntype === ntcCtx.type) return;
+    ntcCtx.type = b.dataset.ntype; ntcCtx.f = ntcDefaults(ntcCtx.type); ntcCtx.edited = { en: false, ta: false };
+    drawNtcFields(); fillNtcText(true);
+  });
+  $("ntcLangs").addEventListener("click", (ev) => { const b = ev.target.closest("[data-nlang]"); if (!b || !ntcCtx) return; ntcCtx.lang = b.dataset.nlang; drawNtcFields(); });
+  const ntcField = (ev) => {
+    const el = ev.target.closest("[data-nf]"); if (!el || !ntcCtx) return;
+    const k = el.dataset.nf; let v = el.value;
+    if (k === "m" || k === "y") v = +v;
+    if (k === "fee") v = parseAmt(v) || 0;
+    ntcCtx.f[k] = v;
+    if (ntcCtx.type === "fee" && (k === "m" || k === "y")) { const m = +ntcCtx.f.m, y = +ntcCtx.f.y; ntcCtx.f.old = feeAt(m === 0 ? y - 1 : y, m === 0 ? 11 : m - 1); }
+    if (ntcCtx.type === "remind" && (k === "m" || k === "y")) ntcCtx.f.fee = feeAt(+ntcCtx.f.y, +ntcCtx.f.m);
+    if ((k === "m" || k === "y") && ntcCtx.type !== "general") { const keep = document.activeElement && document.activeElement.id; drawNtcFields(); if (keep && $(keep)) $(keep).focus(); }
+    fillNtcText(false);
+  };
+  $("ntcFields").addEventListener("input", ntcField);
+  $("ntcFields").addEventListener("change", ntcField);
+  for (const [id, l] of [["ntcEnT", "en"], ["ntcEnB", "en"], ["ntcTaT", "ta"], ["ntcTaB", "ta"]]) $(id).addEventListener("input", () => { if (ntcCtx) ntcCtx.edited[l] = true; });
+  $("ntcReset").addEventListener("click", () => { if (ntcCtx) fillNtcText(true); });
+  function noticeFromForm() {
+    const c = ntcCtx;
+    const part = (t, b) => ({ title: $(t).value.trim().replace(/\s+/g, " ").slice(0, 90), body: $(b).value.replace(/\r/g, "").replace(/[ \t]+\n/g, "\n").replace(/\n{3,}/g, "\n\n").trim().slice(0, 2000) });
+    const rec = { type: c.type, lang: c.lang, f: c.f, t: todayStr() };
+    if (c.lang !== "ta") rec.en = part("ntcEnT", "ntcEnB");
+    if (c.lang !== "en") rec.ta = part("ntcTaT", "ntcTaB");
+    for (const [k, nm] of [["en", "English"], ["ta", "Tamil"]]) if (rec[k] && !rec[k].title && !rec[k].body) { $("ntcErr").textContent = `Write the ${nm} title or message, or choose only one language.`; $("ntcErr").hidden = false; return null; }
+    if (c.lang !== "ta" && /…/.test(rec.en.title + rec.en.body)) { $("ntcErr").textContent = "Fill in the details above (the … in the English wording)."; $("ntcErr").hidden = false; return null; }
+    if (c.lang !== "en" && /…/.test(rec.ta.title + rec.ta.body)) { $("ntcErr").textContent = "Fill in the details above (the … in the Tamil wording)."; $("ntcErr").hidden = false; return null; }
+    const by = whoAmI(); if (by) rec.by = by;
+    return rec;
+  }
+  function saveNotice() {
+    const rec = noticeFromForm();
+    if (!rec) return null;
+    const prev = ntcCtx.id ? noticesAll().find((x) => x._id === ntcCtx.id) : null;
+    if (prev && prev.t) rec.t = prev.t;
+    if (prev && prev.by) rec.by = prev.by;
+    const id = ntcCtx.id || ("n" + Date.now().toString(36) + Math.random().toString(36).slice(2, 5));
+    if (S.canWrite) writeDoc("notice/" + id, rec);
+    ntcCtx.id = id;
+    return { ...rec, _id: id };
+  }
+  const noticeName = (n) => `Pirampady_SC_${safeName(((n.en && n.en.title) || NTC_HEAD[n.type] || "announcement").slice(0, 40))}.pdf`;
+  function noticeText(n) {
+    const out = [];
+    if (n.en) out.push(`*${n.en.title}*\n\n${n.en.body}`);
+    if (n.ta) out.push(`*${n.ta.title}*\n\n${n.ta.body}`);
+    return out.join("\n\n- - -\n\n") + "\n\n_Pirampady Sports Club_";
+  }
+  $("ntcForm").addEventListener("submit", async (ev) => {
+    ev.preventDefault();
+    const n = saveNotice(); if (!n) return;
+    if (!pdfReady()) { toast("Saved. The PDF maker didn't load: close and reopen the app."); return; }
+    await tamilFontReady();
+    $("ntcDlg").close(); render();
+    sharePdf(buildNoticePdf(n), noticeName(n));
+  });
+  $("ntcSave").addEventListener("click", () => { const n = saveNotice(); if (!n) return; $("ntcDlg").close(); render(); toast("Announcement saved. Open it from Announcements to share it."); });
+  $("ntcCopy").addEventListener("click", () => { const n = noticeFromForm(); if (!n) return; copyText(noticeText(n), "Copied. Paste it in WhatsApp."); });
+  $("ntcDel").addEventListener("click", () => {
+    if (!ntcCtx || !ntcCtx.id || !S.canWrite) return;
+    const n = noticesAll().find((x) => x._id === ntcCtx.id); if (!n) return;
+    const { _id, ...body } = n;
+    writeDoc("notice/" + _id, null);
+    $("ntcDlg").close(); render();
+    toast("Announcement deleted.", () => { writeDoc("notice/" + _id, body); render(); });
+  });
+  // Tamil text is drawn with the phone's own text engine (which joins Tamil letters correctly) and placed in the PDF as an image
+  function tamilFontReady() {
+    try { return Promise.all([document.fonts.load('400 20px "Noto Sans Tamil"', "அ"), document.fonts.load('700 20px "Noto Sans Tamil"', "அ")]).catch(() => null); } catch (e) { return Promise.resolve(null); }
+  }
+  function textImage(text, pt, bold, rgb, wMm) {
+    const pxmm = 12, fpx = pt * 0.3528 * pxmm, lh = fpx * 1.55, maxW = wMm * pxmm;
+    const c = document.createElement("canvas"), g = c.getContext("2d");
+    const font = `${bold ? 700 : 400} ${fpx.toFixed(1)}px "Barlow", "Noto Sans Tamil", "Tamil Sangam MN", "Latha", sans-serif`;
+    g.font = font;
+    const lines = [];
+    for (const para of String(text).split("\n")) {
+      if (!para.trim()) { lines.push(""); continue; }
+      let cur = "";
+      for (const word of para.split(/\s+/)) { const tt = cur ? cur + " " + word : word; if (!cur || g.measureText(tt).width <= maxW) cur = tt; else { lines.push(cur); cur = word; } }
+      lines.push(cur);
+    }
+    c.width = Math.ceil(maxW); c.height = Math.max(1, Math.ceil(lines.length * lh + fpx * 0.45));
+    g.font = font; g.fillStyle = `rgb(${rgb.join(",")})`; g.textBaseline = "top";
+    lines.forEach((ln, k) => g.fillText(ln, 0, k * lh + fpx * 0.12));
+    return { url: c.toDataURL("image/png"), h: c.height / pxmm };
+  }
+  // An A5 announcement: the club header in the chosen bill style, English then Tamil, signed at the bottom.
+  // The text size is chosen so it fits on one page; a very long announcement carries on to a second page.
+  function buildNoticePdf(n) {
+    const C = PDF_C, { jsPDF } = window.jspdf, W = 148, H = 210, M = 14, wMm = W - 2 * M, top = 44, bottom = H - 34;
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a5" });
+    const parts = [];
+    if (n.en) parts.push(["en", n.en]);
+    if (n.ta) parts.push(["ta", n.ta]);
+    const layout = (pt) => {
+      const items = [];
+      const en = (txt, size, bold, col) => { doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setFontSize(size); const lines = doc.splitTextToSize(txt, wMm); const lh = size * 0.3528 * 1.45; return { h: lines.length * lh, draw: (y) => { doc.setFont("helvetica", bold ? "bold" : "normal"); doc.setFontSize(size); doc.setTextColor(...col); doc.text(lines, M, y + size * 0.3528, { lineHeightFactor: 1.45 }); } }; };
+      const ta = (txt, size, bold, col) => { const im = textImage(txt, size, bold, col, wMm); return { h: im.h, draw: (y) => doc.addImage(im.url, "PNG", M, y, wMm, im.h) }; };
+      parts.forEach(([lang, p], k) => {
+        if (k) items.push({ h: 9, draw: (y) => { doc.setDrawColor(...C.GOLD); doc.setLineWidth(0.5); doc.line(M + 24, y + 4.5, W - M - 24, y + 4.5); } });
+        const mk = lang === "en" ? en : ta;
+        if (p.title) { items.push(mk(p.title, pt * 1.5, true, C.BROWN)); items.push({ h: pt * 0.32 }); }
+        for (const para of String(p.body || "").split(/\n\n+/)) { if (para.trim()) { items.push(mk(para.trim(), pt, false, C.INK)); items.push({ h: pt * 0.3 }); } }
+      });
+      return items;
+    };
+    let items = null;
+    for (const pt of [12, 11, 10, 9.2, 8.5]) { items = layout(pt); if (items.reduce((t, it) => t + it.h, 0) <= bottom - top) break; }
+    slipHeader(doc, W, M, NTC_HEAD[n.type] || "Notice");
+    slipWatermark(doc, W, 70, 92);
+    let yy = top;
+    for (const it of items) {
+      if (it.draw && yy + it.h > bottom) { doc.addPage("a5", "portrait"); slipHeader(doc, W, M, `${NTC_HEAD[n.type] || "Notice"} (continued)`); slipWatermark(doc, W, 70, 92); yy = top; }
+      if (it.draw) it.draw(yy);
+      yy += it.h;
+    }
+    // footer: the date and the signature of whoever made it
+    const fy = H - 24;
+    doc.setDrawColor(...C.LINE); doc.setLineWidth(0.3); doc.line(M, fy - 6, W - M, fy - 6);
+    doc.setFont("helvetica", "bold"); doc.setFontSize(9); doc.setTextColor(...C.BROWN); doc.text("Pirampady Sports Club", M, fy + 1);
+    doc.setFont("helvetica", "normal"); doc.setFontSize(7.8); doc.setTextColor(...C.GREY); doc.text(`Issued ${n.t ? longDate(n.t) : issuedToday()}`, M, fy + 5.5);
+    sigBlock(doc, W - M - 46, fy + 3, 46, 11, signerFor(n.by), n.by ? `${n.by}, for the club` : "For the club");
+    return doc.output("blob");
   }
   function homeSkeleton() {
     return `<div class="home"><div class="card hm-block skel-card"><i class="skel" style="width:40%"></i><i class="skel" style="width:70%;height:26px"></i><i class="skel" style="width:55%"></i></div><div class="card hm-block skel-card"><i class="skel" style="width:30%"></i><i class="skel" style="width:100%;height:110px"></i></div></div>`;
@@ -2442,6 +2750,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       ]],
       ["Club", [
         rowHTML("members", "Members list", `${memN} members · add, edit, inactive`, 'data-act="members"'),
+        rowHTML("megaphone", "Announcements", "Fee changes, reminders and invitations in English and Tamil, as a PDF", 'data-act="view" data-v="notices"'),
         rowHTML("gear", "Settings &amp; app style", "Monthly fee, signatures and the look of the app", 'data-act="settings"'),
       ]],
       ["Checks", [
@@ -2568,7 +2877,9 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
         restore: `${who} brought back ${rs(l.a)} from ${nm} for ${mon}`, choose: `${who} settled a clash: kept ${rs(l.a)} from ${nm} for ${mon}` },
       exp: { add: `${who} added the expense ${what} (${rs(l.a)})`, edit: l.old !== l.a ? `${who} changed the expense ${what} from ${rs(l.old)} to ${rs(l.a)}` : `${who} edited the expense ${what}`,
         cancel: `${who} cancelled the expense ${what} (${rs(l.a)})`, restore: `${who} brought back the expense ${what} (${rs(l.a)})`,
-        check: `${who} checked the expense ${what} ✓`, uncheck: `${who} took the check off ${what}` },
+        check: `${who} checked the expense ${what} ✓`, uncheck: `${who} took the check off ${what}`,
+        photo: l.n ? `${who} attached ${l.n === 1 ? "a photo" : `${l.n} photos`} of the bill to ${what}` : `${who} removed the bill photo from ${what}` },
+      mem: { left: `${who} marked ${nm} as left the club (from ${mon}; earlier months unchanged)`, back: `${who} brought ${nm} back onto the members list` },
       elec: { add: `${who} recorded the ${mon} electricity bill (${rs(l.a)})`, edit: `${who} changed the ${mon} electricity bill from ${rs(l.old)} to ${rs(l.a)}`,
         cancel: `${who} cleared the ${mon} electricity bill (${rs(l.a)})`, signed: `${who} marked the ${mon} electricity bill as signed by Selvarajah`,
         unsigned: `${who} marked the ${mon} electricity bill as not signed` },
@@ -2836,7 +3147,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     for (const l of list) {
       const day = dayOf(l.t);
       if (day !== last) { if (last) html += "</ul>"; html += `<p class="grp-h">${esc(longDate(day))}</p><ul class="rows card hist-list">`; last = day; }
-      const bad = l.act === "cancel" || l.act === "undo" || l.act === "delete", ic = l.k === "pay" ? "pay" : l.k === "elec" ? "bolt" : l.k === "cash" || l.k === "don" ? "coins" : l.k === "ho" ? "send" : l.k === "acct" ? "statement" : l.k === "ev" ? "trophy" : l.k === "bd" ? "cake" : l.k === "sync" ? "sync" : "receipt";
+      const bad = l.act === "cancel" || l.act === "undo" || l.act === "delete", ic = l.k === "pay" ? "pay" : l.k === "elec" ? "bolt" : l.k === "cash" || l.k === "don" ? "coins" : l.k === "ho" ? "send" : l.k === "acct" ? "statement" : l.k === "ev" ? "trophy" : l.k === "bd" ? "cake" : l.k === "sync" ? "sync" : l.k === "mem" ? "members" : "receipt";
       html += `<li><div class="row hrow${bad ? " is-x" : ""}"><span class="row-ic${bad ? " x" : ""}">${icon(ic)}</span><span class="row-main"><b>${esc(logText(l))}</b><small>${hm(l.t)}${l.r || l.no ? ` · ${esc(l.r || l.no)}` : ""}${l.dev && l.by ? ` · ${esc(l.dev)}` : ""}</small></span></div></li>`;
     }
     if (last) html += "</ul>";
@@ -3560,12 +3871,98 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     const tot = $("expItemsTotal"); if (tot) tot.textContent = rs(v);
     $("expCalc").innerHTML = `<div><span>Balance in hand (end of ${MONTHS_FULL[expCtx.i]})</span><span>${rsSigned(before)}</span></div><div><span>This bill${expRows.length > 1 ? ` (${expRows.length} items)` : ""}</span><span>− Rs. ${fmt(v)}</span></div><div class="after"><span>Balance after</span><span style="color:${before - v < 0 ? "var(--due)" : "var(--ok)"}">${rsSigned(before - v)}</span></div>`;
   }
+  /* ---------- photos of shop bills: kept on this phone (IndexedDB) and in the private data repo (photos/<id>.jpg) ---------- */
+  const photoCache = new Map();          // photo id -> image (data URL), for this session
+  let phDbP = null;
+  function phDb() {
+    if (!phDbP) phDbP = new Promise((res, rej) => {
+      try { const r = indexedDB.open("psc-photos", 1); r.onupgradeneeded = () => r.result.createObjectStore("p"); r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }
+      catch (e) { rej(e); }
+    });
+    return phDbP;
+  }
+  async function phIdb(mode, fn) {
+    const db = await phDb();
+    return new Promise((res, rej) => { const tx = db.transaction("p", mode), r = fn(tx.objectStore("p")); tx.oncomplete = () => res(r ? r.result : undefined); tx.onerror = () => rej(tx.error); tx.onabort = () => rej(tx.error); });
+  }
+  const phPut = (id, v) => phIdb("readwrite", (st) => st.put(v, id));
+  const phGet = (id) => phIdb("readonly", (st) => st.get(id)).catch(() => null);
+  // a photo for this session: memory, then this phone, then the online register
+  async function loadPhoto(id) {
+    if (photoCache.has(id)) return photoCache.get(id);
+    const v = await phGet(id);
+    if (v && v.d) { photoCache.set(id, v.d); return v.d; }
+    if (typeof photoFetch === "function") {
+      try { const d = await photoFetch(id); if (d) { photoCache.set(id, d); phPut(id, { d, up: 1 }).catch(() => {}); return d; } } catch (e) {}
+    }
+    return null;
+  }
+  const loadPhotos = (ids) => Promise.all((ids || []).map((id) => loadPhoto(id).catch(() => null)));
+  // a phone photo made small enough to keep and send (longest side 1,600 px, JPEG, under about 700 KB)
+  async function compressPhoto(file) {
+    const url = URL.createObjectURL(file);
+    try {
+      const img = await new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = () => rej(new Error("image")); i.src = url; });
+      for (const [max, q] of [[1600, 0.72], [1280, 0.62], [1000, 0.55]]) {
+        const sc = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+        const c = document.createElement("canvas"); c.width = Math.max(1, Math.round(img.naturalWidth * sc)); c.height = Math.max(1, Math.round(img.naturalHeight * sc));
+        const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height); g.drawImage(img, 0, 0, c.width, c.height);
+        const d = c.toDataURL("image/jpeg", q);
+        if (d.length < 950000 || max === 1000) return d;
+      }
+    } finally { URL.revokeObjectURL(url); }
+    return null;
+  }
+  function drawExpPhotos() {
+    if (!expCtx) return;
+    const ids = expCtx.ph || [];
+    $("expPhotos").innerHTML = ids.map((id) => { const d = photoCache.get(id); return `<span class="phot-wrap"><button type="button" class="phot" data-phview="${esc(id)}" aria-label="Open the bill photo">${d ? `<img src="${d}" alt="">` : `<span class="ld">Loading…</span>`}</button><button type="button" class="phot-x" data-phdel="${esc(id)}" aria-label="Remove this photo">×</button></span>`; }).join("")
+      + (ids.length < 4 ? `<button type="button" class="btn sm" id="expPhotoAdd">${icon("camera")}${ids.length ? "Add another photo" : "Add a photo of the bill"}</button>` : "");
+  }
+  $("expPhotos").addEventListener("click", (ev) => {
+    if (ev.target.closest("#expPhotoAdd")) { $("expPhotoIn").click(); return; }
+    const del = ev.target.closest("[data-phdel]");
+    if (del && expCtx) { expCtx.ph = (expCtx.ph || []).filter((x) => x !== del.dataset.phdel); drawExpPhotos(); return; }
+    const v = ev.target.closest("[data-phview]");
+    if (v) openPhoto(v.dataset.phview, $("expWhen").textContent);
+  });
+  $("expPhotoIn").addEventListener("change", async () => {
+    const f = $("expPhotoIn").files && $("expPhotoIn").files[0];
+    $("expPhotoIn").value = "";
+    if (!f || !expCtx) return;
+    try {
+      const d = await compressPhoto(f);
+      if (!d) throw new Error("photo");
+      const id = "ph" + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+      photoCache.set(id, d);
+      await phPut(id, { d, up: 0 }).catch(() => {});
+      expCtx.ph = [...(expCtx.ph || []), id].slice(0, 4);
+      $("expErr").hidden = true;
+      drawExpPhotos();
+    } catch (e) { $("expErr").textContent = "That photo couldn't be read. Try taking it again, or choose another photo."; $("expErr").hidden = false; }
+  });
+  async function openPhoto(id, when) {
+    $("phWhen").textContent = when || "Expense";
+    $("phImg").removeAttribute("src");
+    if (!$("phDlg").open) $("phDlg").showModal();
+    const d = await loadPhoto(id);
+    if (d) $("phImg").src = d; else $("phImg").alt = "This photo isn't on this phone yet. Connect to the internet and try again.";
+  }
+  // photos of the year's expenses are fetched quietly, so their bills can be shared again with the photo
+  let phPrefetched = "";
+  function prefetchPhotos() {
+    const ids = expensesAll().flatMap((x) => (Array.isArray(x.ph) ? x.ph : []));
+    const key = S.year + ":" + ids.join(",");
+    if (!ids.length || key === phPrefetched) return;
+    phPrefetched = key;
+    loadPhotos(ids);
+  }
   function openExpense(id, month) {
     if (!S.canWrite) return;
     const x = id ? expensesAll().find((e) => e.id === id) : null;
     if (id && !x) return;
     const i = x ? x.month : month;
-    expCtx = { id: x ? x.id : null, i, year: S.year, no: x ? x.no : null };
+    expCtx = { id: x ? x.id : null, i, year: S.year, no: x ? x.no : null, ph: x && Array.isArray(x.ph) ? x.ph.slice(0, 4) : [] };
     expCat = x ? x.cat || "other" : "equipment";
     $("expWhen").textContent = `${MONTHS_FULL[i]} ${S.year}`;
     $("expTitle").textContent = x ? "Edit expense" : "Add expense";
@@ -3574,7 +3971,8 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     $("expTo").value = x ? x.to || "" : "";
     $("expDel").hidden = !x;
     $("expErr").hidden = true;
-    drawExpCats(); drawExpItems(); drawExpCalc(); fillExpCheck();
+    drawExpCats(); drawExpItems(); drawExpCalc(); fillExpCheck(); drawExpPhotos();
+    if (expCtx.ph.length) loadPhotos(expCtx.ph).then(() => { if ($("expDlg").open) drawExpPhotos(); });
     $("expDlg").showModal();
   }
   $("expCats").addEventListener("click", (ev) => { const b = ev.target.closest("[data-cat]"); if (!b) return; expCat = b.dataset.cat; drawExpCats(); });
@@ -3643,12 +4041,15 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     if (to) rec.to = to;
     const by = getCollector().trim();
     if (by) rec.by = by;
+    if (expCtx.ph && expCtx.ph.length) rec.ph = expCtx.ph.slice(0, 4);
     const prevX = expCtx.id ? expensesAll().find((e) => e.id === expCtx.id) : null;
+    const phChanged = JSON.stringify((prevX && prevX.ph) || []) !== JSON.stringify(rec.ph || []);
     const same = prevX && prevX.amount === rec.amount && prevX.desc === rec.desc && prevX.t === rec.t && (prevX.to || "") === (rec.to || "") && prevX.month === rec.month && prevX.cat === rec.cat && JSON.stringify(expItemsOf(prevX)) === JSON.stringify(expItemsOf(rec));
     if (prevX && prevX.chk && same) rec.chk = prevX.chk;      // a check stays only while the bill is unchanged
     writeDoc("expenses/" + id, rec);
     if (!prevX) logChange({ k: "exp", act: "add", y: S.year, i: month, a: v, no, desc });
     else if (!same) logChange({ k: "exp", act: "edit", y: S.year, i: month, a: v, old: prevX.amount, no, desc, un: prevX.chk ? 1 : undefined });
+    if (phChanged && (prevX || (rec.ph || []).length)) logChange({ k: "exp", act: "photo", y: S.year, i: month, a: v, no, desc, n: (rec.ph || []).length });
     render();
     return { ...rec, id };
   }
@@ -4230,7 +4631,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     const all = allMembers(), act = all.filter((m) => !m.removed && !openOff(m)), ina = all.filter((m) => isInactive(m)), rem = all.filter((m) => m.removed);
     $("memTitle").textContent = ina.length ? `Members (${act.length} active · ${ina.length} inactive)` : `Members (${act.length})`;
     const rmAsk = (m) => confirmId === m.id
-      ? `<div class="confirm">Remove ${esc(m.name)}? Their past payments stay in the register. <button type="button" class="yes" data-mact="rm-yes" data-id="${esc(m.id)}">Remove</button><button type="button" class="no2" data-mact="rm-no">Keep</button></div>` : "";
+      ? `<div class="confirm">Remove ${esc(m.name)}? Their past payments stay in the register, and months before ${MONTHS_FULL[CM]} ${CY} stay as they are. <button type="button" class="yes" data-mact="rm-yes" data-id="${esc(m.id)}">Remove</button><button type="button" class="no2" data-mact="rm-no">Keep</button></div>` : "";
     $("memList").innerHTML = act.map((m, idx) => {
       const sel = m.start && Number.isInteger(m.start.y) ? `${m.start.y}-${m.start.m}` : "";
       let confirm = rmAsk(m);
@@ -4280,7 +4681,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     }).join("");
     $("remBox").hidden = !rem.length;
     $("remSum").textContent = `Removed members (${rem.length})`;
-    $("remList").innerHTML = rem.map((m) => `<li><span>${esc(m.name)}</span><button type="button" class="btn" data-mact="restore" data-id="${esc(m.id)}">Restore</button></li>`).join("");
+    $("remList").innerHTML = rem.map((m) => `<li><span>${esc(m.name)}${leftOf(m) ? ` <small class="hint">left ${MONTHS[m.left.m]} ${m.left.y}</small>` : ""}</span><button type="button" class="btn" data-mact="restore" data-id="${esc(m.id)}">Restore</button></li>`).join("");
   }
   function memberBody(m) { const { id, ...rest } = m; return rest; }
   function openMembers() { confirmId = null; offAsk = null; renderMembers(); $("memDlg").showModal(); }
@@ -4332,8 +4733,19 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     if (act === "off" || act === "back") { offAsk = { id, mode: act }; confirmId = null; renderMembers(); const s = $((act === "off" ? "mo-" : "mb-") + id); if (s) s.focus(); return; }
     if (act === "off-no") { offAsk = null; renderMembers(); return; }
     if (!S.canWrite) { toast("You can view this register, but you can't change it."); return; }
-    if (act === "rm-yes" && m) { confirmId = null; writeDoc("members/" + id, { ...memberBody(m), removed: true }); toast(`Removed ${m.name}.`); }
-    if (act === "restore" && m) { const order = all.reduce((mx, x) => Math.max(mx, x.order || 0), 0) + 1; writeDoc("members/" + id, { ...memberBody(m), removed: false, order }); toast(`Restored ${m.name}.`); }
+    if (act === "rm-yes" && m) {
+      confirmId = null;
+      writeDoc("members/" + id, { ...memberBody(m), removed: true, left: { y: CY, m: CM } });
+      logChange({ k: "mem", act: "left", name: m.name, y: CY, i: CM });
+      toast(`Removed ${m.name}. Months before ${MONTHS_FULL[CM]} ${CY} stay as they are.`);
+    }
+    if (act === "restore" && m) {
+      const order = all.reduce((mx, x) => Math.max(mx, x.order || 0), 0) + 1;
+      const { left, ...rest } = memberBody(m);
+      writeDoc("members/" + id, { ...rest, removed: false, order });
+      logChange({ k: "mem", act: "back", name: m.name, y: CY, i: CM });
+      toast(`Restored ${m.name}.`);
+    }
     if (act === "off-yes" && m) {
       const s = $("mo-" + id), [y, k] = (s ? s.value : "").split("-").map(Number);
       if (!Number.isInteger(y) || !Number.isInteger(k)) return;
@@ -4390,8 +4802,15 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     $("sig2Text").value = st.sig2.text;
     sig2StyleSel = st.sig2.style;
     drawSigChoices();
+    billStyleSel = st.billStyle; drawBillPick();
     $("setDlg").showModal();
   }
+  let billStyleSel = "elite";
+  function drawBillPick() {
+    $("billPick").innerHTML = [["elite", "Elite", "Black band and champagne gold (now)"], ["classic", "Classic", "White with club brown (the earlier bills)"]]
+      .map(([id, name, note]) => `<button type="button" class="styleopt" data-bill-pick="${id}" aria-pressed="${id === billStyleSel}"><span class="sw ${id === "elite" ? "sw-elite" : "sw-billc"}" aria-hidden="true"><i></i><i></i></span><b>${name}</b><small>${note}</small></button>`).join("");
+  }
+  $("billPick").addEventListener("click", (ev) => { const b = ev.target.closest("[data-bill-pick]"); if (!b) return; billStyleSel = b.dataset.billPick; drawBillPick(); });
   /* ---------- app style (this device only) ---------- */
   const STYLES = [
     ["elite", "Elite", "Obsidian black and champagne gold"],
@@ -4540,7 +4959,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     if (fr.err) { $("setErr").textContent = fr.err; $("setErr").hidden = false; return; }
     const fees = fr.fees;
     const before = JSON.stringify(feeSchedule()), after = JSON.stringify(feeSchedule(fees));
-    writeDoc("settings/club", { fees, start: { y: +$("startY").value, m: +$("startM").value }, sig: { text: $("sigText").value.trim().replace(/\s+/g, " "), style: sigStyleSel }, sig2: { text: $("sig2Text").value.trim().replace(/\s+/g, " "), style: sig2StyleSel } });
+    writeDoc("settings/club", { fees, start: { y: +$("startY").value, m: +$("startM").value }, sig: { text: $("sigText").value.trim().replace(/\s+/g, " "), style: sigStyleSel }, sig2: { text: $("sig2Text").value.trim().replace(/\s+/g, " "), style: sig2StyleSel }, billStyle: billStyleSel });
     renderSignature();
     $("setDlg").close();
     render();
@@ -4578,14 +4997,34 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     const { jsPDF } = window.jspdf;
     const doc = new jsPDF({ orientation: "landscape", unit: "mm", format: "a4" });
     const W = 297, H = 210;
-    const BROWN = [28, 24, 20], CREAM = [248, 243, 232], GREEN = [29, 122, 61], AMBER = [152, 86, 0], BLUE = [29, 93, 166], RED = [176, 40, 31], GREY = [110, 103, 95];
-    const GOLD = [190, 152, 86], CHAMP = [232, 208, 156];
+    const old = classicPdf();
+    const BROWN = old ? [107, 58, 0] : [28, 24, 20], CREAM = old ? [255, 247, 218] : [248, 243, 232], GREEN = [29, 122, 61], AMBER = [152, 86, 0], BLUE = [29, 93, 166], RED = [176, 40, 31], GREY = [110, 103, 95];
+    const GOLD = old ? [107, 58, 0] : [190, 152, 86], CHAMP = old ? [255, 255, 255] : [232, 208, 156];
     const LOGO = LOGO_DATA;
     const y = S.year, fee = feeFor(y), everyone = yearMembers();
     // members who asked not to be named are left out and shown together as "Private contributions"
     const ms = everyone.filter((m) => !m.private), priv = everyone.filter((m) => m.private);
 
+    if (old) {
+      // the earlier register: crest on the left, brown title, the year in a brown box, a double brown rule
+      if (LOGO) doc.addImage(LOGO, "JPEG", 10, 6, 28, 24.8);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(21); doc.setTextColor(...BROWN);
+      doc.text("PIRAMPADY SPORTS CLUB", W / 2, 15, { align: "center" });
+      doc.setFontSize(11.5); doc.setTextColor(40, 34, 28);
+      doc.text(`Monthly Subscription Register  ·  ${feeText(y)} per member`, W / 2, 22, { align: "center" });
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8.5); doc.setTextColor(...GREY);
+      const upd0 = NOW.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" }), span0 = countedLabel(y).replace("–", " to ");
+      doc.text(`Updated ${upd0}${span0 ? `  ·  Dues counted for ${span0} ${y}` : ""}`, W / 2, 27.5, { align: "center" });
+      doc.setFillColor(...BROWN); doc.rect(W - 44, 7, 34, 7, "F");
+      doc.setFont("helvetica", "bold"); doc.setFontSize(8); doc.setTextColor(255, 255, 255);
+      doc.text("YEAR", W - 27, 11.8, { align: "center", charSpace: 0.8 });
+      doc.setFillColor(...CREAM); doc.setDrawColor(...BROWN); doc.setLineWidth(0.6); doc.rect(W - 44, 14, 34, 13, "FD");
+      doc.setFontSize(20); doc.setTextColor(...BROWN); doc.text(String(y), W - 27, 23.2, { align: "center" });
+      doc.setDrawColor(...BROWN); doc.setLineWidth(0.9); doc.line(10, 32.2, W - 10, 32.2);
+      doc.setLineWidth(0.25); doc.line(10, 33.5, W - 10, 33.5);
+    }
     // header: an obsidian band with a champagne-gold rule; the crest on a white tile, the year in a gold frame
+    if (!old) {
     doc.setFillColor(20, 18, 15); doc.rect(0, 0, W, 32, "F");
     doc.setFillColor(...GOLD); doc.rect(0, 32, W, 0.9, "F");
     doc.setFillColor(255, 255, 255); doc.roundedRect(9.5, 4, 29, 24.5, 2.5, 2.5, "F");
@@ -4603,6 +5042,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     doc.setFont("helvetica", "bold"); doc.setFontSize(7.5); doc.setTextColor(...CHAMP);
     spaced(doc, "YEAR", W - 27, 11.4, 1.2);
     doc.setFontSize(20); doc.setTextColor(248, 244, 236); doc.text(String(y), W - 27, 22.4, { align: "center" });
+    }
 
     // rows
     const nm = ms.length;
@@ -4737,8 +5177,14 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   }
   /* ---------- PDF slips (one member) and PDF receipts (one payment) ---------- */
   // documents: obsidian and champagne gold on white paper (prints cleanly); the TO PAY / PAID UP stamps keep red and green
-  const PDF_C = { BROWN: [28, 24, 20], CREAM: [248, 243, 232], GREEN: [29, 122, 61], AMBER: [152, 86, 0], BLUE: [29, 93, 166], RED: [176, 40, 31], GREY: [110, 103, 95], INK: [24, 21, 18], LINE: [222, 208, 180],
+  // Two bill styles (Settings): Elite = obsidian band and champagne gold; Classic = the earlier bills, white with club brown
+  const PDF_ELITE = { BROWN: [28, 24, 20], CREAM: [248, 243, 232], GREEN: [29, 122, 61], AMBER: [152, 86, 0], BLUE: [29, 93, 166], RED: [176, 40, 31], GREY: [110, 103, 95], INK: [24, 21, 18], LINE: [222, 208, 180],
     GOLD: [190, 152, 86], GOLDD: [150, 112, 48], CHAMP: [232, 208, 156], BAND: [20, 18, 15], MUTE: [178, 167, 148], PAPER: [250, 247, 240] };
+  const PDF_CLASSIC = { BROWN: [107, 58, 0], CREAM: [255, 247, 218], GREEN: [29, 122, 61], AMBER: [152, 86, 0], BLUE: [29, 93, 166], RED: [176, 40, 31], GREY: [110, 103, 95], INK: [30, 26, 22], LINE: [200, 180, 150],
+    GOLD: [107, 58, 0], GOLDD: [107, 58, 0], CHAMP: [255, 255, 255], BAND: [107, 58, 0], MUTE: [110, 103, 95], PAPER: [255, 255, 255] };
+  // every PDF reads its colours from here, so the chosen style applies to all of them
+  const PDF_C = new Proxy({}, { get: (_, k) => (pdfStyleNow === "classic" ? PDF_CLASSIC : PDF_ELITE)[k] });
+  const classicPdf = () => pdfStyleNow === "classic";
   function pdfLogo() { try { return typeof LOGO_DATA !== "undefined" && LOGO_DATA ? LOGO_DATA : null; } catch (e) { return null; } }
   const safeName = (s) => String(s || "member").replace(/[^A-Za-z0-9]+/g, "_").replace(/^_|_$/g, "");
   const pdfReady = () => !!(window.jspdf && window.jspdf.jsPDF && window.jspdf.jsPDF.API.autoTable);
@@ -4759,6 +5205,21 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   function spaced(doc, txt, cx, y, cs) { doc.text(txt, cx - (doc.getTextWidth(txt) + (txt.length - 1) * cs) / 2, y, { charSpace: cs }); }
   function slipHeader(doc, W, M, title, qr) {
     const C = PDF_C;
+    if (classicPdf()) {
+      // the earlier style: the crest on white, the club name in brown, a double brown rule
+      const LOGO = pdfLogo();
+      if (qr) pdfQR(doc, W - M - 19, 3.6, 19, qr);
+      if (LOGO) doc.addImage(LOGO, "JPEG", M, 8, 24, 24 * 372 / 420);
+      const tx = LOGO ? M + 28 : M;
+      doc.setFont("helvetica", "bold"); doc.setFontSize(14.5); doc.setTextColor(...C.BROWN);
+      doc.text("PIRAMPADY SPORTS CLUB", tx, 16.4);
+      doc.setFontSize(10.5); doc.setTextColor(...C.INK); doc.text(title, tx, 22.6);
+      doc.setFont("helvetica", "normal"); doc.setFontSize(8); doc.setTextColor(...C.GREY);
+      doc.text(`Issued ${issuedToday()}`, tx, 27.8);
+      doc.setDrawColor(...C.BROWN); doc.setLineWidth(0.8); doc.line(M, 32.6, W - M, 32.6);
+      doc.setLineWidth(0.25); doc.line(M, 33.7, W - M, 33.7);
+      return;
+    }
     pdfBand(doc, W, 31);
     if (qr) pdfQR(doc, W - M - 19, 3.6, 19, qr);
     pdfBadge(doc, M + 10.5, 15.5, 10);
@@ -4780,12 +5241,24 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       doc.setFillColor(255, 255, 255); doc.roundedRect(x, y, size, size, 1.4, 1.4, "F");
       doc.setFillColor(20, 18, 15);
       for (let r = 0; r < n; r++) for (let c = 0; c < n; c++) if (q.isDark(r, c)) doc.rect(x + pad + c * cell, y + pad + r * cell, cell + 0.03, cell + 0.03, "F");
-      doc.setFont("helvetica", "bold"); doc.setFontSize(6.4); doc.setTextColor(...PDF_C.CHAMP);
+      if (classicPdf()) { doc.setDrawColor(...PDF_C.LINE); doc.setLineWidth(0.25); doc.roundedRect(x, y, size, size, 1.4, 1.4, "S"); }
+      doc.setFont("helvetica", "bold"); doc.setFontSize(6.4); doc.setTextColor(...(classicPdf() ? PDF_C.BROWN : PDF_C.CHAMP));
       doc.text(`CHECK ${qr.code}`, x + size / 2, y + size + 2.9, { align: "center", charSpace: 0.2 });
     } catch (e) {}
   }
   function centerHeader(doc, W, label, qr) {
     const C = PDF_C;
+    if (classicPdf()) {
+      // the earlier receipts: the crest centred on white, the club name in brown, the kind of document on a brown strip
+      const LOGO = pdfLogo();
+      if (qr) pdfQR(doc, W - 6 - 19, 4.2, 19, qr);
+      if (LOGO) doc.addImage(LOGO, "JPEG", (W - 22) / 2, 5, 22, 22 * 372 / 420);
+      doc.setFont("helvetica", "bold"); doc.setFontSize(12.5); doc.setTextColor(...C.BROWN);
+      doc.text("PIRAMPADY SPORTS CLUB", W / 2, 30.4, { align: "center" });
+      doc.setFillColor(...C.BROWN); doc.rect(9, 33.4, W - 18, 7.5, "F");
+      doc.setFontSize(9); doc.setTextColor(255, 255, 255); spaced(doc, label, W / 2, 38.5, 0.6);
+      return;
+    }
     pdfBand(doc, W, 41);
     if (qr) pdfQR(doc, W - 6 - 19, 4.2, 19, qr);
     pdfBadge(doc, W / 2, 14.2, 9.4);
@@ -5225,7 +5698,40 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       doc.setFont("helvetica", "bold"); doc.setFontSize(7); doc.setTextColor(...C.GREEN);
       doc.text(`CHECKED${x.chk.t ? ` · ${longDate(x.chk.t).toUpperCase()}` : ""}`, M + 20.5, yy + 7.4, { align: "center" });
     }
+    addBillPhotos(doc, x);
     return doc.output("blob");
+  }
+  // each photo of the shop bill on its own A5 page after the expense bill
+  function addBillPhotos(doc, x) {
+    const ids = Array.isArray(x.ph) ? x.ph : [], C = PDF_C;
+    ids.forEach((id, n) => {
+      const W = 148, H = 210, M = 10;
+      doc.addPage("a5", "portrait");
+      if (classicPdf()) {
+        doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...C.BROWN); doc.text("PIRAMPADY SPORTS CLUB", M, 12);
+        doc.setDrawColor(...C.BROWN); doc.setLineWidth(0.6); doc.line(M, 16.4, W - M, 16.4);
+        doc.setFontSize(8.5); doc.setTextColor(...C.INK);
+      } else {
+        doc.setFillColor(...C.BAND); doc.rect(0, 0, W, 16.4, "F"); doc.setFillColor(...C.GOLD); doc.rect(0, 16.4, W, 0.7, "F");
+        doc.setFont("helvetica", "bold"); doc.setFontSize(11); doc.setTextColor(...C.CHAMP); doc.text("PIRAMPADY SPORTS CLUB", M, 10.6);
+        doc.setFontSize(8.5); doc.setTextColor(248, 244, 236);
+      }
+      doc.text(`Shop bill photo${ids.length > 1 ? ` ${n + 1} of ${ids.length}` : ""}  ·  ${x.no || ""}`, W - M, classicPdf() ? 12 : 10.6, { align: "right" });
+      const d = photoCache.get(id), top = 22, maxW = W - 2 * M, maxH = H - top - 14;
+      if (d) {
+        let iw = 3, ih = 4;
+        try { const pr = doc.getImageProperties(d); iw = pr.width; ih = pr.height; } catch (e) {}
+        const sc = Math.min(maxW / iw, maxH / ih), w = iw * sc, hh = ih * sc;
+        doc.addImage(d, "JPEG", (W - w) / 2, top, w, hh);
+        doc.setDrawColor(...C.LINE); doc.setLineWidth(0.25); doc.rect((W - w) / 2, top, w, hh, "S");
+      } else {
+        doc.setDrawColor(...C.LINE); doc.setLineWidth(0.3); doc.roundedRect(M, top, maxW, 40, 2, 2, "S");
+        doc.setFont("helvetica", "normal"); doc.setFontSize(9); doc.setTextColor(...C.GREY);
+        doc.text(doc.splitTextToSize("This photo isn't on this phone yet. Open the expense once while connected to the internet, then share the bill again.", maxW - 12), M + 6, top + 12);
+      }
+      doc.setFont("helvetica", "normal"); doc.setFontSize(7.5); doc.setTextColor(...C.GREY);
+      doc.text(`${x.desc || "Expense"}  ·  Rs. ${fmt(x.amount)}${x.t ? `  ·  ${longDate(x.t)}` : ""}`, W / 2, H - 7, { align: "center" });
+    });
   }
   function shareAccountSlip(i) {
     if (!pdfReady()) { toast("The PDF maker didn't load. Close and reopen the app."); return; }
@@ -5285,6 +5791,8 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
     else if (act === "don-new") openDonation(null);
     else if (act === "don-open") openDonation(b.dataset.id);
     else if (act === "ho-new") openHandover(null);
+    else if (act === "ntc-new") openNotice(null, b.dataset.type || "general");
+    else if (act === "ntc-open") openNotice(b.dataset.id);
     else if (act === "clash-open") openClash(b.dataset.id);
     else if (act === "clash-pick") resolveClash(b.dataset.id, b.dataset.side);
     else if (act === "conf-open") openConflict(b.dataset.id);
@@ -5404,7 +5912,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.15.1";
+  const APP_VERSION = "1.16.0";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty", BASE_KEY = "psc.syncbase.v1";
   const SEED = {};
@@ -5643,7 +6151,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
   }
   // records that two phones can change at the same time: when both changed one since they last synced, the newer
   // change is used for now and both are kept (conflict/...) for someone to choose
-  const CONFLICT_RE = /^(members|expenses|income|events|birthdays|handover|settings)\//;
+  const CONFLICT_RE = /^(members|expenses|income|events|birthdays|handover|settings|notice)\//;
   const canon = (d) => { if (!d || d._deleted) return "deleted"; const { _u, _r, ...b } = d; return JSON.stringify(b, (k, v) => (v && typeof v === "object" && !Array.isArray(v) ? Object.keys(v).sort().reduce((o, kk) => { o[kk] = v[kk]; return o; }, {}) : v)); };
   function mergeStores(local, remote, base) {
     const out = {}, clashes = [], both = [];
@@ -5704,6 +6212,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
         done = true;
       }
       if (!done) throw new SyncError("server", "Your devices kept saving at the same moment. Tap “Sync now” to try again.");
+      try { await photosUp(cfg); } catch (e) { if (e instanceof SyncError && e.kind === "auth") throw e; }
       cfg.joined = true;
       cfg.last = new Date().toISOString();
       saveCfg();
@@ -5718,6 +6227,27 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       SY.running = false;
       if (SY.again) { SY.again = false; scheduleSync(600); }
     }
+  }
+  // bill photos waiting on this phone go to photos/<id>.jpg in the private data repo (only photos used by an expense)
+  async function photosUp(c) {
+    const used = new Set();
+    for (const [k, d] of Object.entries(LocalDB.view ? LocalDB.view() : LocalDB.raw())) if (k.startsWith("expenses/") && d && !d._deleted && Array.isArray(d.ph)) d.ph.forEach((id) => used.add(id));
+    for (const id of used) {
+      if (!/^ph[a-z0-9]+$/.test(id)) continue;
+      const v = await phGet(id);
+      if (!v || !v.d || v.up) continue;
+      const res = await gh(c, `/contents/photos/${id}.jpg`, { method: "PUT", body: JSON.stringify({ message: `Bill photo from ${deviceName()}`, content: String(v.d).replace(/^data:image\/\w+;base64,/, "") }) });
+      if (res.ok || res.status === 422) { await phPut(id, { d: v.d, up: 1 }); continue; }   // 422: it is already there
+      throw ghErr(res);
+    }
+  }
+  // one photo from the private data repo, as an image the app can show and print
+  async function photoFetch(id) {
+    if (!cfg || !/^ph[a-z0-9]+$/.test(id) || navigator.onLine === false) return null;
+    const res = await gh(cfg, `/contents/photos/${id}.jpg`);
+    if (!res.ok) return null;
+    const j = await res.json();
+    return j && j.content ? "data:image/jpeg;base64," + String(j.content).replace(/\s/g, "") : null;
   }
   function scheduleSync(ms) { if (!cfg) return; clearTimeout(SY.timer); SY.timer = setTimeout(syncNow, ms == null ? 2500 : ms); }
   LocalDB.onLocalChange(() => {
@@ -5955,7 +6485,7 @@ html:root[data-style="pearl"] { --nav-bg: rgba(255, 255, 255, .72); --hero-bg: r
       let data = null;
       try { data = JSON.parse(fr.result); } catch (e) {}
       const st = data && data.app === "pirampady-sc" && data.store && typeof data.store === "object" ? data.store : null;
-      const valid = st && Object.keys(st).every((k) => /^(members|payments|electricity|settings|expenses|income|birthdays|events|log|cash|clash|conflict|approve|handover)\/[A-Za-z0-9_.:@+~-]+$/.test(k) && st[k] && typeof st[k] === "object");
+      const valid = st && Object.keys(st).every((k) => /^(members|payments|electricity|settings|expenses|income|birthdays|events|log|cash|clash|conflict|approve|handover|notice)\/[A-Za-z0-9_.:@+~-]+$/.test(k) && st[k] && typeof st[k] === "object");
       if (!valid) { showErr("bakErr", "That file isn't a Pirampady SC backup. Choose the .json file made with “Save backup file”."); return; }
       if (moneyProblem(st)) { showErr("bakErr", "That backup file has amounts that aren't whole rupees (it may have been edited by hand), so it wasn't restored. Use a backup made by the app."); return; }
       const c = countRecords(st);

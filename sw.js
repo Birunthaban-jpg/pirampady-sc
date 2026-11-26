@@ -1,5 +1,5 @@
 // Offline support for Pirampady SC Subscriptions. Bump VERSION on every release.
-const VERSION = "1.15.1";
+const VERSION = "1.16.0";
 const CACHE = "psc-" + VERSION;
 const FILES = [
   "./",
@@ -21,6 +21,8 @@ const FILES = [
   "fonts/barlow-latin-500-normal.woff2",
   "fonts/barlow-latin-600-normal.woff2",
   "fonts/barlow-latin-700-normal.woff2",
+  "fonts/noto-sans-tamil-400.woff2",
+  "fonts/noto-sans-tamil-700.woff2",
   "fonts/sig-1.woff2",
   "fonts/sig-2.woff2",
   "fonts/sig-3.woff2",
