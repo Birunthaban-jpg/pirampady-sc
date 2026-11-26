@@ -1131,6 +1131,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
 .ntc-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
 .ntc-grid .field { margin: 0; }
 .ntc-quick { display: flex; flex-wrap: wrap; gap: 8px; padding: 14px; }
+.ntc-more { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
 </style>
 </head>
 <body>
@@ -1549,10 +1550,13 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     <p class="hint" id="ntcHint">The wording is filled in for you. Change anything you like before you share it.</p>
     <button type="button" class="btn sm" id="ntcReset">Fill in the wording again</button>
     <p class="err" id="ntcErr" hidden></p>
-    <button type="submit" class="btn primary big" id="ntcShare">Save and share PDF</button>
+    <button type="submit" class="btn primary big" id="ntcShare">Save and share picture</button>
+    <div class="ntc-more">
+      <button type="button" class="btn" id="ntcPdf">Share as PDF</button>
+      <button type="button" class="btn" id="ntcCopy">Copy as text</button>
+    </div>
     <div class="foot-row">
       <button type="button" class="btn danger" id="ntcDel" hidden>Delete</button>
-      <button type="button" class="btn" id="ntcCopy">Copy for WhatsApp</button>
       <button type="button" class="btn" id="ntcSave">Save only</button>
     </div>
   </form>
@@ -2448,7 +2452,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     drawNtcFields();
     if (n) { $("ntcEnT").value = (n.en && n.en.title) || ""; $("ntcEnB").value = (n.en && n.en.body) || ""; $("ntcTaT").value = (n.ta && n.ta.title) || ""; $("ntcTaB").value = (n.ta && n.ta.body) || ""; }
     else fillNtcText(true);
-    tamilFontReady();
+    tamilFontReady(); noticeImagesReady();
     $("ntcDlg").showModal();
   }
   $("ntcTypes").addEventListener("click", (ev) => {
@@ -2502,14 +2506,119 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     if (n.ta) out.push(`*${n.ta.title}*\n\n${n.ta.body}`);
     return out.join("\n\n- - -\n\n") + "\n\n_Pirampady Sports Club_";
   }
+  // the main button: the announcement as a picture (WhatsApp shows it straight in the chat)
   $("ntcForm").addEventListener("submit", async (ev) => {
     ev.preventDefault();
+    const n = saveNotice(); if (!n) return;
+    await tamilFontReady();
+    $("ntcDlg").close(); render();
+    shareNoticeImage(n);
+  });
+  $("ntcPdf").addEventListener("click", async () => {
     const n = saveNotice(); if (!n) return;
     if (!pdfReady()) { toast("Saved. The PDF maker didn't load: close and reopen the app."); return; }
     await tamilFontReady();
     $("ntcDlg").close(); render();
     sharePdf(buildNoticePdf(n), noticeName(n));
   });
+  function shareNoticeImage(n) {
+    let blob = null;
+    try {
+      const url = buildNoticeImage(n).toDataURL("image/jpeg", 0.9), bin = atob(url.split(",")[1]), buf = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+      blob = new Blob([buf], { type: "image/jpeg" });
+    } catch (e) { toast("The picture couldn't be made. Try Share as PDF."); return; }
+    deliverFile(blob, noticeName(n).replace(/\.pdf$/, ".jpg"), "image/jpeg", true).then((how) => {
+      if (how === "downloaded") toast("Picture saved. Send it in WhatsApp from your photos or downloads.");
+    }).catch(() => toast("The picture couldn't be shared. Try again."));
+  }
+  // pictures used on the announcement (logo, signatures), decoded ahead so the picture is drawn at once
+  const imgCache = new Map();
+  function imgOf(url) {
+    if (!url) return null;
+    let im = imgCache.get(url);
+    if (!im) { im = new Image(); im.src = url; imgCache.set(url, im); }
+    return im.complete && im.naturalWidth ? im : null;
+  }
+  const noticeImagesReady = () => { imgOf(pdfLogo()); imgOf(sigImg.url); imgOf(sigImg2.url); };
+  // The same announcement as the PDF, drawn as a picture (A5 shape, about 1,240 px wide) in the chosen bill style.
+  // A long announcement makes a taller picture instead of a second page.
+  function buildNoticeImage(n) {
+    const C = PDF_C, k = 8.4, W = 148, M = 14, wMm = W - 2 * M, top = 44, old = classicPdf();
+    const rgb = (c) => `rgb(${c.join(",")})`, mm = (v) => v * k, ptmm = (pt) => pt * 0.3528;
+    const font = (pt, bold) => `${bold ? 700 : 400} ${(ptmm(pt) * k).toFixed(1)}px "Barlow", "Noto Sans Tamil", "Tamil Sangam MN", "Latha", sans-serif`;
+    const meas = document.createElement("canvas").getContext("2d");
+    const wrap = (txt, pt, bold) => {
+      meas.font = font(pt, bold);
+      const out = [], maxW = mm(wMm);
+      for (const para of String(txt).split("\n")) {
+        if (!para.trim()) { out.push(""); continue; }
+        let cur = "";
+        for (const w of para.split(/\s+/)) { const t = cur ? cur + " " + w : w; if (!cur || meas.measureText(t).width <= maxW) cur = t; else { out.push(cur); cur = w; } }
+        out.push(cur);
+      }
+      return out;
+    };
+    const parts = [n.en, n.ta].filter(Boolean);
+    const layout = (pt) => {
+      const items = [];
+      parts.forEach((p, i) => {
+        if (i) items.push({ h: 9, rule: true });
+        if (p.title) { const ls = wrap(p.title, pt * 1.5, true); items.push({ lines: ls, pt: pt * 1.5, bold: true, col: C.BROWN, h: ls.length * ptmm(pt * 1.5) * 1.45 }); items.push({ h: pt * 0.32 }); }
+        for (const para of String(p.body || "").split(/\n\n+/)) if (para.trim()) { const ls = wrap(para.trim(), pt, false); items.push({ lines: ls, pt, bold: false, col: C.INK, h: ls.length * ptmm(pt) * 1.45 }); items.push({ h: pt * 0.3 }); }
+      });
+      return items;
+    };
+    let items = null;
+    for (const pt of [12, 11, 10, 9.2]) { items = layout(pt); if (items.reduce((t, it) => t + it.h, 0) <= 176 - top) break; }
+    const bodyH = items.reduce((t, it) => t + it.h, 0), H = Math.max(210, Math.ceil(top + bodyH + 36));
+    const cv = document.createElement("canvas"); cv.width = Math.round(mm(W)); cv.height = Math.round(mm(H));
+    const g = cv.getContext("2d");
+    g.fillStyle = "#fff"; g.fillRect(0, 0, cv.width, cv.height);
+    const text = (t, x, y, pt, bold, col, align) => { g.font = font(pt, bold); g.fillStyle = rgb(col); g.textAlign = align || "left"; g.textBaseline = "alphabetic"; g.fillText(t, mm(x), mm(y)); };
+    const LOGO = imgOf(pdfLogo());
+    // header, as on the PDF
+    if (old) {
+      if (LOGO) g.drawImage(LOGO, mm(M), mm(8), mm(24), mm(24 * 372 / 420));
+      const tx = LOGO ? M + 28 : M;
+      text("PIRAMPADY SPORTS CLUB", tx, 16.4, 14.5, true, C.BROWN);
+      text(NTC_HEAD[n.type] || "Notice", tx, 22.6, 10.5, true, C.INK);
+      text(`Issued ${n.t ? longDate(n.t) : issuedToday()}`, tx, 27.8, 8, false, C.GREY);
+      g.fillStyle = rgb(C.BROWN); g.fillRect(mm(M), mm(32.2), mm(wMm), mm(0.8)); g.fillRect(mm(M), mm(33.6), mm(wMm), mm(0.25));
+    } else {
+      g.fillStyle = rgb(C.BAND); g.fillRect(0, 0, cv.width, mm(31));
+      g.fillStyle = rgb(C.GOLD); g.fillRect(0, mm(31), cv.width, mm(0.9));
+      const cx = M + 10.5, cy = 15.5, r = 10;
+      g.beginPath(); g.arc(mm(cx), mm(cy), mm(r + 0.9), 0, Math.PI * 2); g.strokeStyle = rgb(C.GOLD); g.lineWidth = mm(0.55); g.stroke();
+      g.beginPath(); g.arc(mm(cx), mm(cy), mm(r), 0, Math.PI * 2); g.fillStyle = "#fff"; g.fill();
+      if (LOGO) { const w = r * 1.44, hh = w * 372 / 420; g.drawImage(LOGO, mm(cx - w / 2), mm(cy - hh / 2), mm(w), mm(hh)); }
+      text("PIRAMPADY SPORTS CLUB", M + 26, 13.4, 14.5, true, C.CHAMP);
+      text(NTC_HEAD[n.type] || "Notice", M + 26, 20, 10, true, [248, 244, 236]);
+      text(`Issued ${n.t ? longDate(n.t) : issuedToday()}`, M + 26, 25.4, 7.6, false, C.MUTE);
+    }
+    if (LOGO) { g.globalAlpha = 0.07; g.drawImage(LOGO, mm((W - 92) / 2), mm(70), mm(92), mm(92 * 372 / 420)); g.globalAlpha = 1; }
+    // the text
+    let yy = top;
+    for (const it of items) {
+      if (it.rule) { g.fillStyle = rgb(C.GOLD); g.fillRect(mm(M + 24), mm(yy + 4.3), mm(wMm - 48), mm(0.5)); }
+      if (it.lines) { const lh = ptmm(it.pt) * 1.45; it.lines.forEach((ln, j) => { if (ln) text(ln, M, yy + ptmm(it.pt) * 1.02 + j * lh, it.pt, it.bold, it.col); }); }
+      yy += it.h;
+    }
+    // footer: both signatures, the club and the date
+    const st = settings(), mine = signerFor(n.by), other = mine === 1 ? 2 : 1;
+    const nameOfSig = (w) => ((w === 1 ? st.sig.text : st.sig2.text) || "").trim();
+    g.fillStyle = rgb(C.LINE); g.fillRect(mm(M), mm(H - 32), mm(wMm), mm(0.3));
+    const sig = (x, which, caption) => {
+      const y = H - 16, w = 46, sg = which === 2 ? sigImg2 : sigImg, im = imgOf(sg.url);
+      if (im && sg.ratio) { let iw = w * 0.92, ih = iw * sg.ratio; if (ih > 11) { ih = 11; iw = ih / sg.ratio; } g.drawImage(im, mm(x + (w - iw) / 2), mm(y - ih + 1.2), mm(iw), mm(ih)); }
+      g.strokeStyle = rgb(C.GREY); g.lineWidth = mm(0.25); g.setLineDash([mm(0.8), mm(0.8)]); g.beginPath(); g.moveTo(mm(x), mm(y)); g.lineTo(mm(x + w), mm(y)); g.stroke(); g.setLineDash([]);
+      text(caption, x + w / 2, y + 3.6, 7.2, false, C.GREY, "center");
+    };
+    sig(W - M - 46, mine, nameOfSig(mine) || n.by || "For the club");
+    if (nameOfSig(other)) sig(M, other, nameOfSig(other));
+    text(`For Pirampady Sports Club  ·  Issued ${n.t ? longDate(n.t) : issuedToday()}`, W / 2, H - 6.5, 8.6, true, C.BROWN, "center");
+    return cv;
+  }
   $("ntcSave").addEventListener("click", () => { const n = saveNotice(); if (!n) return; $("ntcDlg").close(); render(); toast("Announcement saved. Open it from Announcements to share it."); });
   $("ntcCopy").addEventListener("click", () => { const n = noticeFromForm(); if (!n) return; copyText(noticeText(n), "Copied. Paste it in WhatsApp."); });
   $("ntcDel").addEventListener("click", () => {
@@ -5914,7 +6023,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.16.1";
+  const APP_VERSION = "1.16.2";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty", BASE_KEY = "psc.syncbase.v1";
   const SEED = {};
