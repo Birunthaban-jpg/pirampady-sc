@@ -1162,7 +1162,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
         <span id="yearLbl" class="num">2026</span>
         <button type="button" data-act="ynext" aria-label="Next year">›</button>
       </div>
-      <button type="button" class="btn primary" id="pdfBtn" data-act="pdf">
+      <button type="button" class="btn primary" id="pdfBtn" data-act="pdf-file">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
         Register PDF
       </button>
@@ -2836,9 +2836,11 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
   function reportsHTML(ms) {
     const y = S.year, i = S.month;
     const tiles = [
-      tileHTML("doc", "Yearly register", `Every member, month by month, with both signatures`, `<button type="button" class="btn primary" data-act="pdf">${icon("download")}Download PDF</button>`),
+      tileHTML("doc", "Yearly register", `Every member, month by month, with both signatures`, sendAs() === "picture"
+        ? `<span class="inrow"><button type="button" class="btn primary" data-act="pdf">${icon("send")}Share picture</button><button type="button" class="btn" data-act="pdf-file">${icon("download")}PDF</button></span>`
+        : `<button type="button" class="btn primary" data-act="pdf">${icon("download")}Download PDF</button>`),
       tileHTML("send", "Member slips", "Each member's payments and what they still owe", `<button type="button" class="btn" data-act="slips">Open slips</button>`),
-      tileHTML("statement", "Monthly account", "Money in, money spent and the balance in hand", `<span class="inrow"><select id="acctMonth" aria-label="Month for the account">${MONTHS_FULL.map((mn, k) => `<option value="${k}"${k === i ? " selected" : ""}>${mn} ${y}</option>`).join("")}</select><button type="button" class="btn" data-act="acct-sel">PDF</button></span>`),
+      tileHTML("statement", "Monthly account", "Money in, money spent and the balance in hand", `<span class="inrow"><select id="acctMonth" aria-label="Month for the account">${MONTHS_FULL.map((mn, k) => `<option value="${k}"${k === i ? " selected" : ""}>${mn} ${y}</option>`).join("")}</select><button type="button" class="btn" data-act="acct-sel">${sendAs() === "picture" ? "Share" : "PDF"}</button></span>`),
       tileHTML("receipt", "Expense bills", "Open any expense to share its bill", `<button type="button" class="btn" data-act="view" data-v="expenses">Expenses</button>`),
       tileHTML("trophy", "Event reports", "Collections, costs and the club's share", `<button type="button" class="btn" data-act="view" data-v="bday">Events</button>`),
       tileHTML("table", "Export for Excel", "Every payment as a .csv file", `<button type="button" class="btn" data-act="csv">Export CSV</button>`),
@@ -4928,6 +4930,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     try { localStorage.setItem("psc.sendAs", b.dataset.sendas); } catch (e) {}
     drawSendAs();
     if (b.dataset.sendas === "picture") loadPdfJs().catch(() => {});
+    render();
   });
   // get the picture maker ready in the background, so the first bill is quick
   setTimeout(() => { if (sendAs() === "picture") loadPdfJs().catch(() => {}); }, 4000);
@@ -5927,7 +5930,8 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     markSent(m.id);
   }
 
-  async function downloadPdf() {
+  // the yearly register: a picture when "Send bills as" is Picture (asPdf: always the PDF, for printing)
+  async function downloadPdf(asPdf) {
     if (!S.membersLoaded || !S.payLoaded) { toast("Wait for the register to finish loading."); return; }
     if (!window.jspdf || !window.jspdf.jsPDF || !window.jspdf.jsPDF.API.autoTable) { toast("The PDF maker didn't load. Check your connection and reload the page."); return; }
     const btn = $("pdfBtn");
@@ -5935,6 +5939,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     try {
       const blob = buildPdf();
       const day = `${NOW.getDate()}${MONTHS[NOW.getMonth()]}`;
+      if (!asPdf && sendAs() === "picture") { sharePdf(blob, `Pirampady_SC_Register_${S.year}_${day}.pdf`); return; }
       const how = await deliverFile(blob, `Pirampady_SC_Subscriptions_${S.year}_${day}.pdf`, "application/pdf");
       if (how === "downloaded") toast("PDF saved to your Downloads. You can now send it to the members.");
     } catch (e) {
@@ -6009,6 +6014,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     else if (act === "members") { if (!S.db) { toast("Members can't load in this view."); return; } openMembers(); }
     else if (act === "settings") { if (!S.canWrite || !S.db) { toast("You can view this register, but you can't change its settings."); return; } openSettings(); }
     else if (act === "pdf") downloadPdf();
+    else if (act === "pdf-file") downloadPdf(true);
     else if (act === "sync") openSync();
   });
   for (const d of document.querySelectorAll("dialog.dlg")) {
@@ -6090,7 +6096,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.17.0";
+  const APP_VERSION = "1.17.1";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty", BASE_KEY = "psc.syncbase.v1";
   const SEED = {};
