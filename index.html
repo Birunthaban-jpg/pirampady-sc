@@ -1502,6 +1502,11 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
       <p class="hint">Dues are counted from this month up to the current month. A member's own “pays from” month in Members overrides it.</p>
     </div>
     <div class="field">
+      <span class="lbl2">Send bills as</span>
+      <div class="filter" id="sendAsPick" role="group" aria-label="Send bills as"></div>
+      <p class="hint">On this phone. A picture shows straight in the WhatsApp chat; a PDF is better for printing. The register and “all slips to print” are always PDFs.</p>
+    </div>
+    <div class="field">
       <label for="myName">Your name on this phone</label>
       <input id="myName" autocomplete="off" autocapitalize="words" placeholder="Your first name">
       <p class="hint">Kept on this phone only. It goes on the payments you record, your receipts and the change history.</p>
@@ -2519,7 +2524,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     if (!pdfReady()) { toast("Saved. The PDF maker didn't load: close and reopen the app."); return; }
     await tamilFontReady();
     $("ntcDlg").close(); render();
-    sharePdf(buildNoticePdf(n), noticeName(n));
+    sharePdf(buildNoticePdf(n), noticeName(n), { pdf: true });
   });
   function shareNoticeImage(n) {
     let blob = null;
@@ -4913,10 +4918,19 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     $("sig2Text").value = st.sig2.text;
     sig2StyleSel = st.sig2.style;
     drawSigChoices();
-    billStyleSel = st.billStyle; drawBillPick();
+    billStyleSel = st.billStyle; drawBillPick(); drawSendAs();
     $("setDlg").showModal();
   }
   let billStyleSel = "elite";
+  function drawSendAs() { $("sendAsPick").innerHTML = [["picture", "Picture"], ["pdf", "PDF"]].map(([id, n]) => `<button type="button" data-sendas="${id}" aria-pressed="${sendAs() === id}">${n}</button>`).join(""); }
+  $("sendAsPick").addEventListener("click", (ev) => {
+    const b = ev.target.closest("[data-sendas]"); if (!b) return;
+    try { localStorage.setItem("psc.sendAs", b.dataset.sendas); } catch (e) {}
+    drawSendAs();
+    if (b.dataset.sendas === "picture") loadPdfJs().catch(() => {});
+  });
+  // get the picture maker ready in the background, so the first bill is quick
+  setTimeout(() => { if (sendAs() === "picture") loadPdfJs().catch(() => {}); }, 4000);
   function drawBillPick() {
     $("billPick").innerHTML = [["elite", "Elite", "Black band and champagne gold (now)"], ["classic", "Classic", "White with club brown (the earlier bills)"]]
       .map(([id, name, note]) => `<button type="button" class="styleopt" data-bill-pick="${id}" aria-pressed="${id === billStyleSel}"><span class="sw ${id === "elite" ? "sw-elite" : "sw-billc"}" aria-hidden="true"><i></i><i></i></span><b>${name}</b><small>${note}</small></button>`).join("");
@@ -5848,8 +5862,61 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
     if (!pdfReady()) { toast("The PDF maker didn't load. Close and reopen the app."); return; }
     sharePdf(buildAccountSlip(i), `Pirampady_SC_account_${MONTHS[i]}_${S.year}.pdf`);
   }
-  function sharePdf(blob, name) {
+  /* ---------- bills as pictures: each page of the bill's PDF is drawn with pdf.js (Apache-2.0) and sent as a JPEG ---------- */
+  const sendAs = () => { try { return localStorage.getItem("psc.sendAs") === "pdf" ? "pdf" : "picture"; } catch (e) { return "picture"; } };
+  let pdfjsP = null;
+  function loadPdfJs() {
+    if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+    if (!pdfjsP) pdfjsP = new Promise((res, rej) => {
+      const sc = document.createElement("script"); sc.src = "vendor/pdf.min.js";
+      sc.onload = () => { try { window.pdfjsLib.GlobalWorkerOptions.workerSrc = "vendor/pdf.worker.min.js"; res(window.pdfjsLib); } catch (e) { pdfjsP = null; rej(e); } };
+      sc.onerror = (e) => { pdfjsP = null; rej(e); };
+      document.head.appendChild(sc);
+    });
+    return pdfjsP;
+  }
+  // one sharp picture per page (about 8 pixels per millimetre: an A5 bill is 1,240 pixels wide)
+  async function pdfToPictures(blob, name) {
+    const lib = await loadPdfJs();
+    const pdf = await lib.getDocument({ data: new Uint8Array(await blob.arrayBuffer()), isEvalSupported: false }).promise;
+    const files = [], base = name.replace(/\.pdf$/i, ""), n = Math.min(pdf.numPages, 8);
+    for (let k = 1; k <= n; k++) {
+      const page = await pdf.getPage(k), v1 = page.getViewport({ scale: 1 });
+      const px = Math.min(2400, Math.max(900, Math.round((v1.width / 72) * 25.4 * 8.4)));
+      const vp = page.getViewport({ scale: px / v1.width });
+      const c = document.createElement("canvas"); c.width = Math.round(vp.width); c.height = Math.round(vp.height);
+      const g = c.getContext("2d"); g.fillStyle = "#fff"; g.fillRect(0, 0, c.width, c.height);
+      await page.render({ canvasContext: g, viewport: vp }).promise;
+      const jb = await new Promise((r) => c.toBlob(r, "image/jpeg", 0.9));
+      files.push(new File([jb], n > 1 ? `${base}_${k}.jpg` : `${base}.jpg`, { type: "image/jpeg" }));
+    }
+    try { pdf.destroy(); } catch (e) {}
+    return files;
+  }
+  // shares the pictures; if the phone wants a fresh tap (drawing them took a moment), a Share button appears
+  async function sharePictures(files) {
+    if (navigator.canShare && navigator.canShare({ files })) {
+      try { await navigator.share({ files }); return "shared"; }
+      catch (e) {
+        if (e && e.name === "AbortError") return "cancelled";
+        if (e && e.name === "NotAllowedError") { toast(files.length > 1 ? `${files.length} pictures ready.` : "Picture ready.", () => { navigator.share({ files }).catch(() => {}); }, "Share"); return "waiting"; }
+      }
+    }
+    for (const f of files) {
+      const url = URL.createObjectURL(f), a = document.createElement("a");
+      a.href = url; a.download = f.name; a.rel = "noopener"; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    }
+    return "downloaded";
+  }
+  // every bill goes through here: as pictures or as a PDF, as chosen in Settings (opts.pdf: always a PDF)
+  function sharePdf(blob, name, opts) {
     if (typeof deliverFile !== "function") { toast("PDFs can't be shared from here."); return; }
+    if (sendAs() === "picture" && !(opts && opts.pdf)) {
+      pdfToPictures(blob, name).then(sharePictures).then((how) => { if (how === "downloaded") toast("Picture saved to your Downloads. Attach it in the WhatsApp chat."); })
+        .catch(() => toast("The picture couldn't be made. You can share the PDF instead.", () => { deliverFile(blob, name, "application/pdf", true).catch(() => {}); }, "Share PDF"));
+      return;
+    }
     deliverFile(blob, name, "application/pdf", true).then((how) => {
       if (how === "downloaded") toast("PDF saved to your Downloads. Attach it in the member's WhatsApp chat.");
     }).catch(() => toast("The PDF couldn't be shared. Try again."));
@@ -6023,7 +6090,7 @@ textarea[lang="ta"], input[lang="ta"] { font-family: "Barlow", "Noto Sans Tamil"
      Every record carries _u (last change, ms). Deleted records become
      {_deleted: true, _u} so a deletion can travel to the other device.
      ====================================================================== */
-  const APP_VERSION = "1.16.2";
+  const APP_VERSION = "1.17.0";
   const STORE_KEY = "psc.store.v1", BAK_KEY = "psc.lastBackup", CHG_KEY = "psc.lastChange";
   const SYNC_KEY = "psc.sync.v1", DIRTY_KEY = "psc.sync.dirty", BASE_KEY = "psc.syncbase.v1";
   const SEED = {};
